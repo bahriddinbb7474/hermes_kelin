@@ -1,6 +1,7 @@
 # Database
 
-Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md`
+Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (DDL всех таблиц — §13).
+Реализация: `backend/sql/001_init.sql` (схема + seed категорий, идемпотентно) в ветке `feature-hermes-mariyam-mvp`; проверено тестами, включая границу суток Asia/Tashkent (`TZ_BOUNDARY_PASSED`).
 
 ## Назначение
 
@@ -23,6 +24,12 @@ PostgreSQL хранит точные данные. Hermes memory хранит т
 
 - Напоминания: живут в Hermes cron/profile и попадают в backup через копию профиля.
 - `daily_reports`: не обязательна. Отчёт 19:30 формирует Hermes из `get_admin_report_data`. Архив `sent_reports` можно добавить позже, если понадобится.
+
+## Миграции и seed (ТЗ §13.2)
+
+- SQL-файлы нумерованные (`001_init.sql`, `002_*.sql`), каждый идемпотентен (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`).
+- `docker-entrypoint-initdb.d` применяется только при первом создании volume; последующие изменения схемы применяются вручную через `psql -f` (команда — в deploy-доке).
+- До первого реального вызова tools в `users` должны существовать Ойижон и Бахриддин ака: через tool `ensure_user` или документированный SQL-seed.
 
 ## Валюта и суммы
 

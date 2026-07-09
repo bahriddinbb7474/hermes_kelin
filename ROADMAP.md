@@ -2,17 +2,19 @@
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md`
 
-## MVP этапы
+## MVP этапы (нумерация = ТЗ §21)
 
-1. Подготовка данных: доступы, Telegram IDs, voice samples, категории, бюджет.
-2. VPS + Hermes + Telegram: установка, профиль, allowlist, автозапуск.
-3. Skill Мариям: стиль, язык, onboarding, правило кириллицы.
-4. Голос: тест STT, выбор TTS/LLM, budget estimate, `log_usage_cost`.
-5. Backend tools + БД: PostgreSQL, MCP tools, категории, UTC/Asia-Tashkent правила.
-6. Бухгалтерия: расходы, доходы, отчёты, баланс, исправление и удаление.
-7. Hermes cron: напоминания, утро/вечер, новости, погода, намаз, heartbeat.
-8. Admin reports + safety: отчёт 19:30, health alerts, `alert_events`.
-9. Backup/restore/monitoring: encrypted backup, real restore test, reboot recovery.
+| Этап | Что | Статус (2026-07-10) |
+|---|---|---|
+| 0 | Подготовка данных: доступы, Telegram IDs, voice samples, категории, бюджет | ⬜ не начат — блокирует 1–3 |
+| 1 | VPS + Hermes + Telegram: установка, профиль, allowlist, автозапуск | ⬜ не начат (VPS не трогать без разрешения) |
+| 2 | Skill Мариям: стиль, язык, onboarding, кириллица | 🟡 skill написан (`skills/mariyam/SKILL.md`), не установлен в Hermes, AC не прогнаны |
+| 3 | Голос: тест STT на реальном голосе, выбор TTS/LLM, бюджет | ⬜ не начат — нужны voice samples из Этапа 0 |
+| 4 | Backend tools (MCP) + БД | ✅ сделано и проверено (19 tools, 4 тест-маркера, ТЗ v3.1 AC) |
+| 5 | Бухгалтерия: расходы/доходы/отчёты/баланс/исправление/удаление | ✅ backend-часть готова; 🟡 сквозная проверка через Hermes — после Этапа 1 |
+| 6 | Hermes cron: напоминания, утро/вечер, новости, погода, намаз | ⬜ не начат — см. `CRON_AND_REMINDERS.md` |
+| 7 | Admin reports + safety: отчёт 19:30, alerts, recall 100% | ⬜ не начат — backend-tools готовы, нужен Hermes |
+| 8 | Backup/restore/monitoring | ⬜ не начат — `backup_data`/`get_backup_status` намеренно возвращают `NOT_CONFIGURED` |
 
 ## После MVP
 

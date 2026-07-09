@@ -2,6 +2,32 @@
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md`
 
+## Чек-лист настройки (Этапы 1–2, по порядку)
+
+Предварительно нужны (Этап 0): Telegram Bot Token, Telegram ID Ойижон и Бахриддин ака, доступ к VPS.
+
+1. Установить Hermes Agent на VPS по официальной документации (репозиторий NousResearch; ссылки — в конце ТЗ). Зафиксировать версию: `hermes --version` — от неё зависят точные имена конфиг-полей ниже.
+2. Создать профиль `mariyam_oyijon`.
+3. Подключить Telegram Gateway: bot token — только через env/конфиг вне git.
+4. Настроить **allowlist**: только два Telegram ID (Ойижон, Бахриддин ака). Проверить негативный тест: третий ID получает `Кечирасиз, бу шахсий ёрдамчи.` и не может вызвать tools.
+5. Установить skill из `skills/mariyam/SKILL.md` в профиль.
+6. Зарегистрировать backend как **stdio MCP-сервер** (точный синтаксис сверить с документацией установленной версии Hermes):
+   ```yaml
+   mcp:
+     servers:
+       mariyam_backend:
+         command: python
+         args: ["-m", "backend"]
+         cwd: /opt/hermes-mariyam
+         env:
+           MCP_TRANSPORT: stdio
+           DATABASE_URL: ${DATABASE_URL}   # из /opt/hermes-mariyam-secrets/backend.env
+   ```
+7. Проверить `hermes tools`: видны все 19 tools (список — `TOOLS_CONTRACTS.md`). Выдать tool-permissions.
+8. Seed пользователей через `ensure_user` (или SQL из `deploy/DEPLOY.md`); записать полученные `user_id` (Ойижон и админа) в память профиля — tools принимают именно `user_id`, не telegram_id.
+9. Настроить автозапуск Hermes (systemd user-service + `loginctl enable-linger`), проверить подъём после `reboot`.
+10. Прогнать AC Этапа 2: 20 тест-фраз → ответы только узбекская кириллица (0 латинских букв).
+
 ## Профиль
 
 Основной профиль Hermes: `mariyam_oyijon`.
