@@ -23,3 +23,10 @@ Hermes/Mariyam — персональный Telegram ИИ-агент для Ой
 ## MVP в одном абзаце
 
 Настроить Hermes profile `mariyam_oyijon`, Telegram allowlist, skill личности Мариям, память, STT/TTS тест на реальном голосе, маленький MCP backend с PostgreSQL для точных данных, бухгалтерию с исправлением/удалением, Hermes cron для напоминаний и отчётов, safety alerts, backup/restore и мониторинг.
+
+## Развёртывание и документация
+
+- `deploy/DEPLOY.md` — инструкция deploy (локальная проверка на Windows + VPS Ubuntu 24.04), команды будущего запуска/отката, секреты, FORBIDDEN-секция (изоляция от Time-Agent).
+- `deploy/hermes-mariyam.service` — systemd unit template (`After/Requires=docker.service`, `Restart=always`, запуск через `docker compose up -d`, остановка `docker compose down`, секреты через `/opt/hermes-mariyam-secrets/backend.env`).
+- `backend/.env.example` — пример переменных окружения (только placeholder, без реального пароля).
+- `tests/run_tests.py` — постоянные тесты (`ALL_TOOL_TESTS_PASSED`, `TZ_BOUNDARY_PASSED`), запуск из репозитория.
