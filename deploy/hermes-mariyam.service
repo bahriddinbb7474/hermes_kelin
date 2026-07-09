@@ -4,20 +4,20 @@
 #   sudo install -d -m 700 /opt/hermes-mariyam-secrets
 #   sudo install -m 600 /path/to/real-backend.env /opt/hermes-mariyam-secrets/backend.env
 #   sudo cp deploy/hermes-mariyam.service /etc/systemd/system/
+#   sudo systemd-analyze verify /etc/systemd/system/hermes-mariyam.service
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now hermes-mariyam.service
 #
-# Этот файл — шаблон. Реальные токены/пароли НЕ вписывать сюда; они в
-# /opt/hermes-mariyam-secrets/backend.env (читается docker compose через env_file).
+# Реальные токены/пароли НЕ вписывать сюда; они в
+# /opt/hermes-mariyam-secrets/backend.env. EnvironmentFile кладёт их в env процесса,
+# docker compose использует интерполяцию переменных окружения.
 #
-# Ограничения (раздел 17 ТЗ, Шаг 5):
-#   - After/Requires docker.service (backend живёт в docker compose)
-#   - Restart=always
-#   - запуск: docker compose up -d ; остановка: docker compose down
-#   - НЕ трогать /opt/time-agent, time_agent_bot, Time-Agent .env, SQLite volume, logs, backups
+# Type=oneshot + RemainAfterExit=yes: systemd только поднимает/останавливает compose.
+# Перезапуск контейнеров обеспечивает docker compose restart: unless-stopped + docker.service.
+# НЕ трогать /opt/time-agent, time_agent_bot, Time-Agent .env, SQLite volume, logs, backups.
 
 [Unit]
-Description=Hermes/Mariyam backend (MCP + PostgreSQL via docker compose)
+Description=Hermes/Mariyam PostgreSQL via docker compose
 After=docker.service
 Requires=docker.service
 
@@ -25,14 +25,9 @@ Requires=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/hermes-mariyam
-
-# Секреты только из изолированного env_file (не в unit-файле)
 EnvironmentFile=/opt/hermes-mariyam-secrets/backend.env
-
-ExecStart=/usr/bin/docker compose up -d
+ExecStart=/usr/bin/docker compose up -d hermes_mariyam_postgres
 ExecStop=/usr/bin/docker compose down
-
-Restart=always
 TimeoutStartSec=300
 
 [Install]

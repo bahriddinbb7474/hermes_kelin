@@ -7,13 +7,10 @@ mcp>=1.2.0
 # PostgreSQL async driver
 asyncpg>=0.29.0
 
-# HTTP transport (optional, for docker-compose / remote Hermes)
+# HTTP transport (optional, for docker-compose / fallback)
 uvicorn>=0.30.0
 starlette>=0.36.0
 anyio>=4.4.0
-
-# env / config
-python-dotenv>=1.0.0
 
 # date/time (Asia/Tashkent handling)
 tzdata>=2024.1

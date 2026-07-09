@@ -1,15 +1,17 @@
 """Hermes/Mariyam backend — MCP server exposing storage tools (раздел 15).
-Транспорт: stdio. Backend only validates/stores/returns facts — no intent logic.
+Транспорт: stdio по умолчанию. Backend only validates/stores/returns facts — no intent logic.
 Источник истины: TZ_Hermes_Mariyam_FINAL_v3_0.md.
 """
 import json
+import os
+from contextlib import asynccontextmanager
+
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 import mcp.types as types
-import os
 
 from . import db
-from .config import get_pool, DATABASE_URL
+from .config import get_pool
 
 app = Server("hermes-mariyam-backend")
 
@@ -22,25 +24,32 @@ def err(code, ru, uz):
     return {"ok": False, "error_code": code, "message_ru": ru, "message_uz": uz}
 
 
-async def _pool():
-    return await get_pool()
-
-
 @app.list_tools()
 async def list_tools():
-    return [
-        types.Tool(name=n, description=d, inputSchema=s)
-        for n, d, s in TOOLS
-    ]
+    return [types.Tool(name=n, description=d, inputSchema=s) for n, d, s in TOOLS]
 
 
 @app.call_tool()
-async def call_tool(name: str, arguments: dict):
-    pool = await _pool()
+async def call_tool(name: str, arguments: dict | None):
+    arguments = arguments or {}
     try:
-        result = await DISPATCH[name](pool, arguments)
+        required = REQUIRED_BY_TOOL[name]
     except KeyError:
         result = err("UNKNOWN_TOOL", f"Неизвестный tool: {name}", "Номаълум восита")
+        return [types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
+
+    missing = [field for field in required if field not in arguments]
+    if missing:
+        result = err(
+            "INVALID_INPUT",
+            "Отсутствуют обязательные поля: " + ", ".join(missing),
+            "Мажбурий майдонлар етишмайди",
+        )
+        return [types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
+
+    pool = await get_pool()
+    try:
+        result = await DISPATCH[name](pool, arguments)
     except ValueError as e:
         msg = str(e)
         if msg.startswith("BAD_CATEGORY"):
@@ -57,6 +66,11 @@ async def call_tool(name: str, arguments: dict):
 # ---------------------------------------------------------------------------
 # Tool dispatch
 # ---------------------------------------------------------------------------
+async def t_ensure_user(pool, a):
+    user_id, created = await db.ensure_user(pool, a["telegram_id"], a["role"], a["display_name"])
+    return ok(user_id=user_id, created=created)
+
+
 async def t_save_expense(pool, a):
     r = await db.save_expense(
         pool, a["user_id"], a["items"],
@@ -75,21 +89,21 @@ async def t_save_income(pool, a):
 
 
 async def t_update_expense(pool, a):
-    r = await db.update_expense(pool, a["user_id"], a.get("expense_id"), a.get("fields", {}))
+    r = await db.update_expense(pool, a["user_id"], a["expense_id"], a["fields"])
     if not r:
         return err("NOT_FOUND", "Запись не найдена", "Ёзув топилмади")
     return ok(**r)
 
 
 async def t_update_last_expense(pool, a):
-    r = await db.update_expense(pool, a["user_id"], None, a.get("fields", {}))
+    r = await db.update_expense(pool, a["user_id"], None, a["fields"])
     if not r:
         return err("NOT_FOUND", "Запись не найдена", "Ёзув топилмади")
     return ok(**r)
 
 
 async def t_delete_expense(pool, a):
-    r = await db.delete_expense(pool, a["user_id"], a.get("expense_id"))
+    r = await db.delete_expense(pool, a["user_id"], a["expense_id"])
     if not r:
         return err("NOT_FOUND", "Запись не найдена", "Ёзув топилмади")
     return ok(**r)
@@ -158,13 +172,19 @@ async def t_get_admin_report_data(pool, a):
 
 
 async def t_backup_data(pool, a):
-    # Placeholder: real backup is documented in SECURITY_PRIVACY / раздел 18.
-    # Reports status only; actual archive via rclone/gpg runs on VPS.
-    return ok(archive="<configured-on-vps>", uploaded=False)
+    return err(
+        "NOT_CONFIGURED",
+        "Backup ещё не настроен (Этап 8)",
+        "Заҳира нусхаси ҳали созланмаган",
+    )
 
 
 async def t_get_backup_status(pool, a):
-    return ok(last_backup_at=None, last_ok=True)
+    return err(
+        "NOT_CONFIGURED",
+        "Backup ещё не настроен (Этап 8)",
+        "Заҳира нусхаси ҳали созланмаган",
+    )
 
 
 async def t_get_bot_status(pool, a):
@@ -179,6 +199,7 @@ async def t_log_usage_cost(pool, a):
 
 
 DISPATCH = {
+    "ensure_user": t_ensure_user,
     "save_expense": t_save_expense,
     "save_income": t_save_income,
     "update_expense": t_update_expense,
@@ -200,100 +221,106 @@ DISPATCH = {
 }
 
 
-SCHEMA_OBJ = {
-    "type": "object",
-    "properties": {
-        "user_id": {"type": "integer"},
-        "items": {"type": "array", "items": {"type": "object"}},
-        "occurred_at": {"type": "string"},
-        "source_type": {"type": "string"},
-        "source_text": {"type": "string"},
-        "amount": {"type": "number"},
-        "currency": {"type": "string"},
-        "source_name": {"type": "string"},
-        "expense_id": {"type": "integer"},
-        "fields": {"type": "object"},
-        "period": {"type": "string"},
-        "from": {"type": "string"},
-        "to": {"type": "string"},
+def schema(props: dict, required: list[str] | None = None) -> dict:
+    return {"type": "object", "properties": props, "required": required or []}
+
+
+P = {
+    "user_id": {"type": "integer"},
+    "telegram_id": {"type": "integer"},
+    "role": {"type": "string", "enum": list(db.ROLES)},
+    "display_name": {"type": "string"},
+    "items": {"type": "array", "items": {"type": "object", "properties": {
+        "item_name": {"type": "string"},
+        "amount_uzs": {"type": "number"},
         "category_code": {"type": "string"},
-        "surah": {"type": "string"},
-        "juz": {"type": "integer"},
-        "page": {"type": "integer"},
-        "note": {"type": "string"},
-        "severity": {"type": "string"},
-        "alert_type": {"type": "string"},
-        "bot_response": {"type": "string"},
-        "detected_by": {"type": "string"},
-        "sent_to_admin": {"type": "boolean"},
-        "kind": {"type": "string"},
-        "text": {"type": "string"},
-        "value_int": {"type": "integer"},
-        "date": {"type": "string"},
-        "provider": {"type": "string"},
-        "service_type": {"type": "string"},
-        "units": {"type": "number"},
-        "estimated_cost_usd": {"type": "number"},
-    },
+    }, "required": ["amount_uzs"]}},
+    "occurred_at": {"type": "string", "description": "UTC ISO 8601 или дата (день по Ташкенту)"},
+    "source_type": {"type": "string", "enum": list(db.SOURCE_TYPES)},
+    "source_text": {"type": "string"},
+    "amount": {"type": "number"},
+    "currency": {"type": "string", "enum": list(db.CURRENCIES)},
+    "source_name": {"type": "string"},
+    "expense_id": {"type": "integer"},
+    "fields": {"type": "object"},
+    "period": {"type": "string", "enum": ["today", "week", "month", "custom"]},
+    "from": {"type": "string"},
+    "to": {"type": "string"},
+    "category_code": {"type": "string"},
+    "surah": {"type": "string"},
+    "juz": {"type": "integer"},
+    "page": {"type": "integer"},
+    "note": {"type": "string"},
+    "severity": {"type": "string", "enum": list(db.HEALTH_SEVERITIES)},
+    "alert_severity": {"type": "string", "enum": list(db.ALERT_SEVERITIES)},
+    "alert_type": {"type": "string"},
+    "bot_response": {"type": "string"},
+    "detected_by": {"type": "string", "enum": list(db.DETECTED_BY)},
+    "sent_to_admin": {"type": "boolean"},
+    "kind": {"type": "string"},
+    "text": {"type": "string"},
+    "value_int": {"type": "integer"},
+    "date": {"type": "string"},
+    "provider": {"type": "string"},
+    "service_type": {"type": "string", "enum": list(db.SERVICE_TYPES)},
+    "units": {"type": "number"},
+    "estimated_cost_usd": {"type": "number"},
 }
 
+
+def pick(*names: str) -> dict:
+    return {name: P[name] for name in names}
+
+
 TOOLS = [
-    ("save_expense", "Сохранить расход(ы). items:[{item_name,amount_uzs,category_code}]", SCHEMA_OBJ),
-    ("save_income", "Сохранить доход (пенсия и т.п.)", SCHEMA_OBJ),
-    ("update_expense", "Исправить расход по id", SCHEMA_OBJ),
-    ("update_last_expense", "Исправить последнюю расходную запись", SCHEMA_OBJ),
-    ("delete_expense", "Удалить расход по id", SCHEMA_OBJ),
-    ("delete_last_expense", "Удалить последний расход", SCHEMA_OBJ),
-    ("get_expense_report", "Отчёт по расходам: today/week/month/custom", SCHEMA_OBJ),
-    ("get_balance_summary", "Доход/расход/остаток за период", SCHEMA_OBJ),
-    ("save_quran_progress", "Сохранить прогресс Корана", SCHEMA_OBJ),
-    ("get_quran_progress", "Последний прогресс Корана", SCHEMA_OBJ),
-    ("save_health_note", "Заметка о самочувствии (без диагноза)", SCHEMA_OBJ),
-    ("save_alert_event", "Событие срочного уведомления", SCHEMA_OBJ),
-    ("save_plan_note", "План/заметка/счётчик как факт", SCHEMA_OBJ),
-    ("get_admin_report_data", "Факты для отчёта 19:30 (прозу пишет Hermes)", SCHEMA_OBJ),
-    ("backup_data", "Запустить backup (на VPS через rclone/gpg)", SCHEMA_OBJ),
-    ("get_backup_status", "Статус последнего backup", SCHEMA_OBJ),
-    ("get_bot_status", "Heartbeat: gateway/db/time", SCHEMA_OBJ),
-    ("log_usage_cost", "Записать оценку стоимости STT/TTS/LLM", SCHEMA_OBJ),
+    ("ensure_user", "Создать/найти пользователя по telegram_id", schema(pick("telegram_id", "role", "display_name"), ["telegram_id", "role", "display_name"])),
+    ("save_expense", "Сохранить расход(ы). items:[{item_name,amount_uzs,category_code}]", schema(pick("user_id", "items", "occurred_at", "source_type", "source_text"), ["user_id", "items"])),
+    ("save_income", "Сохранить доход (пенсия и т.п.)", schema(pick("user_id", "amount", "currency", "source_name", "occurred_at", "source_type"), ["user_id", "amount"])),
+    ("update_expense", "Исправить расход по id", schema(pick("user_id", "expense_id", "fields"), ["user_id", "expense_id", "fields"])),
+    ("update_last_expense", "Исправить последнюю расходную запись", schema(pick("user_id", "fields"), ["user_id", "fields"])),
+    ("delete_expense", "Удалить расход по id", schema(pick("user_id", "expense_id"), ["user_id", "expense_id"])),
+    ("delete_last_expense", "Удалить последний расход", schema(pick("user_id"), ["user_id"])),
+    ("get_expense_report", "Отчёт по расходам: today/week/month/custom", schema(pick("user_id", "period", "from", "to", "category_code"), ["user_id"])),
+    ("get_balance_summary", "Доход/расход/остаток за период", schema(pick("user_id", "period"), ["user_id"])),
+    ("save_quran_progress", "Сохранить прогресс Корана", schema(pick("user_id", "surah", "juz", "page", "note"), ["user_id"])),
+    ("get_quran_progress", "Последний прогресс Корана", schema(pick("user_id"), ["user_id"])),
+    ("save_health_note", "Заметка о самочувствии (без диагноза)", schema(pick("user_id", "note", "severity", "source_text"), ["user_id", "note"])),
+    ("save_alert_event", "Событие срочного уведомления", schema({**pick("user_id", "alert_type"), "severity": P["alert_severity"], **pick("source_text", "bot_response", "detected_by", "sent_to_admin")}, ["user_id", "alert_type", "severity", "source_text"])),
+    ("save_plan_note", "План/заметка/счётчик как факт", schema(pick("user_id", "kind", "text", "value_int"), ["user_id", "text"])),
+    ("get_admin_report_data", "Факты для отчёта 19:30 (прозу пишет Hermes)", schema(pick("user_id", "date"), ["user_id"])),
+    ("backup_data", "Backup: до Этапа 8 возвращает NOT_CONFIGURED", schema({})),
+    ("get_backup_status", "Статус backup: до Этапа 8 возвращает NOT_CONFIGURED", schema({})),
+    ("get_bot_status", "Heartbeat: gateway/db/time", schema({})),
+    ("log_usage_cost", "Записать оценку стоимости STT/TTS/LLM", schema(pick("provider", "service_type", "units", "estimated_cost_usd"), ["provider", "service_type", "units", "estimated_cost_usd"])),
 ]
+REQUIRED_BY_TOOL = {name: tool_schema.get("required", []) for name, _desc, tool_schema in TOOLS}
 
 
 async def main():
     transport_mode = os.environ.get("MCP_TRANSPORT", "stdio").lower()
     if transport_mode == "http":
-        from mcp.server.streamable_http import StreamableHTTPServerTransport
         import uvicorn
+        from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
         from starlette.applications import Starlette
-        from starlette.routing import Route
-        from starlette.requests import Request
+        from starlette.routing import Mount
 
         host = os.environ.get("MCP_HTTP_HOST", "127.0.0.1")
         port = int(os.environ.get("MCP_HTTP_PORT", "8000"))
-        init_options = app.create_initialization_options()
+        session_manager = StreamableHTTPSessionManager(app=app, json_response=True)
 
-        from contextlib import asynccontextmanager
-        import anyio
+        class MCPASGIApp:
+            def __init__(self, manager):
+                self.manager = manager
 
-        http_transport = StreamableHTTPServerTransport(mcp_session_id=None)
-        init_options = app.create_initialization_options()
+            async def __call__(self, scope, receive, send):
+                await self.manager.handle_request(scope, receive, send)
 
         @asynccontextmanager
         async def lifespan(_app):
-            async with http_transport.connect() as (read, write):
-                async with anyio.create_task_group() as tg:
-                    tg.start_soon(app.run, read, write, init_options)
-                    yield
+            async with session_manager.run():
+                yield
 
-        async def mcp_endpoint(request: Request):
-            await http_transport.handle_request(
-                request.scope, request.receive, request._send)
-
-        app_http = Starlette(
-            routes=[Route("/mcp", endpoint=mcp_endpoint,
-                          methods=["GET", "POST", "DELETE"])],
-            lifespan=lifespan,
-        )
+        app_http = Starlette(routes=[Mount("/mcp", app=MCPASGIApp(session_manager))], lifespan=lifespan)
         cfg = uvicorn.Config(app_http, host=host, port=port)
         server = uvicorn.Server(cfg)
         await server.serve()

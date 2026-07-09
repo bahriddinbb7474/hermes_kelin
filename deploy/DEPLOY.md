@@ -1,100 +1,162 @@
-# Hermes/Mariyam — инструкция по развёртыванию (deploy docs)
+# Hermes/Mariyam — инструкция по развёртыванию
 
-Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md`, раздел 17.
-Локальная среда (Windows) — только для разработки и проверки. Реальный VPS пока НЕ трогать.
+Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md`, раздел 17. VPS пока НЕ трогать без отдельного разрешения.
 
-## Что разворачивается
+## Архитектура deploy
 
-- `hermes_mariyam_backend` — MCP-сервер (storage tools, §15), слушает HTTP на `127.0.0.1:${BACKEND_HOST_PORT}` внутри изолированной сети compose.
-- `hermes_mariyam_postgres` — PostgreSQL 16 (данные в volume `hermes_mariyam_pg_data`).
-- Backend НЕ содержит scheduler и второго "мозга". Все расписания — через Hermes cron (§17).
+- По умолчанию на VPS: `docker compose` поднимает **только PostgreSQL**.
+- Backend MCP регистрируется в Hermes как `stdio` command: `python -m backend`.
+- HTTP backend в compose оставлен только для локальной проверки/запасного варианта.
+- Backend = storage/tools. Scheduler/router/intent-classifier/LLM-orchestrator здесь запрещены.
 
-## Локальная проверка (Windows, без sudo)
+## Секреты и env
+
+Compose-файл не использует `env_file:`. Секреты попадают через **интерполяцию переменных окружения процесса** `docker compose`.
+На VPS это делает systemd `EnvironmentFile=/opt/hermes-mariyam-secrets/backend.env`.
+
+Для ручных compose-команд сначала загрузить env:
 
 ```bash
-# 1. Создать backend/.env из примера и заполнить POSTGRES_PASSWORD
-cp backend/.env.example backend/.env
-#    отредактировать backend/.env: POSTGRES_PASSWORD=<сильный пароль>, BACKEND_HOST_PORT=8000
+set -a; . backend/.env; set +a
+# или на VPS:
+set -a; . /opt/hermes-mariyam-secrets/backend.env; set +a
+```
 
-# 2. Поднять compose (изоляция: name=hermes-mariyam, контейнеры hermes_mariyam_*)
+Иначе `docker compose down/up` может дать warning про unset `POSTGRES_PASSWORD`.
+Не пишите реальные пароли прямо в shell-командах: они остаются в history.
+
+## Локальная проверка с нуля
+
+```bash
+# 1. Создать backend/.env из примера и заполнить POSTGRES_PASSWORD, DATABASE_URL, BACKEND_HOST_PORT
+cp backend/.env.example backend/.env
+# для локальных тестов DATABASE_URL должен указывать на localhost, например:
+# DATABASE_URL=postgresql://hermes:<POSTGRES_PASSWORD>@localhost:${POSTGRES_HOST_PORT:-5432}/hermes
+
+# 2. Загрузить env для compose и тестов
+set -a; . backend/.env; set +a
+
+# 3. Свежий volume и старт Postgres + HTTP-backend для локальной проверки
+# ВНИМАНИЕ: удаляет локальную тестовую БД проекта.
+docker compose down -v
 docker compose up -d
 
-# 3. Проверить готовность БД
+# 4. Проверить готовность БД
 docker compose exec hermes_mariyam_postgres pg_isready -U hermes
 
-# 4. Проверить, что backend отвечает по MCP HTTP
-curl -s -X POST http://127.0.0.1:8000/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}'
+# 5. HTTP initialize: первый и повторный запрос должны вернуть JSON-RPC ответ
+curl -s -X POST http://127.0.0.1:${BACKEND_HOST_PORT:-8000}/mcp/   -H "Content-Type: application/json"   -H "Accept: application/json, text/event-stream"   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}'
 
-# 5. Запустить тесты (требуют применённой миграции)
-DATABASE_URL=postgresql://hermes:<пароль>@localhost:5432/hermes backend/.venv/Scripts/python.exe tests/run_tests.py
-#    ожидаемый вывод: ALL_TOOL_TESTS_PASSED / TZ_BOUNDARY_PASSED
+curl -s -X POST http://127.0.0.1:${BACKEND_HOST_PORT:-8000}/mcp/   -H "Content-Type: application/json"   -H "Accept: application/json, text/event-stream"   -d '{"jsonrpc":"2.0","id":2,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"t2","version":"1"}}}'
 
-# 6. Остановить
+# 6. Тесты. DATABASE_URL обязателен; предохранитель откажется от non-local/prod URL.
+backend/.venv/Scripts/python.exe tests/run_tests.py
+# ожидаемые маркеры:
+# ALL_TOOL_TESTS_PASSED
+# TZ_BOUNDARY_PASSED
+# POOL_STABLE_PASSED
+# MCP_SMOKE_PASSED
+
+# 7. Проверка образа: секреты и venv не внутри image
+docker compose build hermes_mariyam_backend
+docker run --rm --entrypoint sh hermes-mariyam-hermes_mariyam_backend:latest -c "ls -la /app/backend/; test ! -e /app/backend/.env && test ! -d /app/backend/.venv && echo IMAGE_CLEAN"
+
+# 8. Остановить
 docker compose down
 ```
 
-## VPS deploy (Ubuntu 24.04, Hetzner) — КОМАНДЫ ДЛЯ БУДУЩЕГО ЗАПУСКА
+## Миграции БД
 
-> НЕ выполнять сейчас. Показано для готовности. Требует sudo и доступа к VPS.
+`backend/sql/001_init.sql` применяется контейнером Postgres только при первом создании volume.
+Для будущих миграций `002_*.sql` на существующей БД применять вручную:
 
 ```bash
-# 0. Перед стартом — проверить, что порт 8000 свободен
-ss -tulpen | grep ':8000' || true
+set -a; . backend/.env; set +a
+docker compose exec -T hermes_mariyam_postgres psql -U hermes -d hermes -f /docker-entrypoint-initdb.d/002_next.sql
+```
 
-# 1. Скопировать проект в /opt/hermes-mariyam
+## Seed пользователей — обязательно до подключения Hermes
+
+Предпочтительно вызвать MCP-tool `ensure_user` из Hermes/MCP-клиента:
+
+```json
+{ "telegram_id": 111222333, "role": "oyijon", "display_name": "Ойижон" }
+{ "telegram_id": 444555666, "role": "admin", "display_name": "Бахриддин ака" }
+```
+
+Запасной SQL:
+
+```sql
+INSERT INTO users (telegram_id, role, display_name) VALUES
+  (<TG_ID_ОЙИЖОН>, 'oyijon', 'Ойижон'),
+  (<TG_ID_АДМИНА>, 'admin',  'Бахриддин ака')
+ON CONFLICT (telegram_id) DO NOTHING;
+```
+
+## Stdio backend в Hermes (VPS-вариант по умолчанию)
+
+Пример MCP-конфига Hermes-профиля:
+
+```yaml
+mcp:
+  servers:
+    mariyam_backend:
+      command: python
+      args: ["-m", "backend"]
+      cwd: /opt/hermes-mariyam
+      env:
+        MCP_TRANSPORT: stdio
+        DATABASE_URL: ${DATABASE_URL}
+```
+
+Проверка запуска stdio вручную: `python -m backend` должен стартовать как MCP stdio server; полноценный initialize выполняется MCP-клиентом Hermes.
+
+## VPS deploy (Ubuntu 24.04, Hetzner) — только позже
+
+```bash
+# 0. Pre-check: порт PostgreSQL на VPS
+ss -tulpen | grep ':5432' || true
+# Если 5432 уже занят — остановить deploy и согласовать другой POSTGRES_HOST_PORT.
+
+# 1. Подготовить /opt/hermes-mariyam и секреты
 sudo install -d -m 755 /opt/hermes-mariyam
-sudo rsync -a --exclude='.venv' --exclude='__pycache__' --exclude='.env' \
-  ./ /opt/hermes-mariyam/
+sudo rsync -a --exclude='.venv' --exclude='__pycache__' --exclude='.env' ./ /opt/hermes-mariyam/
 
-# 2. Секреты в изолированный env_file (НЕ в репозитории)
 sudo install -d -m 700 /opt/hermes-mariyam-secrets
 sudo install -m 600 /path/to/real-backend.env /opt/hermes-mariyam-secrets/backend.env
-#    real-backend.env содержит: POSTGRES_PASSWORD=..., BACKEND_HOST_PORT=8000, DATABASE_URL=...
 
-# 3. Установить systemd unit и включить автозапуск
+# 2. Проверить unit до enable
 sudo cp deploy/hermes-mariyam.service /etc/systemd/system/
+sudo systemd-analyze verify /etc/systemd/system/hermes-mariyam.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now hermes-mariyam.service
 
-# 4. Проверить статус
+# 3. Проверить Postgres compose
 sudo systemctl status hermes-mariyam.service
-docker compose -f /opt/hermes-mariyam/docker-compose.yml ps
+cd /opt/hermes-mariyam && sudo docker compose ps
+
+# 4. Seed users, затем подключить backend в Hermes как stdio MCP server
 ```
 
 ## VPS rollback
 
 ```bash
-# Остановить и откатить к предыдущему коммиту/образу
 sudo systemctl stop hermes-mariyam.service
 cd /opt/hermes-mariyam && sudo docker compose down
-#    вернуть предыдущую версию из git и повторить deploy (пункты 1-3)
+# вернуть предыдущую версию из git и повторить deploy
 sudo systemctl start hermes-mariyam.service
 ```
 
-## Secrets (безопасность, §19)
+## Secrets
 
-- Реальные пароли/токены только в `/opt/hermes-mariyam-secrets/backend.env` (mode 600).
-- `.env.example` — только placeholder, без реальных значений. Коммитится.
-- `.env` и `.venv/` скрыты через `.gitignore`, в git не попадают.
+- Реальные пароли/токены только в `/opt/hermes-mariyam-secrets/backend.env` (mode 600) или локальном `backend/.env`.
+- `.env.example` — placeholder, без реальных значений.
+- `.env`, `.venv/`, `__pycache__/` и docs не должны попадать в Docker image; проверка — `IMAGE_CLEAN`.
+- Если старый image уже собирался с `.env`, удалить старые images, выполнить `docker builder prune`, сменить `POSTGRES_PASSWORD`.
 
-## FORBIDDEN — что НЕ трогать (изоляция от Time-Agent)
+## FORBIDDEN — что НЕ трогать
 
-- `/opt/time-agent` — каталог другого проекта.
-- `time_agent_bot` — процесс/контейнер другого проекта.
-- Time-Agent `.env` и любые его секреты.
-- SQLite volume Time-Agent (если есть).
-- logs и backups Time-Agent.
+- `/opt/time-agent`, `time_agent_bot`, Time-Agent `.env`, SQLite volume, logs, backups.
+- Любой scheduler/router/intent-classifier/LLM-orchestrator в backend.
 
-Hermes/Mariyam использует ТОЛЬКО свои изолированные ресурсы:
-`name: hermes-mariyam`, контейнеры `hermes_mariyam_*`, сеть `hermes_mariyam_net`,
-том `hermes_mariyam_pg_data`, порт `127.0.0.1:${BACKEND_HOST_PORT}`.
-
-## Проверка изоляции
-
-```bash
-docker compose config          # name, container_name, networks, volumes — префикс hermes_mariyam
-docker ps --format '{{.Names}}' | grep hermes_mariyam
-```
+Hermes/Mariyam использует только свои ресурсы: `name: hermes-mariyam`, контейнеры `hermes_mariyam_*`, сеть `hermes_mariyam_net`, volume `hermes_mariyam_pg_data`, localhost-порт `${BACKEND_HOST_PORT}`.

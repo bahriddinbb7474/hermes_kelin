@@ -2,23 +2,45 @@
 Источник истины: TZ_Hermes_Mariyam_FINAL_v3_0.md, разделы 13, 15.
 Backend validates and stores already-parsed data; returns exact facts/numbers.
 """
-from datetime import datetime, timezone
-import asyncpg
+from datetime import datetime, timedelta, timezone
 
 from .config import TASHKENT, parse_dt
 
+CURRENCIES = ("UZS", "USD")
+HEALTH_SEVERITIES = ("info", "low", "medium", "high", "critical")
+ALERT_SEVERITIES = ("low", "medium", "high", "critical")
+SOURCE_TYPES = ("text", "voice", "admin")
+DETECTED_BY = ("llm", "keyword", "both")
+SERVICE_TYPES = ("stt", "tts", "llm")
+ROLES = ("oyijon", "admin")
 
-async def ensure_user(pool, telegram_id: int, role: str, display_name: str) -> int:
+
+def _one_of(field: str, value, allowed: tuple[str, ...], *, allow_none: bool = False):
+    if value is None and allow_none:
+        return
+    if value not in allowed:
+        raise ValueError(f"INVALID_INPUT: {field} must be one of {', '.join(allowed)}")
+
+
+async def ensure_user(pool, telegram_id: int, role: str, display_name: str) -> tuple[int, bool]:
+    _one_of("role", role, ROLES)
     row = await pool.fetchrow(
-        "SELECT id FROM users WHERE telegram_id = $1", telegram_id
+        """WITH ins AS (
+               INSERT INTO users (telegram_id, role, display_name)
+               VALUES ($1, $2, $3)
+               ON CONFLICT (telegram_id) DO NOTHING
+               RETURNING id
+           )
+           SELECT id, true AS created FROM ins
+           UNION ALL
+           SELECT id, false AS created FROM users
+           WHERE telegram_id = $1 AND NOT EXISTS (SELECT 1 FROM ins)
+           LIMIT 1""",
+        int(telegram_id), role, display_name,
     )
-    if row:
-        return row["id"]
-    return await pool.fetchval(
-        """INSERT INTO users (telegram_id, role, display_name)
-           VALUES ($1, $2, $3) RETURNING id""",
-        telegram_id, role, display_name,
-    )
+    if not row:
+        raise RuntimeError("failed to ensure user")
+    return row["id"], row["created"]
 
 
 async def valid_category(pool, code: str) -> bool:
@@ -29,7 +51,7 @@ async def valid_category(pool, code: str) -> bool:
 
 
 async def save_expense(pool, user_id, items, occurred_at, source_type, source_text=None):
-    """items: list of {item_name, amount_uzs, category_code}. Returns saved ids + total."""
+    _one_of("source_type", source_type, SOURCE_TYPES)
     occurred = parse_dt(occurred_at) or datetime.now(timezone.utc)
     total = 0
     saved_ids = []
@@ -56,6 +78,8 @@ async def save_expense(pool, user_id, items, occurred_at, source_type, source_te
 
 
 async def save_income(pool, user_id, amount, currency, source_name, occurred_at, source_type):
+    _one_of("currency", currency, CURRENCIES)
+    _one_of("source_type", source_type, SOURCE_TYPES)
     occurred = parse_dt(occurred_at) or datetime.now(timezone.utc)
     amount = int(round(float(amount)))
     if amount < 0:
@@ -97,7 +121,7 @@ async def update_expense(pool, user_id, expense_id, fields):
     if "item_name" in fields:
         sets.append(f"item_name=${idx}"); params.append(fields["item_name"]); idx += 1
     if not sets:
-        return None
+        raise ValueError("INVALID_INPUT: fields is empty, nothing to update")
     row = await pool.fetchrow(
         f"UPDATE transactions SET {','.join(sets)} "
         "WHERE user_id=$1 AND id=$2 AND type='expense' RETURNING id, amount",
@@ -122,7 +146,6 @@ async def delete_expense(pool, user_id, expense_id):
 
 def _day_bounds(date_str: str | None):
     """Day boundaries in Asia/Tashkent, returned as UTC datetimes."""
-    from datetime import datetime, timedelta
     if date_str:
         base = datetime.fromisoformat(date_str).date()
     else:
@@ -133,7 +156,6 @@ def _day_bounds(date_str: str | None):
 
 
 def _period_bounds(period: str, from_dt=None, to_dt=None):
-    from datetime import datetime, timedelta
     now_t = datetime.now(TASHKENT)
     if period == "today":
         return _day_bounds(None)
@@ -143,20 +165,28 @@ def _period_bounds(period: str, from_dt=None, to_dt=None):
         return start.astimezone(timezone.utc), (start + timedelta(days=7)).astimezone(timezone.utc)
     if period == "month":
         start = now_t.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        if start.month == 12:
-            nxt = start.replace(year=start.year + 1, month=1)
-        else:
-            nxt = start.replace(month=start.month + 1)
+        nxt = start.replace(year=start.year + 1, month=1) if start.month == 12 else start.replace(month=start.month + 1)
         return start.astimezone(timezone.utc), nxt.astimezone(timezone.utc)
-    # custom: date-only string -> Tashkent day bounds; ISO datetime -> as-is
+    if period != "custom":
+        raise ValueError("INVALID_INPUT: period must be one of today, week, month, custom")
+    if not from_dt and not to_dt:
+        raise ValueError("INVALID_INPUT: custom period requires from/to")
     if from_dt and len(from_dt) <= 10:
         s, e = _day_bounds(from_dt)
+        if to_dt:
+            _, e = _day_bounds(to_dt) if len(to_dt) <= 10 else (None, parse_dt(to_dt))
     else:
         s = parse_dt(from_dt)
-    if to_dt and len(to_dt) <= 10:
-        _, e = _day_bounds(to_dt)
-    else:
-        e = parse_dt(to_dt)
+        if from_dt and not to_dt:
+            raise ValueError("INVALID_INPUT: custom datetime 'from' requires 'to'")
+        e = parse_dt(to_dt) if to_dt else None
+    if to_dt and not from_dt:
+        e = _day_bounds(to_dt)[1] if len(to_dt) <= 10 else parse_dt(to_dt)
+        s = datetime.min.replace(tzinfo=timezone.utc)
+    if s is None or e is None:
+        raise ValueError("INVALID_INPUT: custom period requires from/to")
+    if s >= e:
+        raise ValueError("INVALID_INPUT: from must be before to")
     return s, e
 
 
@@ -223,6 +253,7 @@ async def get_quran_progress(pool, user_id):
 
 
 async def save_health_note(pool, user_id, note, severity, source_text):
+    _one_of("severity", severity, HEALTH_SEVERITIES)
     return await pool.fetchval(
         """INSERT INTO health_notes (user_id, note, severity, source_text)
            VALUES ($1,$2,$3,$4) RETURNING id""",
@@ -232,6 +263,8 @@ async def save_health_note(pool, user_id, note, severity, source_text):
 
 async def save_alert_event(pool, user_id, alert_type, severity, source_text,
                            bot_response, detected_by, sent_to_admin):
+    _one_of("severity", severity, ALERT_SEVERITIES)
+    _one_of("detected_by", detected_by, DETECTED_BY, allow_none=True)
     return await pool.fetchval(
         """INSERT INTO alert_events
            (user_id, alert_type, severity, source_text, bot_response, detected_by, sent_to_admin)
@@ -249,7 +282,8 @@ async def save_plan_note(pool, user_id, kind, text, value_int):
 
 
 async def admin_report_data(pool, user_id, date_str):
-    start, end = _day_bounds(date_str)
+    report_date = date_str or datetime.now(TASHKENT).date().isoformat()
+    start, end = _day_bounds(report_date)
     exp_total = await pool.fetchval(
         "SELECT COALESCE(SUM(amount),0) FROM transactions "
         "WHERE user_id=$1 AND type='expense' AND occurred_at >= $2 AND occurred_at < $3",
@@ -286,7 +320,7 @@ async def admin_report_data(pool, user_id, date_str):
         user_id, start, end,
     )
     return {
-        "date": date_str,
+        "date": report_date,
         "expense_total_uzs": int(exp_total),
         "expense_by_category": [
             {"category_code": r["category_code"], "name_uz": r["name_uz"],
@@ -300,6 +334,7 @@ async def admin_report_data(pool, user_id, date_str):
 
 
 async def log_usage_cost(pool, provider, service_type, units, estimated_cost_usd):
+    _one_of("service_type", service_type, SERVICE_TYPES)
     await pool.execute(
         """INSERT INTO usage_costs (provider, service_type, units, estimated_cost_usd)
            VALUES ($1,$2,$3,$4)""",
