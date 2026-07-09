@@ -1,0 +1,30 @@
+# Hermes/Mariyam — gitignore
+# Секреты, виртуальные окружения и артефакты сборки не коммитятся (B2).
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python venv (в т.ч. Windows venv — не коммитить)
+.venv/
+venv/
+env/
+
+# Python cache / compiled
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Logs / cache / temp
+logs/
+*.log
+.cache/
+tmp/
+temp/
+*.tmp
+.DS_Store

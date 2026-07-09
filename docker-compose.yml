@@ -1,0 +1,56 @@
+# Hermes/Mariyam backend — compose (изолированный проект)
+# Источник истины: TZ_Hermes_Mariyam_FINAL_v3_0.md, разделы 13, 16, 17.
+# Все имена изолированы префиксом hermes_mariyam, чтобы не конфликтовать с другими compose-проектами.
+# Секреты ТОЛЬКО из .env (см. backend/.env.example). Weak fallback запрещён (B3).
+# HTTP backend слушает только внутри изолированной сети + 127.0.0.1 (SECURITY_PRIVACY.md).
+
+name: hermes-mariyam
+
+services:
+  hermes_mariyam_postgres:
+    image: postgres:16-alpine
+    container_name: hermes_mariyam_postgres
+    environment:
+      POSTGRES_USER: hermes
+      # пароль строго из .env (POSTGRES_PASSWORD), без значения по умолчанию
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: hermes
+    volumes:
+      - hermes_mariyam_pg_data:/var/lib/postgresql/data
+      - ./backend/sql:/docker-entrypoint-initdb.d:ro
+    networks:
+      - hermes_mariyam_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hermes"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  hermes_mariyam_backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: hermes_mariyam_backend
+    depends_on:
+      hermes_mariyam_postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://hermes:${POSTGRES_PASSWORD}@hermes_mariyam_postgres:5432/hermes
+      MCP_TRANSPORT: http
+      MCP_HTTP_HOST: 0.0.0.0
+      MCP_HTTP_PORT: 8000
+    ports:
+      # host port берётся из .env (BACKEND_HOST_PORT); только localhost
+      - "127.0.0.1:${BACKEND_HOST_PORT:-8000}:8000"
+    networks:
+      - hermes_mariyam_net
+    restart: unless-stopped
+
+networks:
+  hermes_mariyam_net:
+    name: hermes_mariyam_net
+
+volumes:
+  hermes_mariyam_pg_data:
+    name: hermes_mariyam_pg_data
