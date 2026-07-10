@@ -1,6 +1,6 @@
 # Hermes/Mariyam
 
-Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md`
+Источник истины: `docs/TZ/TZ_Hermes_Mariyam_FINAL_v3_0.md`
 
 ## Что это
 
@@ -8,13 +8,42 @@ Hermes/Mariyam — персональный Telegram ИИ-агент для Ой
 
 Ключевой принцип: **Hermes-first**. Hermes является единственным "мозгом"; backend нужен только как MCP tools/storage для точных данных.
 
+## Структура репозитория
+
+```
+hermes-mariyam/
+├── README.md              # этот файл
+├── docs/                  # вся документация
+│   ├── TZ/                # ТЗ и спецификации (источник истины)
+│   │   ├── TZ_Hermes_Mariyam_FINAL_v3_0.md
+│   │   ├── ARCHITECTURE.md, DATABASE.md, TOOLS_CONTRACTS.md
+│   │   ├── CRON_AND_REMINDERS.md, VOICE_STT_TTS.md
+│   │   ├── SECURITY_PRIVACY.md, DECISIONS.md, ACCEPTANCE_CRITERIA.md
+│   ├── HERMES_PROFILE.md  # профиль Hermes
+│   ├── PROJECT_CONTEXT.md # контекст проекта
+│   └── ROADMAP.md         # дорожная карта
+├── backend/               # тонкий MCP backend (FastMCP + PostgreSQL)
+│   ├── server.py, db.py, config.py, __init__.py, __main__.py
+│   ├── sql/001_init.sql
+│   ├── requirements.txt, Dockerfile, .env.example
+├── skills/mariyam/        # skill личности Мариям (SOUL-профиль)
+│   └── SKILL.md
+├── deploy/                # deploy docs + systemd template
+│   ├── DEPLOY.md
+│   └── hermes-mariyam.service
+├── tests/run_tests.py     # постоянные тесты (ALL_TOOL_TESTS_PASSED)
+├── data/voice-samples/    # голоса (gitignored, не коммитятся)
+├── docker-compose.yml     # изолированный compose (hermes_mariyam_*)
+└── .gitignore
+```
+
 ## Как читать документы
 
-1. Начинать с `Hermes-Oyijon-TZ/TZ_Hermes_Mariyam_FINAL_v3_0.md` — это финальный single source of truth.
-2. Затем читать рабочие конспекты в корне: архитектура, профиль Hermes, контракты tools, БД, cron, безопасность, критерии приёмки.
-3. Старые v1/v2/review-файлы не использовать для исполнения. Они только история.
+1. Начинать с `docs/TZ/TZ_Hermes_Mariyam_FINAL_v3_0.md` — финальный single source of truth.
+2. Затем рабочие конспекты в `docs/TZ/`: архитектура, контракты tools, БД, cron, безопасность, критерии приёмки.
+3. Старые v1/v2/review-файлы не использовать для исполнения.
 
-## Что нельзя начинать из этих документов
+## Что нельзя
 
 - Нельзя писать отдельный backend-router, intent-classifier, LLM orchestrator или второй "мозг".
 - Нельзя делать backend scheduler: все расписания идут через Hermes cron.
