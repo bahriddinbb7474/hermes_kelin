@@ -28,6 +28,10 @@
 
 Hermes сам вызывает MCP tool и получает ответ. Backend только сохраняет/возвращает. Неверная категория даёт `BAD_CATEGORY`. Время хранится UTC, "сегодня" считается по Asia/Tashkent и проверено на границе суток.
 
+Дополнительно (ТЗ v3.1): один пул соединений (число соединений не растёт после ≥50 вызовов); `ensure_user` идемпотентен; smoke-тест через MCP-слой (`call_tool`) для всех tools включая ошибочные пути; per-tool inputSchema с `required`; docker-образ без `.env`/`.venv`; тестовый предохранитель против боевой БД; systemd unit проходит `systemd-analyze verify`.
+
+**Статус (2026-07-10): backend-часть этапа выполнена и проверена** на чистой БД — маркеры `ALL_TOOL_TESTS_PASSED`, `TZ_BOUNDARY_PASSED`, `POOL_STABLE_PASSED`, `MCP_SMOKE_PASSED`, `IMAGE_CLEAN`; stdio и HTTP initialize отвечают. Остаток этапа: подключение к реальному Hermes (`hermes tools`) и `systemd-analyze verify` — только на VPS.
+
 ### 5. Бухгалтерия
 
 `нон 12 минг, гўшт 180 минг` создаёт две записи, категории верные, итог 192 000. Monthly report сходится с БД. Исправление `гўштни 150 минг қил` меняет запись. `охиргисини ўчир` удаляет. Категории только фиксированные.
@@ -43,6 +47,8 @@ Hermes сам вызывает MCP tool и получает ответ. Backend 
 ### 8. Backup, restore, monitoring
 
 Зашифрованный backup уходит в Google Drive. Restore в чистое окружение восстановил известный расход и число строк. Бот поднимается после reboot. Админ получает heartbeat и уведомление при падении.
+
+Дополнительно (ТЗ v3.1): до завершения этапа `backup_data`/`get_backup_status` возвращают `NOT_CONFIGURED`, не ложный успех.
 
 ### 9. После MVP: религиозный RAG
 

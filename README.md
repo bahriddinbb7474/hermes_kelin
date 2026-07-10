@@ -41,7 +41,8 @@ hermes-mariyam/
 
 1. Начинать с `docs/TZ/TZ_Hermes_Mariyam_FINAL_v3_0.md` — финальный single source of truth.
 2. Затем рабочие конспекты в `docs/TZ/`: архитектура, контракты tools, БД, cron, безопасность, критерии приёмки.
-3. Старые v1/v2/review-файлы не использовать для исполнения.
+3. **Задания по аудиту v3.1** — `docs/TZ/ZADANIYA_KODERU_FIKSY_AUDITA_v3_1.md` (порядок работы A→B→C, Definition of Done).
+4. Старые v1/v2/review-файлы не использовать для исполнения.
 
 ## Что нельзя
 
@@ -56,6 +57,6 @@ hermes-mariyam/
 ## Развёртывание и документация
 
 - `deploy/DEPLOY.md` — инструкция deploy (локальная проверка на Windows + VPS Ubuntu 24.04), команды будущего запуска/отката, секреты, FORBIDDEN-секция (изоляция от Time-Agent).
-- `deploy/hermes-mariyam.service` — systemd unit template (`After/Requires=docker.service`, `Restart=always`, запуск через `docker compose up -d`, остановка `docker compose down`, секреты через `/opt/hermes-mariyam-secrets/backend.env`).
+- `deploy/hermes-mariyam.service` — systemd unit template (`Type=oneshot` + `RemainAfterExit=yes`, без `Restart=`; перезапуск — ответственность docker), запуск через `docker compose up -d`, остановка `docker compose down`, секреты через `/opt/hermes-mariyam-secrets/backend.env`.
 - `backend/.env.example` — пример переменных окружения (только placeholder, без реального пароля).
 - `tests/run_tests.py` — постоянные тесты (`ALL_TOOL_TESTS_PASSED`, `TZ_BOUNDARY_PASSED`), запуск из репозитория.
