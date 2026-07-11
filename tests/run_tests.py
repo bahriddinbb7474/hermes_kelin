@@ -13,16 +13,18 @@ import sys
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
-# Предохранитель: тесты делают TRUNCATE ... CASCADE.
-db_url = os.environ.get("DATABASE_URL", "")
-if not db_url:
-    sys.exit("DATABASE_URL is not set for tests")
-allowed = ("localhost" in db_url or "127.0.0.1" in db_url or "_test" in db_url)
-if not allowed and os.environ.get("ALLOW_DESTRUCTIVE_TESTS") != "1":
-    sys.exit(
-        "REFUSED: tests TRUNCATE the database; DATABASE_URL does not look like a test DB. "
-        "Set ALLOW_DESTRUCTIVE_TESTS=1 only if you are absolutely sure."
+# Предохранитель: тесты делают TRUNCATE ... RESTART IDENTITY CASCADE.
+# Проверка цели выполняется ДО создания pool и любого подключения к БД.
+from tests.db_guard import validate_destructive_test_target
+
+try:
+    validate_destructive_test_target(
+        database_url=os.environ.get("DATABASE_URL", ""),
+        app_env=os.environ.get("APP_ENV"),
+        allow_remote=os.environ.get("ALLOW_DESTRUCTIVE_TESTS") == "1",
     )
+except Exception as exc:  # noqa: BLE001 - guard reports a clean refusal reason
+    sys.exit(f"REFUSED: {exc}")
 
 from backend import db
 from backend.config import get_pool

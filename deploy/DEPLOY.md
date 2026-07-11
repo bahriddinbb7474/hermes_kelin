@@ -30,8 +30,10 @@ set -a; . /opt/hermes-mariyam-secrets/backend.env; set +a
 ```bash
 # 1. Создать backend/.env из примера и заполнить POSTGRES_PASSWORD, DATABASE_URL, BACKEND_HOST_PORT
 cp backend/.env.example backend/.env
-# для локальных тестов DATABASE_URL должен указывать на localhost, например:
-# DATABASE_URL=postgresql://hermes:<POSTGRES_PASSWORD>@localhost:${POSTGRES_HOST_PORT:-5432}/hermes
+# для локальных тестов DATABASE_URL обязан указывать на ОТДЕЛЬНУЮ тестовую БД,
+# имя которой оканчивается на _test (НЕ на боевую `hermes`):
+# DATABASE_URL=postgresql://hermes_test:<TEST_PASSWORD>@127.0.0.1:${POSTGRES_HOST_PORT:-5432}/hermes_test
+# и APP_ENV=test обязателен.
 
 # 2. Загрузить env для compose и тестов
 set -a; . backend/.env; set +a
@@ -49,7 +51,19 @@ curl -s -X POST http://127.0.0.1:${BACKEND_HOST_PORT:-8000}/mcp/   -H "Content-T
 
 curl -s -X POST http://127.0.0.1:${BACKEND_HOST_PORT:-8000}/mcp/   -H "Content-Type: application/json"   -H "Accept: application/json, text/event-stream"   -d '{"jsonrpc":"2.0","id":2,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"t2","version":"1"}}}'
 
-# 6. Тесты. DATABASE_URL обязателен; предохранитель откажется от non-local/prod URL.
+# 6. Тесты. Перед запуском оператор ОБЯЗАН проверить имя БД в DATABASE_URL.
+#    Требования (см. tests/db_guard.py, Блок 6Ж):
+#      - APP_ENV=test (строго);
+#      - имя БД оканчивается на _test;
+#      - боевая БД `hermes` запрещена безусловно;
+#      - localhost / 127.0.0.1 сами по себе НЕ являются признаком тестовой БД;
+#      - удалённая тестовая БД требует ALLOW_DESTRUCTIVE_TESTS=1.
+#    Destructive suite на VPS production НЕ запускать.
+#
+#    Безопасный пример (без реальных credential; <TEST_PASSWORD> — placeholder,
+#    не копировать буквально):
+APP_ENV=test \
+DATABASE_URL='postgresql://test_user:<TEST_PASSWORD>@127.0.0.1:5432/hermes_test' \
 backend/.venv/Scripts/python.exe tests/run_tests.py
 # ожидаемые маркеры:
 # ALL_TOOL_TESTS_PASSED
