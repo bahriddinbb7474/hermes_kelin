@@ -32,7 +32,7 @@ set -a; . /opt/hermes-mariyam-secrets/backend.env; set +a
 cp backend/.env.example backend/.env
 # для локальных тестов DATABASE_URL обязан указывать на ОТДЕЛЬНУЮ тестовую БД,
 # имя которой оканчивается на _test (НЕ на боевую `hermes`):
-# DATABASE_URL=postgresql://hermes_test:<TEST_PASSWORD>@127.0.0.1:${POSTGRES_HOST_PORT:-5432}/hermes_test
+# DATABASE_URL=postgresql://hermes:<LOCAL_TEST_PASSWORD>@127.0.0.1:${POSTGRES_HOST_PORT:-5432}/hermes_test
 # и APP_ENV=test обязателен.
 
 # 2. Загрузить env для compose и тестов
@@ -60,10 +60,10 @@ curl -s -X POST http://127.0.0.1:${BACKEND_HOST_PORT:-8000}/mcp/   -H "Content-T
 #      - удалённая тестовая БД требует ALLOW_DESTRUCTIVE_TESTS=1.
 #    Destructive suite на VPS production НЕ запускать.
 #
-#    Безопасный пример (без реальных credential; <TEST_PASSWORD> — placeholder,
+#    Безопасный пример (без реальных credential; <LOCAL_TEST_PASSWORD> — placeholder,
 #    не копировать буквально):
 APP_ENV=test \
-DATABASE_URL='postgresql://test_user:<TEST_PASSWORD>@127.0.0.1:5432/hermes_test' \
+DATABASE_URL='postgresql://hermes:<LOCAL_TEST_PASSWORD>@127.0.0.1:5432/hermes_test' \
 backend/.venv/Scripts/python.exe tests/run_tests.py
 # ожидаемые маркеры:
 # ALL_TOOL_TESTS_PASSED
@@ -71,24 +71,29 @@ backend/.venv/Scripts/python.exe tests/run_tests.py
 # POOL_STABLE_PASSED
 # MCP_SMOKE_PASSED
 
-# Создание отдельной тестовой БД (один согласованный тестовый пользователь
-# `test_user`; <TEST_PASSWORD> — placeholder, НЕ копировать буквально и НЕ
-# использовать реальный пароль боевой БД):
+# Создание отдельной локальной тестовой БД (PostgreSQL role — `hermes`,
+# та же, что владеет боевой БД; <LOCAL_TEST_PASSWORD> — placeholder, реальный
+# пароль в документ не писать):
 #   1. создать БД `hermes_test` (compose НЕ создаёт её автоматически);
 #   2. применить к ней миграцию 001_init.sql;
 #   3. запускать destructive suite ТОЛЬКО с APP_ENV=test и DATABASE_URL на
 #      `hermes_test`.
 #
 # !!! ВНИМАНИЕ:
-#   - боевая БД `hermes` ЗАПРЕЩЕНА для destructive suite;
+#   - боевая БД `hermes` ЗАПРЕЩЕНА для destructive suite (guard блокирует
+#     безусловно);
 #   - localhost / 127.0.0.1 сами по себе НЕ означают test БД;
 #   - suite НЕЛЬЗЯ запускать против живой VPS-БД `hermes`;
-#   - создание `hermes_test` не выполняется автоматически compose.
+#   - `hermes_test` compose автоматически не создаёт — создавать вручную;
+#   - `createdb` выполняют ОДИН раз; если `hermes_test` уже есть, повторно не
+#     создавать (иначе ошибка); удаление `hermes_test` НЕ затрагивает
+#     production volume и БД `hermes`.
 POSTGRES_HOST_PORT=${POSTGRES_HOST_PORT:-5432}
-docker compose exec -T hermes_mariyam_postgres psql -U hermes -v ON_ERROR_STOP=1 -c \
-  "CREATE DATABASE hermes_test;"
-# применить миграцию к тестовой БД (имя пользователя = имя БД, не путать):
-docker compose exec -T hermes_mariyam_postgres psql -U hermes -d hermes_test -v ON_ERROR_STOP=1 \
+docker compose exec -T hermes_mariyam_postgres \
+  createdb -U hermes hermes_test
+# применить миграцию к тестовой БД (role `hermes`, отдельная БД `hermes_test`):
+docker compose exec -T hermes_mariyam_postgres \
+  psql -U hermes -d hermes_test -v ON_ERROR_STOP=1 \
   -f /docker-entrypoint-initdb.d/001_init.sql
 
 # 7. Проверка образа: секреты и venv не внутри image
