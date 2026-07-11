@@ -61,8 +61,8 @@ hermes-mariyam/
 Этап 1 (VPS + Hermes + Telegram) — **в работе**:
 - ✅ PostgreSQL healthy (порт 127.0.0.1:5432, init-миграции применены);
 - ✅ Hermes Agent v0.18.2 установлен (профиль `mariyam_oyijon` создан; модель `gpt-5.6-luna` через api.n1n.ai — утверждена 2026-07-12, язык 100%/числа 100%; в allowlist сейчас только админ, временный test-user «Тест Ойижон» допустим для e2e-тестов — ТЗ §0.4);
-- ⬜ MCP-регистрация backend (stdio) + `hermes tools`;
-- ⬜ skill Мариям в профиль;
+- ✅ MCP stdio зарегистрирован (`mariyam_backend`): Hermes видит ровно **19 tools**, реальные tool-calls работают; `ensure_user` (admin) выполнен идемпотентно;
+- ✅ skill mariyam установлен в профиль (enabled, sha256 совпадает с репо);
 - ⬜ Telegram Gateway + негативный тест: любой ID вне allowlist;
 - ⬜ автозапуск (systemd user-service + `loginctl enable-linger`) + reboot-тест.
 

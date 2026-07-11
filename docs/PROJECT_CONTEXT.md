@@ -43,11 +43,11 @@
 На VPS (Этап 1, в работе) выполнено:
 - PostgreSQL поднят и **healthy** (контейнер `hermes_mariyam_postgres`, порт 127.0.0.1:5432, init-миграции применены).
 - Hermes Agent **v0.18.2** (upstream `3b2ef789`) установлен под `timeagent`.
-- Профиль `mariyam_oyijon` создан; модель `tencent/hy3:free` (временная тестовая, ТЗ §0.3); allowlist содержит **только ID администратора**.
+- Профиль `mariyam_oyijon` создан; модель **`gpt-5.6-luna` через api.n1n.ai** (утверждена 2026-07-12, резерв `deepseek-v4-flash`; DECISIONS.md); allowlist содержит **только ID администратора**.
+- Backend зарегистрирован как **stdio MCP** (`mariyam_backend`): Hermes видит ровно 19 tools, реальные tool-calls работают, `ensure_user` (admin) выполнен идемпотентно.
+- Skill Мариям установлен в профиль (enabled, sha256 совпадает с репо).
 
 Ещё не завершено (Этап 1):
-- регистрация backend как MCP-сервер (stdio) и проверка `hermes tools`;
-- установка skill Мариям в профиль;
 - запуск Telegram Gateway и негативный тест: любой ID вне allowlist;
 - автозапуск (systemd user-service + `loginctl enable-linger`) и проверка подъёма после `reboot`.
 

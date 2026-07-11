@@ -6,6 +6,10 @@
 
 Предварительно нужны (Этап 0): Telegram Bot Token, **только Telegram ID администратора (Бахриддин ака)**. Telegram ID Ойижон запрашивается **перед финальной передачей** (решение v3.3, ТЗ §0.3, §21) — сейчас его подключать нельзя.
 
+**Статус выполнения (2026-07-12):** шаги 1–2 и 4–8 выполнены — Hermes v0.18.2, профиль создан, allowlist = только админ, skill установлен (enabled, sha256==repo), stdio MCP `mariyam_backend` зарегистрирован (`hermes tools` = ровно 19), seed admin через `ensure_user` идемпотентен. Остаток: шаг 3 (Telegram Gateway), шаги 9–10 (автозапуск/reboot, живой AC кириллицы).
+
+**Модель профиля:** `gpt-5.6-luna` через api.n1n.ai (`provider: custom`, `base_url: https://api.n1n.ai/v1`, ключ `N1N_API_KEY` в профильном `.env`, 600). Резерв: `deepseek/deepseek-v4-flash` (DECISIONS.md, 2026-07-12).
+
 1. Установить Hermes Agent на VPS по официальной документации (репозиторий NousResearch; ссылки — в конце ТЗ). Зафиксировать версию: `hermes --version` — от неё зависят точные имена конфиг-полей ниже.
 2. Создать профиль `mariyam_oyijon`.
 3. Подключить Telegram Gateway: bot token — только через env/конфиг вне git.
