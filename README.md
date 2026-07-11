@@ -52,7 +52,7 @@ hermes-mariyam/
 
 ## MVP в одном абзаце
 
-Настроить Hermes profile `mariyam_oyijon`, Telegram allowlist, skill личности Мариям, память, STT/TTS тест на реальном голосе, маленький MCP backend с PostgreSQL для точных данных, бухгалтерию с исправлением/удалением, Hermes cron для напоминаний и отчётов, safety alerts, backup/restore и мониторинг.
+Настроить Hermes profile `mariyam_oyijon`, Telegram allowlist, skill личности Мариям, память, сквозной STT-тест на реальном голосе (TTS отложен — ТЗ v3.2, ответы только текстом), маленький MCP backend с PostgreSQL для точных данных, бухгалтерию с исправлением/удалением, Hermes cron для напоминаний и отчётов, safety alerts, backup/restore и мониторинг.
 
 ## Развёртывание и документация
 
