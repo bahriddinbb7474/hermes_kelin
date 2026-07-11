@@ -31,3 +31,9 @@ temp/
 
 # Голоса Ойижон (реальные .ogg не коммитятся)
 data/
+
+# Chat sources staging (пересобирается из docs/, в git не входит)
+CHAT_SOURCES_v3_2/
+
+# Git worktrees
+.worktrees/

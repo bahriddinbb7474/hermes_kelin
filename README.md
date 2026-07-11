@@ -52,7 +52,21 @@ hermes-mariyam/
 
 ## MVP в одном абзаце
 
-Настроить Hermes profile `mariyam_oyijon`, Telegram allowlist, skill личности Мариям, память, сквозной STT-тест на реальном голосе (TTS отложен — ТЗ v3.2, ответы только текстом), маленький MCP backend с PostgreSQL для точных данных, бухгалтерию с исправлением/удалением, Hermes cron для напоминаний и отчётов, safety alerts, backup/restore и мониторинг.
+Настроить Hermes profile `mariyam_oyijon`, Telegram allowlist, skill личности Мариям, память, сквозной STT-тест на реальном голосе (TTS отложен — ТЗ v3.4, ответы только текстом), маленький MCP backend с PostgreSQL для точных данных, бухгалтерию с исправлением/удалением, Hermes cron для напоминаний и отчётов, safety alerts, backup/restore и мониторинг.
+
+## Текущее состояние (2026-07-11)
+
+ТЗ: **v3.4**. Решение заказчика 2026-07-11: для полного тестирования до handover разрешён второй Telegram-аккаунт заказчика с временным test role=oyijon (`display_name="Тест Ойижон"`); настоящий ID Ойижон и seed — только при handover; реальной Ойижон отправка строго запрещена.
+
+Этап 1 (VPS + Hermes + Telegram) — **в работе**:
+- ✅ PostgreSQL healthy (порт 127.0.0.1:5432, init-миграции применены);
+- ✅ Hermes Agent v0.18.2 установлен (профиль `mariyam_oyijon` создан; модель `gpt-5.6-luna` через api.n1n.ai — утверждена 2026-07-12, язык 100%/числа 100%; в allowlist сейчас только админ, временный test-user «Тест Ойижон» допустим для e2e-тестов — ТЗ §0.4);
+- ✅ MCP stdio зарегистрирован (`mariyam_backend`): Hermes видит ровно **19 tools**, реальные tool-calls работают; `ensure_user` (admin) выполнен идемпотентно;
+- ✅ skill mariyam установлен в профиль (enabled, sha256 совпадает с репо);
+- ⬜ Telegram Gateway + негативный тест: любой ID вне allowlist;
+- ⬜ автозапуск (systemd user-service + `loginctl enable-linger`) + reboot-тест.
+
+Telegram Ойижон не подключается и не получает сообщений/onboarding/cron до финальной передачи.
 
 ## Развёртывание и документация
 
