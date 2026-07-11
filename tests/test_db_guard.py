@@ -76,15 +76,51 @@ class GuardTests(unittest.TestCase):
             validate_destructive_test_target(_FAKE.format(db="hermes_test_backup"), "test", False)
         self.assertEqual(ctx.exception.reason, "bad_db_suffix")
 
-    # K. Ошибка не содержит пароль из тестового URL
-    def test_k_error_message_no_secret(self):
-        url = "postgresql://test_user:super_secret_pw@127.0.0.1:5432/hermes"
+    # L. Malformed IPv6 URL -> REFUSED malformed_url (no secrets in message)
+    def test_l_malformed_ipv6(self):
+        url = "postgresql://u:p@[::1:5432/hermes_test"
         with self.assertRaises(DestructiveTestTargetError) as ctx:
             validate_destructive_test_target(url, "test", False)
+        self.assertEqual(ctx.exception.reason, "malformed_url")
         msg = str(ctx.exception)
-        self.assertNotIn("super_secret_pw", msg)
-        self.assertNotIn("test_user", msg)
+        self.assertNotIn("u:p", msg)
         self.assertNotIn(url, msg)
+
+    # M. URL with query parameters -> PASS
+    def test_m_query_params(self):
+        url = "postgresql://u:p@127.0.0.1:5432/hermes_test?sslmode=disable"
+        res = validate_destructive_test_target(url, "test", False)
+        self.assertEqual(res.db_name, "hermes_test")
+        self.assertTrue(res.local)
+
+    # N. Percent-encoded DB name herm%65s -> REFUSED as production 'hermes'
+    def test_n_percent_encoded_prod(self):
+        url = "postgresql://u:p@127.0.0.1:5432/herm%65s"
+        with self.assertRaises(DestructiveTestTargetError) as ctx:
+            validate_destructive_test_target(url, "test", True)
+        self.assertEqual(ctx.exception.reason, "prod_db_name")
+
+    # O. IPv6 loopback [::1] -> PASS as local
+    def test_o_ipv6_loopback(self):
+        url = "postgresql://u:p@[::1]:5432/hermes_test"
+        res = validate_destructive_test_target(url, "test", False)
+        self.assertEqual(res.db_name, "hermes_test")
+        self.assertTrue(res.local)
+
+    # P. Fake localhost (localhost.evil.test) without override -> REFUSED remote
+    def test_p_fake_localhost_remote(self):
+        url = "postgresql://u:p@localhost.evil.test:5432/hermes_test"
+        with self.assertRaises(DestructiveTestTargetError) as ctx:
+            validate_destructive_test_target(url, "test", False)
+        self.assertEqual(ctx.exception.reason, "remote_requires_override")
+        self.assertFalse(ctx.exception.local)
+
+    # Q. Case-insensitive production name HERMES -> REFUSED
+    def test_q_uppercase_prod(self):
+        url = "postgresql://u:p@127.0.0.1:5432/HERMES"
+        with self.assertRaises(DestructiveTestTargetError) as ctx:
+            validate_destructive_test_target(url, "test", True)
+        self.assertEqual(ctx.exception.reason, "prod_db_name")
 
 
 if __name__ == "__main__":

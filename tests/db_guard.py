@@ -19,7 +19,7 @@ Rules (all must hold for a target to be allowed):
 
 This module has NO dependency on the backend or any database driver.
 """
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 # Hosts that are considered "local" (loopback). Local alone is NOT sufficient
 # to mark a database as a test target (rule 5).
@@ -55,13 +55,18 @@ class GuardResult:
 
 
 def _parse_db_name(database_url: str):
-    """Return (db_name, is_local) from a URL without leaking secrets.
+    """Return (db_name, is_local) parsed from a URL without leaking secrets.
 
-    Does not raise on parse errors; returns (None, False) for unparsable input.
+    Percent-encoded characters in the database name are decoded (e.g.
+    ``herm%65s`` -> ``hermes``) so the production-name check cannot be
+    bypassed. Raises ValueError for malformed URLs (e.g. an invalid IPv6
+    literal); callers must catch it and convert it into a clean refusal.
     """
     parsed = urlparse(database_url)
-    db_name = parsed.path.lstrip("/") or None
-    host = parsed.hostname  # None for unix-socket / relative URLs
+    raw_path = parsed.path.lstrip("/") or None
+    db_name = unquote(raw_path) if raw_path is not None else None
+    host = parsed.hostname  # None for unix-socket / relative URLs; also raises
+    # ValueError for malformed IPv6 literals (e.g. '[::1:5432/...').
     is_local = (host is None) or (host in LOCAL_HOSTS)
     return db_name, is_local
 
@@ -89,7 +94,15 @@ def validate_destructive_test_target(
             reason="missing_url",
         )
 
-    db_name, is_local = _parse_db_name(database_url)
+    try:
+        db_name, is_local = _parse_db_name(database_url)
+    except ValueError:
+        # Malformed URL (e.g. invalid IPv6 literal). Refuse without echoing
+        # the URL, username, password or any credentials.
+        raise DestructiveTestTargetError(
+            "DATABASE_URL is malformed; refusing destructive tests",
+            reason="malformed_url",
+        )
 
     # Rule 2: APP_ENV must be strictly 'test'.
     if app_env != "test":
@@ -101,8 +114,9 @@ def validate_destructive_test_target(
         )
 
     # Rule 4: production database name 'hermes' is banned unconditionally.
-    # Checked BEFORE allow_remote so the override can never bypass it (rule 8).
-    if db_name == PRODUCTION_DB_NAME:
+    # Case-insensitive (HERMES == hermes). Checked BEFORE allow_remote so the
+    # override can never bypass it (rule 8).
+    if db_name and db_name.lower() == PRODUCTION_DB_NAME:
         raise DestructiveTestTargetError(
             "production database 'hermes' is forbidden for destructive tests",
             reason="prod_db_name",
