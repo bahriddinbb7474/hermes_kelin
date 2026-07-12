@@ -57,7 +57,7 @@ hermes-mariyam/
 
 ## Текущее состояние (2026-07-12)
 
-ТЗ: **v3.5**. Решение заказчика 2026-07-11/12: для полного тестирования до handover разрешён второй Telegram-аккаунт заказчика с временным test role=oyijon (`display_name="Тест Ойижон"`); настоящий ID Ойижон и seed — только при handover; реальной Ойижон отправка строго запрещена. Решение 2026-07-12: тихая блокировка unauthorized в Hermes v0.18.2 принята как допустимое поведение MVP (ТЗ §0.5, DECISIONS.md).
+ТЗ: **v3.6**. Решение заказчика 2026-07-11/12: для полного тестирования до handover разрешён второй Telegram-аккаунт заказчика с временным test role=oyijon (`display_name="Тест Ойижон"`); настоящий ID Ойижон и seed — только при handover; реальной Ойижон отправка строго запрещена. Решение 2026-07-12: тихая блокировка unauthorized в Hermes v0.18.2 принята как допустимое поведение MVP (ТЗ §0.5, DECISIONS.md). Дополнительно 2026-07-12: детерминированная identity binding зафиксирована в ТЗ v3.6 (§0.6) и прошла независимый аудит `PASS_TO_VPS_PHASE_B`; вся feature-ветка **merged локально в `main` через `dd9261e`** (включая DB guard и identity guard). VPS Phase B ещё не выполнялась.
 
 Этап 1 (VPS + Hermes + Telegram) — **закрыт по решению заказчика (2026-07-12, ТЗ v3.5)**:
 - ✅ PostgreSQL healthy (порт 127.0.0.1:5432, init-миграции применены);
@@ -69,9 +69,9 @@ hermes-mariyam/
 - ✅ Негативный allowlist-тест выполнен: аккаунт вне allowlist блокируется адаптером **до** LLM/tools/БД — `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (решение заказчика 2026-07-12, ТЗ §0.5; точный текст отказа `Кечирасиз, бу шахсий ёрдамчи.` не обязателен для Hermes v0.18.2);
 - ✅ Автозапуск + reboot-тест пройдены: после общего `sudo reboot` (VPS общий с Time-Agent) Gateway поднялся автоматически, ровно один процесс, PostgreSQL healthy, контейнер Time-Agent снова работает, `/opt/time-agent` не трогался (Блок 6И);
 - ✅ Очистка тестовых данных production-БД выполнена (Блок 6З): остался только `admin` (id=1), все fixture-таблицы пусты; backup перед очисткой сохранён;
-- ✅ Коммит systemd `d24d01c` (deploy unit + раздел DEPLOY.md) отправлен в `origin/feature/hermes-mariyam-mvp`.
+- ✅ **Вся feature-ветка merged локально в `main` через `dd9261e`** (DB guard `tests/db_guard.py` и identity guard `deploy/hermes_plugins/mariyam_identity_guard/` включены; commit systemd `d24d01c` вошёл в merge).
 
-Формальный **аудит и merge в `main` Этапа 1 ещё впереди** (отдельное действие заказчика) — не блокирует следующие этапы по решению заказчика.
+**Формальный аудит и merge в `main` Этапа 1 — ВЫПОЛНЕНЫ** (локальный commit `dd9261e`; push в `origin/main` ещё НЕ выполнен — по решению заказчика push отдельный). VPS Phase B (установка identity guard на VPS) ещё не выполнялась.
 
 **Этап 2 (язык, живой AC) — PARTIAL 8/20, НЕ закрыт:**
 - ✅ 8 из 20 фраз проверены (Сообщения 1–2, по 4 фразы) со второго аккаунта «Тест Ойижон»;
@@ -81,6 +81,7 @@ hermes-mariyam/
 
 **Этап 5 (бухгалтерия, живой AC) — НЕ тестирован:**
 - 🟡 backend готов; сквозная проверка через Hermes (6 бухгалтерских сообщений) не выполнялась. `transactions` test-user = 0.
+- 🟡 **Identity-дефект обнаружен и устранён локально** (ТЗ §0.6, `docs/TZ/EVIDENCE_IDENTITY_GUARD_2026-07-12.md`): при livete-тесте Hermes передал tools `user_id` admin вместо test-user. Локальная реализация identity guard прошла **43 unit/integration tests**, реальный Hermes v0.18.2 PluginManager discovery подтверждён, независимый аудит — `PASS_TO_VPS_PHASE_B`; код merged в `main` `dd9261e`. **VPS runtime и Telegram E2E ещё НЕ выполнены** → Этап 5 **НЕ закрыт**.
 
 Текущий allowlist: **admin + временный «Тест Ойижон»** (второй аккаунт заказчика, role=oyijon). Реальная Ойижон отсутствует (до handover).
 

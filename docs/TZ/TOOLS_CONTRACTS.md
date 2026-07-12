@@ -18,6 +18,15 @@
 - backend держит **один** пул соединений на процесс (создание пула на каждый вызов запрещено, ТЗ §16);
 - нереализованная функция возвращает `NOT_CONFIGURED`, а не ложный успех (ТЗ §15).
 
+## Детерминированная identity binding (v3.6)
+
+- `user_id` — internal owner/target (из `users`), см. ТЗ §15.
+- Для user-scoped tools effective `user_id` **проверяется и при необходимости переписывается identity guard** (`mariyam_identity_guard`, `tool_execution` middleware) на основе current Telegram session — до вызова backend. Аргументы модели/display name не являются источником identity.
+- `role=oyijon` **не может** вызвать tool для другого пользователя (всегда self-only).
+- `role=admin` cross-target ограничен строгими allowlists: tools ∈ {`get_expense_report`, `get_balance_summary`, `get_admin_report_data`, `save_plan_note`} И target ∈ `allowed_target_user_ids`; cross-target write/delete запрещены.
+- Malformed/unknown identity блокируется **до backend** (fail-closed, коды `IDENTITY_*`).
+- API backend tools **не меняется** (ТЗ §0.6, §19, §20).
+
 ## MVP tools
 
 - `ensure_user` — идемпотентно создать/найти пользователя по telegram_id (seed при настройке; ТЗ §15.15).
@@ -44,7 +53,7 @@
 
 | Tool | required | Примечание |
 |---|---|---|
-| `ensure_user` | telegram_id, role, display_name | role: `oyijon`/`admin`; повторный вызов → тот же user_id, `created:false` |
+| `ensure_user` | telegram_id, role, display_name | role: `oyijon`/`admin`; повторный вызов → тот же user_id, `created:false`. **При runtime setup через identity guard (v3.6): `telegram_id`, `role` и `display_name` привязываются к sender mapping из middleware — LLM не может произвольно создать другого пользователя через подмену аргументов.** |
 | `save_expense` | user_id, items | items: `[{item_name, amount_uzs, category_code}]`; required внутри item: amount_uzs |
 | `save_income` | user_id, amount | currency по умолчанию UZS |
 | `update_expense` | user_id, expense_id, fields | fields: amount_uzs / category_code / item_name; пустые → INVALID_INPUT |

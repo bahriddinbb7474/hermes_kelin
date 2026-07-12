@@ -15,10 +15,16 @@ Telegram (Ойижон / Бахриддин ака)
   -> Hermes Telegram Gateway + allowlist
   -> Hermes Profile: mariyam_oyijon
        memory, skill, LLM, STT/TTS, cron
+  -> Hermes profile plugin `mariyam_identity_guard`   (v3.6, узкий слой)
+       tool_execution middleware: current session
+       -> persisted Telegram source -> private mapping -> internal users.id
+       (не router, не второй мозг; только детерминированная привязка sender)
   -> MCP backend tools
   -> PostgreSQL
   -> encrypted backup через rclone/Google Drive
 ```
+
+> Узкий слой `mariyam_identity_guard` (v3.6) стоит **между** профилем Hermes и MCP backend. Он **не является router-ом и не является вторым мозгом**: плагин только детерминированно связывает Telegram sender с internal `users.id` и переписывает `user_id` в аргументах user-scoped tools до вызова backend. Смысл сообщения, категория расхода, сумма и решение вызвать tool остаются в Hermes. Backend остаётся тонким tools/storage (ТЗ §0.6, §19, §20).
 
 ## Граница Hermes/backend
 

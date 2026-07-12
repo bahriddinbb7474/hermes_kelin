@@ -29,7 +29,17 @@
   - удалённая тестовая БД `*_test` дополнительно требует `ALLOW_DESTRUCTIVE_TESTS=1`.
 - `ALLOW_DESTRUCTIVE_TESTS=1` НЕ может обойти запрет `hermes`, отсутствие `APP_ENV=test` или отсутствие суффикса `_test`.
 
-> **Статус (2026-07-12):** жёсткий `tests/db_guard.py` (Блок 6Ж) находится в feature-ветке `feature/hermes-mariyam-mvp` и **ещё не merged в `main`**; 16 unit-тестов guard PASS. Destructive suite не запускался. Обязательны `APP_ENV=test` и БД с окончанием `_test`; production БД `hermes` запрещена безусловно; `localhost`/`127.0.0.1` сами по себе НЕ являются достаточным признаком тестовой БД.
+> **Статус (2026-07-12, после merge в `main` `dd9261e`):** жёсткий `tests/db_guard.py` (Блок 6Ж, 16 unit-тестов PASS) **уже merged в `main`** через `dd9261e`. Аналогично **identity guard** (`deploy/hermes_plugins/mariyam_identity_guard/`, 43 теста PASS, независимый аудит `PASS_TO_VPS_PHASE_B`) **также merged в `main`**. **VPS installation/runtime (Фаза B) обоих ещё НЕ выполнена** — требует отдельного разрешения. Destructive suite не запускался на production-БД. Обязательны `APP_ENV=test` и БД с окончанием `_test`; production БД `hermes` запрещена безусловно; `localhost`/`127.0.0.1` сами по себе НЕ являются достаточным признаком тестовой БД.
+
+## Детерминированный identity guard (v3.6)
+
+- Sender определяется по **exact Telegram session** (persisted `sessions.origin_json`, platform=`telegram`), а не по аргументам модели/display name.
+- `role=oyijon` — **self-only** (всегда свой internal `user_id`).
+- `role=admin` cross-target — только по allowlist tools (`get_expense_report`, `get_balance_summary`, `get_admin_report_data`, `save_plan_note`) И `allowed_target_user_ids`; cross-target write/delete запрещены.
+- **Fail-closed:** unknown/corrupt identity, неизвестная роль, malformed mapping и небезопасные права mapping-файла блокируются **до MCP tool** (коды `IDENTITY_UNRESOLVED` / `IDENTITY_TARGET_FORBIDDEN` / `IDENTITY_MAPPING_INVALID` / `IDENTITY_MAPPING_PERMISSIONS` / `IDENTITY_GUARD_ERROR`).
+- Mapping **вне git и вне model-visible profile**; файл `MARIYAM_IDENTITY_MAP_FILE` с правами **`chmod 600`** (plugin отказывает при более широких правах).
+- **Raw Telegram ID и содержимое mapping не логируются** (маскируются функцией `_mask`).
+- Плагин находится в репо, но на VPS ещё **НЕ установлен** — runtime (Фаза B) требует отдельного разрешения; до установки identity обеспечивается только allowlist-логикой.
 
 ## Приватность
 

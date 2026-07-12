@@ -86,6 +86,21 @@
 - **Для обновления источников чата файлы выбираются напрямую из актуального repo/worktree** (свежие незакоммиченные или последний коммит — по указанию заказчика).
 - **Экспортные копии и CHAT_SOURCES запрещены** (закреплено в `docs/ARCHITECT_PROMPT.md`, правило 2).
 
+## Решения заказчика (2026-07-12) — детерминированная identity binding MCP tools
+
+**Обоснование (зачем):** при livete-тестировании бухгалтерских tools Telegram-сессия test-user была корректной, но Hermes передал tools `user_id` администратора — две тестовые записи попали владельцу admin. Root cause: стабильный Telegram sender ID отсутствовал в model context, identity ошибочно зависела от LLM.
+
+- **Identity берётся из текущей Telegram session через Hermes middleware** (`tool_execution`), а не из аргументов модели/display name.
+- **LLM/display_name не являются источником identity** — `user_id` для user-scoped tools переписывается guard на sender-bound.
+- **Oyijon self-only:** всегда свой internal `user_id`.
+- **Admin cross-target только по строгим allowlists:** tool ∈ {`get_expense_report`, `get_balance_summary`, `get_admin_report_data`, `save_plan_note`} И target ∈ `allowed_target_user_ids`; cross-target write/delete запрещены.
+- **Unknown/corrupt identity fail-closed:** блок до MCP tool (коды `IDENTITY_UNRESOLVED` / `IDENTITY_TARGET_FORBIDDEN` / `IDENTITY_MAPPING_INVALID` / `IDENTITY_MAPPING_PERMISSIONS` / `IDENTITY_GUARD_ERROR`).
+- **Mapping вне model-visible profile/git**, mode `0600`.
+- **Backend и Hermes core не изменяются** — плагин только детерминированно связывает sender с internal user, не становится вторым мозгом и не делает identity routing.
+- **Независимый аудит: PASS** (итог `PASS_TO_VPS_PHASE_B`).
+- **Merged в `main` `dd9261e`** (merge всей feature-ветки).
+- **VPS runtime (Фаза B) pending** — требует отдельного разрешения; реальные Telegram ID и содержимое mapping не логируются.
+
 ## Версионность ТЗ
 
-Исполнять только `TZ_Hermes_Mariyam_FINAL_v3_0.md` (внутри — версия 3.5, раздел 0.1–0.5 = changelog): §0.1 — v3.0 → v3.1 (фиксы аудита); §0.2 — v3.1 → v3.2 (TTS off и STT); §0.3 — v3.2 → v3.3 (Ойижон не подключать до handover); §0.4 — v3.3 → v3.4 (временный test-user); §0.5 — v3.4 → v3.5 (ACCEPTED_SILENT_DENIAL). Старые v1/v2/review-файлы не использовать как рабочие требования.
+Исполнять только `TZ_Hermes_Mariyam_FINAL_v3_0.md` (внутри — версия 3.6, раздел 0.1–0.6 = changelog): §0.1 — v3.0 → v3.1 (фиксы аудита); §0.2 — v3.1 → v3.2 (TTS off и STT); §0.3 — v3.2 → v3.3 (Ойижон не подключать до handover); §0.4 — v3.3 → v3.4 (временный test-user); §0.5 — v3.4 → v3.5 (ACCEPTED_SILENT_DENIAL); §0.6 — v3.5 → v3.6 (детерминированная identity binding). Старые v1/v2/review-файлы не использовать как рабочие требования.

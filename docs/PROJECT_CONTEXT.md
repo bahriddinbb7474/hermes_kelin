@@ -38,7 +38,7 @@
 
 ## Где мы сейчас (2026-07-12)
 
-ТЗ поднят до **v3.5** (решение заказчика 2026-07-11/12: для полного тестирования до handover разрешён второй Telegram-аккаунт заказчика с временным test role=oyijon; настоящий ID Ойижон — только при handover; реальной Ойижон отправка строго запрещена. Тихая блокировка unauthorized в Hermes v0.18.2 принята как допустимое поведение MVP — ТЗ §0.5, DECISIONS.md).
+ТЗ поднят до **v3.6** (решение заказчика 2026-07-11/12: для полного тестирования до handover разрешён второй Telegram-аккаунт заказчика с временным test role=oyijon; настоящий ID Ойижон — только при handover; реальной Ойижон отправка строго запрещена. Тихая блокировка unauthorized в Hermes v0.18.2 принята как допустимое поведение MVP — ТЗ §0.5, DECISIONS.md. Дополнительно 2026-07-12: детерминированная identity binding зафиксирована в ТЗ v3.6 §0.6 и прошла независимый аудит `PASS_TO_VPS_PHASE_B`; feature-ветка **merged локально в `main` через `dd9261e`** — DB guard и identity guard находятся в `main`).
 
 На VPS выполнено (Этап 1, технически):
 - PostgreSQL поднят и **healthy** (контейнер `hermes_mariyam_postgres`, порт 127.0.0.1:5432, init-миграции применены).
@@ -53,11 +53,12 @@
 - Очистка тестовых данных production-БД выполнена (Блок 6З): остался только `admin`, fixture-таблицы пусты.
 
 Открыто:
-- **Этап 1 закрыт по решению заказчика (2026-07-12, ТЗ v3.5):** `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (тихая блокировка принята). Аудит и merge коммита `d24d01c` (systemd unit) в `main` — отдельное действие (push в feature-ветку выполнен).
-- DB guard (`tests/db_guard.py`) ещё не в `main` (находится в feature-ветке);
+- **Этап 1 закрыт по решению заказчика (2026-07-12, ТЗ v3.5):** `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (тихая блокировка принята). **Аудит и merge коммита `d24d01c` (systemd unit) в `main` ВЫПОЛНЕНЫ** — вся feature-ветка merged локально в `main` через `dd9261e` (push в `origin/main` ещё НЕ выполнен).
+- **DB guard (`tests/db_guard.py`) находится в `main`** (merged через `dd9261e`; 16 unit-тестов PASS). Destructive suite на production-БД не запускался.
+- **Identity guard (`deploy/hermes_plugins/mariyam_identity_guard/`) находится в `main`** (merged через `dd9261e`); прошёл 43 unit/integration tests и независимый аудит `PASS_TO_VPS_PHASE_B`. VPS installation/runtime (Фаза B) ещё НЕ выполнена.
 - очистка тестовых данных БД — выполнена, закрепить аудитом;
 - **Этап 2 (язык): PARTIAL 8/20, НЕ закрыт** — 8 из 20 фраз проверены (8/8 кириллица, `LATIN_LINES: []`), полный AC (20/20, 0 латиницы) не пройден; тест остановлен заказчиком, не из-за FAIL (см. `docs/TZ/EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md`);
-- **Этап 5 (бухгалтерия): НЕ тестирован** — 6 бухгалтерских сообщений не отправлялись; `transactions` test-user = 0;
+- **Этап 5 (бухгалтерия): НЕ тестирован** — 6 бухгалтерских сообщений не отправлялись; `transactions` test-user = 0. **Identity-дефект обнаружен и устранён локально** (ТЗ §0.6, `docs/TZ/EVIDENCE_IDENTITY_GUARD_2026-07-12.md`): Hermes передал tools `user_id` admin вместо test-user; локальная реализация guard прошла 43 тестов, независимый аудит `PASS_TO_VPS_PHASE_B`; код в `main` `dd9261e`. Этап 5 **НЕ закрыт** (VPS runtime и Telegram E2E pending);
 - STT end-to-end — не выполнен;
 - cron / safety / backup — не начаты.
 
