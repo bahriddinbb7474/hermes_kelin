@@ -7,12 +7,12 @@
 | Этап | Что | Статус (2026-07-12) |
 |---|---|---|
 | 0 | Подготовка данных: доступы, Telegram ID админа (ID Ойижон — перед передачей), voice samples, категории, бюджет | 🟡 частично выполнен — есть ID админа, bot token, VPS, бюджет, voice-samples; ID Ойижон отложен до handover (v3.4) |
-| 1 | VPS + Hermes + Telegram: установка, профиль, allowlist, автозапуск. Сейчас в allowlist только админ; **для e2e-тестов допустимо временно добавить test-user «Тест Ойижон» (второй аккаунт заказчика, §0.4)** | ✅ Gateway работает (user-systemd, active/enabled, 1 процесс); ✅ live Telegram-ответ админу (кириллица); ✅ allowlist security проверена (PASS_SECURITY); ✅ systemd user-service; ✅ enable-linger; ✅ reboot/autostart пройден; 🟡 формальное закрытие ожидает решения по молчаливому отказу (FAIL_TEXT_AC) и финального аудита |
+| 1 | VPS + Hermes + Telegram: установка, профиль, allowlist, автозапуск. Текущий allowlist: **admin + временный test-user «Тест Ойижон»** для e2e-тестов (§0.4); реальная Ойижон не подключается до handover | ✅ **закрыт по решению заказчика (2026-07-12, ТЗ v3.5)**: Gateway работает (user-systemd, active/enabled, 1 процесс); ✅ live Telegram-ответ админу (кириллица); ✅ allowlist security проверена (PASS_SECURITY / ACCEPTED_SILENT_DENIAL — тихая блокировка принята); ✅ systemd user-service; ✅ enable-linger; ✅ reboot/autostart пройден; 🟡 **аудит и merge в main ещё впереди** (отдельное действие) |
 | 1.5 | Финальная передача (pre-handover, v3.4): очистка тест-данных/памяти/cron, добавление ID Ойижон, seed role=oyijon, мягкий onboarding — **только по отдельному разрешению** | ⬜ не начат |
-| 2 | Skill Мариям: стиль, язык, onboarding, кириллица | 🟡 skill установлен в профиль (enabled, sha256==repo); offline-тест языка пройден (24/24 кириллица на выбранной LLM); **один живой ответ кириллицей через Telegram подтверждён**; полный Telegram test-set (20 фраз, 0 латиницы) ещё не выполнен |
+| 2 | Skill Мариям: стиль, язык, onboarding, кириллица | 🟡 skill установлен в профиль (enabled, sha256==repo); offline-тест языка пройден (24/24 кириллица на выбранной LLM); **один живой ответ кириллицей через Telegram подтверждён**; **PARTIAL живой AC: 8/20 фраз проверены (8/8 кириллица, LATIN_LINES=[]), полный AC (20/20, 0 латиницы) НЕ пройден — тест остановлен заказчиком, не из-за FAIL** (см. EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md) |
 | 3 | Голос: сквозной STT-тест (голос→Whisper→LLM→БД, числа ≥90%), бюджет; TTS отложен (v3.2) | 🟡 **LLM выбрана: `gpt-5.6-luna` через api.n1n.ai (2026-07-12, язык 100%/числа 100%, резерв deepseek-v4-flash)**; 15 записей Ойижон есть; сквозная STT-точность ещё не измерена |
 | 4 | Backend tools (MCP) + БД | ✅ выполнен полностью (2026-07-12): backend tools + PostgreSQL (19 tools, 4 тест-маркера, ТЗ v3.1 AC); systemd verify пройден; stdio MCP зарегистрирован в реальном Hermes, `hermes tools` = ровно 19, реальные tool-calls работают, `ensure_user` идемпотентен |
-| 5 | Бухгалтерия: расходы/доходы/отчёты/баланс/исправление/удаление | ✅ backend-часть готова; 🟡 сквозная проверка через Hermes — после Этапа 1 |
+| 5 | Бухгалтерия: расходы/доходы/отчёты/баланс/исправление/удаление | ✅ backend-часть готова; 🟡 сквозная проверка через Hermes (6 бухгалтерских сообщений, Этап 5) **НЕ тестирована** (test-user transactions=0); остановлена заказчиком до завершения |
 | 6 | Hermes cron: напоминания, утро/вечер, новости, погода, намаз | ⬜ не начат — см. `CRON_AND_REMINDERS.md` |
 | 7 | Admin reports + safety: отчёт 19:30, alerts, recall 100% | ⬜ не начат — backend-tools готовы, нужен Hermes |
 | 8 | Backup/restore/monitoring | ⬜ не начат — `backup_data`/`get_backup_status` намеренно возвращают `NOT_CONFIGURED` |
@@ -21,7 +21,7 @@
 
 - **Очистка тестовых данных production-БД** — ВЫПОЛНЕНА (Блок 6З: остался только `admin`, fixture-таблицы пусты, backup сохранён); требует закрепления финальным аудитом.
 - **Merge DB guard в `main`** — `tests/db_guard.py` (Блок 6Ж, 16 unit-тестов PASS) находится в feature-ветке `feature/hermes-mariyam-mvp`, ещё не merged в `main`; destructive suite не запускался.
-- **Решение по точному тексту unauthorized-ответа** — `FAIL_TEXT_AC / PASS_SECURITY`: внешний sender блокируется молча до LLM/tools/БД, требуемый текст `Кечирасиз, бу шахсий ёрдамчи.` не отправляется. Требуется решение заказчика (возможно, отдельная версия ТЗ); нормативное требование ТЗ остаётся без изменений до решения.
+- **Тихая блокировка unauthorized решена в ТЗ v3.5** — `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (решение заказчика 2026-07-12, ТЗ §0.5); отдельный gateway-fork не требуется; аудит и merge `d24d01c` в `main` остаются отдельными действиями.
 
 ## После MVP
 
