@@ -1,0 +1,41 @@
+# Hermes/Mariyam gateway — systemd USER unit (reference copy)
+#
+# Сгенерирован штатной командой Hermes v0.18.2:
+#   hermes -p mariyam_oyijon gateway install --start-on-login
+# Затем включён linger:
+#   loginctl enable-linger timeagent
+# Проверка:
+#   systemd-analyze --user verify ~/.config/systemd/user/hermes-gateway-mariyam_oyijon.service
+#
+# Это USER-unit (WantedBy=default.target), а НЕ system-unit.
+# Безопасно: секретов в файле НЕТ — только пути окружения (PATH/VIRTUAL_ENV/HERMES_HOME).
+# Реальные токены/пароли берутся из профиля ~/.hermes/profiles/mariyam_oyijon/.env в рантайме.
+# Restart=always — gateway сам поднимается после reboot / падения.
+# НЕ трогать /opt/time-agent, time_agent_bot, Time-Agent .env, SQLite volume, logs, backups.
+
+[Unit]
+Description=Hermes Agent Gateway - Messaging Platform Integration
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/home/timeagent/.hermes/hermes-agent/venv/bin/python -m hermes_cli.main --profile mariyam_oyijon gateway run
+WorkingDirectory=/home/timeagent/.hermes/profiles/mariyam_oyijon
+Environment="PATH=/home/timeagent/.hermes/hermes-agent/venv/bin:/home/timeagent/.hermes/hermes-agent/node_modules/.bin:/home/timeagent/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="VIRTUAL_ENV=/home/timeagent/.hermes/hermes-agent/venv"
+Environment="HERMES_HOME=/home/timeagent/.hermes/profiles/mariyam_oyijon"
+Restart=always
+RestartSec=5
+RestartForceExitStatus=75
+KillMode=mixed
+KillSignal=SIGTERM
+ExecReload=/bin/kill -USR1 $MAINPID
+ExecStopPost=-/home/timeagent/.hermes/hermes-agent/venv/bin/python -m gateway.cgroup_cleanup
+TimeoutStopSec=90
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

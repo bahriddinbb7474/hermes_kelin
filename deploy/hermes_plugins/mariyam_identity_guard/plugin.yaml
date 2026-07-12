@@ -1,0 +1,8 @@
+name: mariyam_identity_guard
+version: "1.0.0"
+description: >-
+  Deterministic Telegram session -> internal users.id guard for all
+  user-scoped Mariyam MCP tools. Rewrites tool arguments by the current
+  Telegram session identity from a private mapping. Fail-closed: unknown
+  sender or missing mapping blocks the tool instead of calling it.
+author: Hermes/Mariyam

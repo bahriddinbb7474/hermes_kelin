@@ -177,6 +177,42 @@ cd /opt/hermes-mariyam && sudo docker compose ps
 # 4. Seed users, затем подключить backend в Hermes как stdio MCP server
 ```
 
+## Hermes Gateway — systemd USER-unit (автозапуск Telegram-бота)
+
+Штатный путь (Hermes v0.18.2): `hermes gateway install` генерирует systemd unit,
+`loginctl enable-linger` держит его после logout/reboot. Самодельные демоны НЕ писать.
+
+```bash
+# Под пользователем timeagent (НЕ root):
+export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$PATH"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+
+# 1. Установить USER-unit (WantedBy=default.target, без секретов в файле)
+hermes -p mariyam_oyijon gateway install --start-on-login
+
+# 2. Linger — unit переживает logout и поднимается при boot
+loginctl enable-linger timeagent
+loginctl show-user timeagent -p Linger   # ожидаем: Linger=yes
+
+# 3. Проверить unit ДО запуска (без секретов)
+systemd-analyze --user verify ~/.config/systemd/user/hermes-gateway-mariyam_oyijon.service
+
+# 4. Запуск (или enable --now в install сделает это сам)
+hermes -p mariyam_oyijon gateway start
+systemctl --user status hermes-gateway-mariyam_oyijon.service
+
+# Остановка / откат:
+hermes -p mariyam_oyijon gateway stop
+# или: systemctl --user disable --now hermes-gateway-mariyam_oyijon.service
+```
+
+Эталонная копия unit лежит в `deploy/hermes-gateway-mariyam_oyijon.service`
+(`Restart=always`, env только PATH/VIRTUAL_ENV/HERMES_HOME — секретов нет;
+реальные токены/пароли из `~/.hermes/profiles/mariyam_oyijon/.env` в рантайме).
+
+ВАЖНО: VPS общий с Time-Agent. Reboot влияет на оба сервиса — согласовывать окно.
+НЕ трогать /opt/time-agent, time_agent_bot, Time-Agent .env, SQLite volume, logs, backups.
+
 ## VPS rollback
 
 ```bash
@@ -192,6 +228,69 @@ sudo systemctl start hermes-mariyam.service
 - `.env.example` — placeholder, без реальных значений.
 - `.env`, `.venv/`, `__pycache__/` и docs не должны попадать в Docker image; проверка — `IMAGE_CLEAN`.
 - Если старый image уже собирался с `.env`, удалить старые images, выполнить `docker builder prune`, сменить `POSTGRES_PASSWORD`.
+
+## Mariyam identity guard
+
+Role-aware, fail-closed `tool_execution` middleware, который привязывает
+MCP tools к правильному внутреннему `users.id` по текущей Telegram-сессии.
+Plugin: `deploy/hermes_plugins/mariyam_identity_guard/`.
+
+Шаги будущей **Фазы B** (выполнять только по отдельному разрешению):
+
+1. Скопировать plugin в профиль Hermes:
+
+   ```text
+   deploy/hermes_plugins/mariyam_identity_guard
+   → <HERMES_HOME>/plugins/mariyam_identity_guard
+   ```
+
+2. Включить plugin в `config.yaml` профиля:
+
+   ```yaml
+   plugins:
+     enabled:
+       - mariyam_identity_guard
+   ```
+
+3. Создать приватный mapping-файл (только фиктивные/реальные ID вне git):
+
+   ```text
+   /opt/hermes-mariyam-secrets/identity-map.json
+   ```
+
+4. Установить владельца и права (strict 0600 — plugin откажет при более
+   широких правах):
+
+   ```bash
+   chown timeagent:timeagent /opt/hermes-mariyam-secrets/identity-map.json
+   chmod 600 /opt/hermes-mariyam-secrets/identity-map.json
+   ```
+
+5. Добавить в Gateway environment:
+
+   ```text
+   MARIYAM_IDENTITY_MAP_FILE=/opt/hermes-mariyam-secrets/identity-map.json
+   ```
+
+6. Будущая проверка после restart Gateway:
+
+   ```text
+   plugin loaded
+   tool_execution middleware registered
+   mapping mode 0600
+   Gateway active
+   PostgreSQL healthy
+   ```
+
+7. Будущий runtime smoke (без raw Telegram IDs в отчёте):
+
+   ```text
+   original target
+   effective target
+   tool result
+   ```
+
+НЕ выполнять эти шаги сейчас.
 
 ## FORBIDDEN — что НЕ трогать
 
