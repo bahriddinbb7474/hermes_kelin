@@ -177,6 +177,42 @@ cd /opt/hermes-mariyam && sudo docker compose ps
 # 4. Seed users, затем подключить backend в Hermes как stdio MCP server
 ```
 
+## Hermes Gateway — systemd USER-unit (автозапуск Telegram-бота)
+
+Штатный путь (Hermes v0.18.2): `hermes gateway install` генерирует systemd unit,
+`loginctl enable-linger` держит его после logout/reboot. Самодельные демоны НЕ писать.
+
+```bash
+# Под пользователем timeagent (НЕ root):
+export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$PATH"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+
+# 1. Установить USER-unit (WantedBy=default.target, без секретов в файле)
+hermes -p mariyam_oyijon gateway install --start-on-login
+
+# 2. Linger — unit переживает logout и поднимается при boot
+loginctl enable-linger timeagent
+loginctl show-user timeagent -p Linger   # ожидаем: Linger=yes
+
+# 3. Проверить unit ДО запуска (без секретов)
+systemd-analyze --user verify ~/.config/systemd/user/hermes-gateway-mariyam_oyijon.service
+
+# 4. Запуск (или enable --now в install сделает это сам)
+hermes -p mariyam_oyijon gateway start
+systemctl --user status hermes-gateway-mariyam_oyijon.service
+
+# Остановка / откат:
+hermes -p mariyam_oyijon gateway stop
+# или: systemctl --user disable --now hermes-gateway-mariyam_oyijon.service
+```
+
+Эталонная копия unit лежит в `deploy/hermes-gateway-mariyam_oyijon.service`
+(`Restart=always`, env только PATH/VIRTUAL_ENV/HERMES_HOME — секретов нет;
+реальные токены/пароли из `~/.hermes/profiles/mariyam_oyijon/.env` в рантайме).
+
+ВАЖНО: VPS общий с Time-Agent. Reboot влияет на оба сервиса — согласовывать окно.
+НЕ трогать /opt/time-agent, time_agent_bot, Time-Agent .env, SQLite volume, logs, backups.
+
 ## VPS rollback
 
 ```bash
