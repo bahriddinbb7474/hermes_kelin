@@ -36,19 +36,29 @@
 
 Основной и обязательный канал MVP — Telegram. Семейная группа, веб-дашборд, кнопочный UI и CRM в MVP не нужны.
 
-## Где мы сейчас (2026-07-11)
+## Где мы сейчас (2026-07-12)
 
 ТЗ поднят до **v3.4** (решение заказчика 2026-07-11: для полного тестирования до handover разрешён второй Telegram-аккаунт заказчика с временным test role=oyijon; настоящий ID Ойижон — только при handover; реальной Ойижон отправка строго запрещена).
 
-На VPS (Этап 1, в работе) выполнено:
+На VPS выполнено (Этап 1, технически):
 - PostgreSQL поднят и **healthy** (контейнер `hermes_mariyam_postgres`, порт 127.0.0.1:5432, init-миграции применены).
 - Hermes Agent **v0.18.2** (upstream `3b2ef789`) установлен под `timeagent`.
 - Профиль `mariyam_oyijon` создан; модель **`gpt-5.6-luna` через api.n1n.ai** (утверждена 2026-07-12, резерв `deepseek-v4-flash`; DECISIONS.md); allowlist содержит **только ID администратора**.
 - Backend зарегистрирован как **stdio MCP** (`mariyam_backend`): Hermes видит ровно 19 tools, реальные tool-calls работают, `ensure_user` (admin) выполнен идемпотентно.
 - Skill Мариям установлен в профиль (enabled, sha256 совпадает с репо).
+- Telegram Gateway установлен как **systemd user-service** (`hermes-gateway-mariyam_oyijon.service`), `active`/`enabled`; `loginctl enable-linger timeagent` выполнен (Блок 6И).
+- **Первый живой ответ получен**: бот ответил Бахриддин ака в Telegram на узбекской кириллице (gateway реально принимает/обрабатывает сообщения).
+- systemd/автозапуск/reboot проверены: после общего `sudo reboot` Gateway поднялся автоматически (ровно 1 процесс), PostgreSQL healthy, контейнер Time-Agent снова работает, `/opt/time-agent` не трогался (Блок 6И).
+- allowlist блокирует чужой аккаунт **до** LLM/tools/БД (`PASS_SECURITY`); требуемый текст отказа не отправляется (`FAIL_TEXT_AC` — наблюдаемое поведение Hermes v0.18.2, не изменение нормы).
+- Очистка тестовых данных production-БД выполнена (Блок 6З): остался только `admin`, fixture-таблицы пусты.
 
-Ещё не завершено (Этап 1):
-- запуск Telegram Gateway и негативный тест: любой ID вне allowlist;
-- автозапуск (systemd user-service + `loginctl enable-linger`) и проверка подъёма после `reboot`.
+Открыто:
+- формальное решение по молчаливому unauthorized-block (`FAIL_TEXT_AC / PASS_SECURITY`) — требуется решение заказчика;
+- аудит и merge коммита `d24d01c` (systemd unit) в `main` — push в feature-ветку выполнен, аудит ожидается;
+- DB guard (`tests/db_guard.py`) ещё не в `main` (находится в feature-ветке);
+- очистка тестовых данных БД — выполнена, закрепить аудитом;
+- полный AC языка через Telegram (20 фраз, 0 латиницы) — не выполнен;
+- STT end-to-end — не выполнен;
+- cron / safety / backup — не начаты.
 
-Telegram Ойижон не подключается и не получает сообщений/onboarding/cron до финальной передачи (ТЗ §0.3). Статусы по этапам — `ROADMAP.md`; входная точка для исполнителя — `README.md`.
+Бот НЕ готов для реальной Ойижон: она не подключена до handover. Telegram Ойижон не получает сообщений/onboarding/cron до финальной передачи (ТЗ §0.3). Статусы по этапам — `ROADMAP.md`; входная точка для исполнителя — `README.md`.

@@ -6,7 +6,7 @@
 
 Предварительно нужны (Этап 0): Telegram Bot Token, **только Telegram ID администратора (Бахриддин ака)**. Telegram ID Ойижон запрашивается **перед финальной передачей** (решение v3.3, ТЗ §0.3, §21) — сейчас его подключать нельзя.
 
-**Статус выполнения (2026-07-12):** шаги 1–2 и 4–8 выполнены — Hermes v0.18.2, профиль создан, allowlist = только админ, skill установлен (enabled, sha256==repo), stdio MCP `mariyam_backend` зарегистрирован (`hermes tools` = ровно 19), seed admin через `ensure_user` идемпотентен. Остаток: шаг 3 (Telegram Gateway), шаги 9–10 (автозапуск/reboot, живой AC кириллицы).
+**Статус выполнения (2026-07-12):** шаги 1–9 выполнены — Hermes v0.18.2, профиль создан, allowlist = только админ, skill установлен (enabled, sha256==repo), stdio MCP `mariyam_backend` зарегистрирован (`hermes tools` = ровно 19), seed admin через `ensure_user` идемпотентен, Telegram Gateway запущен (user-systemd, `active`/`enabled`, `loginctl enable-linger` выполнен), reboot/autostart пройден. **Шаг 10 (AC 20 фраз через Telegram) ещё не выполнен полностью** — подтверждён только один живой ответ кириллицей.
 
 **Модель профиля:** `gpt-5.6-luna` через api.n1n.ai (`provider: custom`, `base_url: https://api.n1n.ai/v1`, ключ `N1N_API_KEY` в профильном `.env`, 600). Резерв: `deepseek/deepseek-v4-flash` (DECISIONS.md, 2026-07-12).
 
@@ -33,6 +33,13 @@
 10. Прогнать AC Этапа 2: 20 тест-фраз → ответы только узбекская кириллица (0 латинских букв).
 
 > **Запрет до handover (v3.4):** до отдельного финального разрешения заказчика бот **не пишет** реальной Ойижон — любые сообщения, onboarding и cron-доставка в её Telegram запрещены. Тесты (Telegram, allowlist, tools, cron, alerts) выполняются на аккаунте админа или на временном test-user «Тест Ойижон» (второй аккаунт заказчика, ТЗ §0.4).
+
+## Наблюдаемое поведение allowlist (Hermes v0.18.2)
+
+- user-service `hermes-gateway-mariyam_oyijon.service`: `active`, `enabled`, `Restart=always`; `loginctl show-user timeagent -p Linger` = `yes`; после общего `reboot` поднялся автоматически, ровно один процесс.
+- allowlist содержит **только админа** (Бахриддин ака); реальная Ойижон не подключена (до handover).
+- Пользователь вне allowlist блокируется адаптером **до** agent session / LLM / tools / БД — `PASS_SECURITY`.
+- **Но требуемый текст отказа `Кечирасиз, бу шахсий ёрдамчи.` не отправляется** — `FAIL_TEXT_AC` (тихий отказ). Это наблюдаемое поведение Hermes v0.18.2, а не изменение нормативного требования ТЗ: норма ТЗ (этот файл, шаг 4) остаётся в силе до решения заказчика.
 
 ## Профиль
 
