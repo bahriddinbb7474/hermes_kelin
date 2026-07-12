@@ -13,7 +13,8 @@ PostgreSQL хранит точные данные. Hermes memory хранит т
 
 - `users` — Telegram ID, роль `oyijon`/`admin`, имя, язык, timezone.
 - `expense_categories` — фиксированные категории и подкатегории расходов.
-- `transactions` — расходы и доходы: сумма, валюта, категория, предмет, описание, source text/type, время операции.
+- `transactions` — расходы и доходы: сумма, валюта, категория, предмет, description, source, время. **v3.7 (target):** nullable `item_name_normalized`, `quantity`, `unit` (`kg|g|l|ml|pcs|pack`); unit только с quantity; quantity>0; старые rows без quantity валидны.
+- `monthly_budget_plans` — **v3.7 target:** plan на `(user_id, month, category_code)`: planned_amount_uzs, note, timestamps.
 - `quran_progress` — сура/жуз/страница/заметка и дата обновления.
 - `health_notes` — заметки о самочувствии с severity, без диагноза.
 - `alert_events` — срочные события: тип, severity, исходная фраза, ответ бота, `detected_by`, отправлено ли админу.

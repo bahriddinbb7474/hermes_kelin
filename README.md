@@ -57,7 +57,7 @@ hermes-mariyam/
 
 ## Текущее состояние (2026-07-12)
 
-ТЗ: **v3.6** (без bump требований). Identity binding runtime: plugin **1.0.3** (MCP-prefix, fail-closed barrier, int telegram_id, SKILL sentinel `user_id:0`). Stage 5 E2E **PASS** 2026-07-13 на временном test-user «Тест Ойижон»; реальная Ойижон не подключена. Тихая блокировка unauthorized принята (ТЗ §0.5). **Открытый критический блокер:** self-improvement drift SKILL.md — live follow-up/handover запрещены до фикса.
+ТЗ: **v3.7** (Этап 5.1 analytics/monthly plan — PLANNED). Identity binding runtime: plugin **1.0.3**. Stage 5 E2E **PASS** 2026-07-13; runtime tools **19**, target after 5.1 = **21**. Реальная Ойижон не подключена. **Открытый критический блокер:** self-improvement drift SKILL.md — live follow-up / Stage 5.1 live / handover запрещены до фикса.
 
 Этап 1 (VPS + Hermes + Telegram) — **закрыт по решению заказчика (2026-07-12, ТЗ v3.5)**:
 - ✅ PostgreSQL healthy (порт 127.0.0.1:5432, init-миграции применены);
@@ -80,10 +80,12 @@ hermes-mariyam/
 - Детали: `docs/TZ/EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md`.
 
 **Этап 5 (бухгалтерия, живой AC) — ЗАКРЫТ (PASS 2026-07-13):**
-- ✅ identity guard **1.0.3** на VPS; MCP-prefixed tools; sentinel `user_id:0` → effective test-user **20**.
-- ✅ E2E 4/4: create 192k → report → update 162k → delete → final test **1/12000**; admin **8/768000** (+0).
-- ✅ Evidence: `docs/TZ/EVIDENCE_STAGE_5_E2E_2026-07-12.md`, `docs/TZ/EVIDENCE_IDENTITY_GUARD_2026-07-12.md`; FAIL history: `EVIDENCE_STAGE5_E2E_FAIL_2026-07-12.md`.
-- 🛑 **Блокер:** self-improvement изменил runtime SKILL (восстановлен `dfc7e327…`); следующие live-этапы/handover запрещены до фикса.
+- ✅ identity guard **1.0.3**; E2E 4/4; runtime tools **19**.
+- ✅ Evidence: `docs/TZ/EVIDENCE_STAGE_5_E2E_2026-07-12.md`.
+
+**Этап 5.1 (аналитика + monthly plan) — NOT STARTED (ТЗ v3.7):**
+- ⬜ quantity/unit, by_item, compare/trend, plan/fact; target tools **21**.
+- 🛑 Live 5.1 / handover **запрещены** до фикса self-improvement SKILL drift.
 
 Текущий allowlist: **admin + временный «Тест Ойижон»** (второй аккаунт заказчика, role=oyijon). Реальная Ойижон отсутствует (до handover).
 

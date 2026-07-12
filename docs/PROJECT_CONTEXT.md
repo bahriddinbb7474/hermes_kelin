@@ -38,7 +38,7 @@
 
 ## Где мы сейчас (2026-07-12)
 
-ТЗ поднят до **v3.6** (решение заказчика 2026-07-11/12: для полного тестирования до handover разрешён второй Telegram-аккаунт заказчика с временным test role=oyijon; настоящий ID Ойижон — только при handover; реальной Ойижон отправка строго запрещена. Тихая блокировка unauthorized в Hermes v0.18.2 принята как допустимое поведение MVP — ТЗ §0.5, DECISIONS.md. Дополнительно 2026-07-12: детерминированная identity binding зафиксирована в ТЗ v3.6 §0.6 и прошла независимый аудит `PASS_TO_VPS_PHASE_B`; feature-ветка **merged локально в `main` через `dd9261e`** — DB guard и identity guard находятся в `main`).
+ТЗ: **v3.7** (2026-07-13: Этап 5.1 analytics/monthly plan — PLANNED/NOT STARTED; runtime tools 19, target 21). v3.6 identity binding runtime PASS (plugin 1.0.3, Stage 5 E2E). Test-user «Тест Ойижон» allowed pre-handover; real Oyijon not connected. Silent denial accepted (v3.5).
 
 На VPS выполнено (Этап 1, технически):
 - PostgreSQL поднят и **healthy** (контейнер `hermes_mariyam_postgres`, порт 127.0.0.1:5432, init-миграции применены).
@@ -56,8 +56,10 @@
 - **Этап 1 закрыт по решению заказчика (2026-07-12, ТЗ v3.5):** `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (тихая блокировка принята). **Аудит и merge коммита `d24d01c` (systemd unit) в `main` ВЫПОЛНЕНЫ** — вся feature-ветка merged локально в `main` через `dd9261e` (push в `origin/main` ещё НЕ выполнен).
 - **DB guard (`tests/db_guard.py`) находится в `main`** (merged через `dd9261e`; 16 unit-тестов PASS). Destructive suite на production-БД не запускался.
 - **Identity guard 1.0.3** — VPS runtime + Stage 5 E2E PASS (`EVIDENCE_IDENTITY_GUARD_2026-07-12.md`, `EVIDENCE_STAGE_5_E2E_2026-07-12.md`). MCP-prefix, fail-closed barrier, int `telegram_id`, SKILL sentinel `user_id:0`.
-- **Этап 5 (бухгалтерия): ЗАКРЫТ (PASS 2026-07-13)** — E2E 4/4 на test-user; final test **1/12000**, admin **8/768000** (+0 за E2E; ошибочные rows не удалялись).
+- **Этап 5 (бухгалтерия): ЗАКРЫТ (PASS 2026-07-13)** — E2E 4/4; final test **1/12000**, admin **8/768000**; runtime tools **19**.
+- **Этап 5.1 (аналитика + monthly plan): NOT STARTED** (ТЗ **v3.7**) — quantity/unit, by_item, compare/trend, plan/fact; target tools **21**; live 5.1 **запрещены** до SKILL drift fix.
 - **КРИТИЧЕСКИЙ ОТКРЫТЫЙ БЛОКЕР:** self-improvement изменил runtime SKILL.md + служебное сообщение в Telegram; SKILL восстановлен (`dfc7e327…`); live follow-up/handover **запрещены** до минимального фикса.
+- **Утверждённая цель (v3.7):** Мариям = бытовой финансовый аналитик (группы, товары, quantity, compare, plan/fact, осторожные советы); backend считает факты, Hermes объясняет; memory ≠ источник аналитики.
 - очистка тестовых данных БД — выполнена, закрепить аудитом;
 - **Этап 2 (язык): PARTIAL 8/20, НЕ закрыт** — 8 из 20 фраз проверены (8/8 кириллица, `LATIN_LINES: []`), полный AC (20/20, 0 латиницы) не пройден; тест остановлен заказчиком, не из-за FAIL (см. `docs/TZ/EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md`);
 - STT end-to-end — не выполнен;

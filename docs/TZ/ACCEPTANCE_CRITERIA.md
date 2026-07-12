@@ -48,7 +48,25 @@ Hermes сам вызывает MCP tool и получает ответ. Backend 
 
 *Статус (2026-07-13): **Этап 5 ЗАКРЫТ (PASS).** Сквозной Telegram AC на «Тест Ойижон»: create 2×192k → report 192k → update meat 150k (total 162k) → delete last (остался нон 12k). admin **+0** (8/768000; ошибочные historical rows не удалялись). Guard 1.0.3: MCP-prefixed tools, sentinel `user_id:0` → effective 20. Evidence: `EVIDENCE_STAGE_5_E2E_2026-07-12.md`. Реальная Ойижон не подключена. Требования AC не ослаблены.*
 
-> **Identity runtime (v3.6 + 1.0.3):** детерминированный binding через `mariyam_identity_guard` (не LLM). Исторические FAIL: `EVIDENCE_STAGE5_E2E_FAIL_2026-07-12.md` (не удалять). **Открытый блокер вне AC Этапа 5:** self-improvement drift SKILL.md (см. evidence §5) — live follow-up/handover запрещены до фикса.
+> **Identity runtime (v3.6 + 1.0.3):** детерминированный binding через `mariyam_identity_guard` (не LLM). Исторические FAIL: `EVIDENCE_STAGE5_E2E_FAIL_2026-07-12.md` (не удалять). **Открытый блокер вне AC Этапа 5:** self-improvement drift SKILL.md (см. evidence §5) — live follow-up/handover/Stage 5.1 live **запрещены** до фикса.
+
+### 5.1. Аналитика расходов и месячный план (v3.7)
+
+**Статус: PLANNED / NOT STARTED.** Runtime tools = **19**; target after 5.1 = **21**.
+
+AC (измеримые):
+1. Отчёт показывает основные группы расходов.
+2. Питание раскрывается по товарам (`by_item`).
+3. На товар: сумма, purchase_count, quantity (если было указано).
+4. Текущий месяц точно сравнивается с предыдущим.
+5. Ряд ≥3 месяцев при наличии данных (`monthly_series`).
+6. Можно сохранить бюджет следующего месяца по категориям.
+7. План/факт совпадает с БД.
+8. При отсутствии quantity Мариям не придумывает количество.
+9. Совет по опту без выдуманной цены/гарантированной экономии.
+10. Все ответы Ойижон — узбекская кириллица.
+11. Identity guard на все новые user-scoped tools (`set_monthly_budget`, `get_monthly_budget_status`).
+12. Реальная Ойижон до handover не подключается.
 
 ### 6. Напоминания, новости, погода, намаз
 

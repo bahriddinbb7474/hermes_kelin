@@ -98,9 +98,27 @@
 - **Mapping вне model-visible profile/git**, mode `0600`.
 - **Backend и Hermes core не изменяются** — плагин только детерминированно связывает sender с internal user, не становится вторым мозгом и не делает identity routing.
 - **Независимый аудит: PASS** (итог `PASS_TO_VPS_PHASE_B`).
-- **Merged в `main` `dd9261e`** (merge всей feature-ветки).
-- **VPS runtime (Фаза B) pending** — требует отдельного разрешения; реальные Telegram ID и содержимое mapping не логируются.
+- **Merged в `main` `dd9261e`** (merge feature-ветки identity guard).
+- **VPS runtime + Stage 5 E2E PASS (2026-07-13)** — plugin 1.0.3; evidence `EVIDENCE_STAGE_5_E2E_2026-07-12.md`.
+- Реальные Telegram ID и содержимое mapping не логируются.
+
+## Решения заказчика (2026-07-13) — аналитика расходов и месячный план (Этап 5.1 / ТЗ v3.7)
+
+**Зачем:** Мариям должна быть бытовым финансовым аналитиком (группы, товары, quantity, compare/trend, plan/fact, осторожные советы), а не только калькулятором сумм.
+
+**Риск:** галлюцинации quantity/цен/экономии; смешение units; точные прогнозы без данных; drift security-critical SKILL (уже открытый блокер).
+
+**Цена:** миграция schema + 2 MCP tools (19→21) + расширение report; skill/проза; без identity rewrite.
+
+**Эффект:**
+- nullable `item_name_normalized` / `quantity` / `unit` на `transactions`;
+- `monthly_budget_plans` + `set_monthly_budget` / `get_monthly_budget_status`;
+- `get_expense_report`: compare_previous, trend_months, by_item, previous_period, monthly_series;
+- backend = факты; Hermes = нормализация + объяснения + осторожные советы;
+- LLM memory ≠ источник финансовой аналитики;
+- Этап 5.1 = **PLANNED / NOT STARTED**; live 5.1 **запрещены** до фикса self-improvement SKILL drift;
+- runtime tools = **19**, target = **21**.
 
 ## Версионность ТЗ
 
-Исполнять только `TZ_Hermes_Mariyam_FINAL_v3_0.md` (внутри — версия 3.6, раздел 0.1–0.6 = changelog): §0.1 — v3.0 → v3.1 (фиксы аудита); §0.2 — v3.1 → v3.2 (TTS off и STT); §0.3 — v3.2 → v3.3 (Ойижон не подключать до handover); §0.4 — v3.3 → v3.4 (временный test-user); §0.5 — v3.4 → v3.5 (ACCEPTED_SILENT_DENIAL); §0.6 — v3.5 → v3.6 (детерминированная identity binding). Старые v1/v2/review-файлы не использовать как рабочие требования.
+Исполнять только `TZ_Hermes_Mariyam_FINAL_v3_0.md` (внутри — версия **3.7**, раздел 0.1–0.7 = changelog): §0.1 — v3.0→3.1; §0.2 — TTS/STT; §0.3 — Ойижон не до handover; §0.4 — test-user; §0.5 — silent denial; §0.6 — identity binding; §0.7 — analytics & monthly plan. Старые v1/v2/review-файлы не использовать как рабочие требования.
