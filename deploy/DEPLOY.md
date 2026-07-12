@@ -237,11 +237,11 @@ Plugin: `deploy/hermes_plugins/mariyam_identity_guard/`.
 
 Шаги будущей **Фазы B** (выполнять только по отдельному разрешению):
 
-1. Скопировать plugin в профиль Hermes:
+1. Скопировать plugin в профиль Hermes (runtime-путь именно профиля):
 
    ```text
    deploy/hermes_plugins/mariyam_identity_guard
-   → <HERMES_HOME>/plugins/mariyam_identity_guard
+   → /home/timeagent/.hermes/profiles/mariyam_oyijon/plugins/mariyam_identity_guard
    ```
 
 2. Включить plugin в `config.yaml` профиля:
@@ -250,6 +250,8 @@ Plugin: `deploy/hermes_plugins/mariyam_identity_guard/`.
    plugins:
      enabled:
        - mariyam_identity_guard
+   display:
+     tool_progress: "off"
    ```
 
 3. Создать приватный mapping-файл (только фиктивные/реальные ID вне git):
@@ -266,12 +268,21 @@ Plugin: `deploy/hermes_plugins/mariyam_identity_guard/`.
    chmod 600 /opt/hermes-mariyam-secrets/identity-map.json
    ```
 
-5. Добавить в Gateway environment:
+5. Добавить в Gateway user-unit environment (файл
+   `deploy/hermes-gateway-mariyam_oyijon.service` + live unit):
 
    ```text
-   MARIYAM_IDENTITY_MAP_FILE=/opt/hermes-mariyam-secrets/identity-map.json
+   Environment="MARIYAM_IDENTITY_MAP_FILE=/opt/hermes-mariyam-secrets/identity-map.json"
    ```
 
+   Без этой переменной plugin fail-closed (`IDENTITY_UNRESOLVED`) и **не**
+   вызывает MCP tools. Проверка: `systemctl --user show … -p Environment`
+   содержит ключ `MARIYAM_IDENTITY_MAP_FILE` (значение — путь, не содержимое map).
+
+   Live Hermes передаёт MCP tools как `mcp__mariyam_backend__<tool>`;
+   plugin 1.0.2+ канонизирует только этот server-prefix до bare-имени
+   (`save_expense`, `ensure_user`, …) для policy. Другие server-prefix не
+   трогаются.
 6. Будущая проверка после restart Gateway:
 
    ```text

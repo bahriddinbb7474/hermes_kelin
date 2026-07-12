@@ -1,72 +1,65 @@
 # Evidence — Deterministic Identity Guard
 
-Дата: 2026-07-12
+Дата: 2026-07-12 → runtime close 2026-07-13
 Связь: `TZ_Hermes_Mariyam_FINAL_v3_0.md` §0.6, §15, §19, §21 (v3.6).
-Плагин: `deploy/hermes_plugins/mariyam_identity_guard/`.
+Плагин: `deploy/hermes_plugins/mariyam_identity_guard/` (**1.0.3**).
 
-## 1. Инцидент
+## 1. Инцидент (исторический)
 
 - Telegram session test-user была корректной (allowlist пропустил sender).
 - Hermes вызвал бухгалтерские tools с `user_id` администратора.
-- Две тестовые записи попали владельцу admin (вместо test-user).
+- Тестовые записи попадали владельцу admin (вместо test-user).
 - Backend сохранил переданный `user_id` корректно — ошибка не в backend.
-- Root cause: стабильный Telegram sender ID отсутствовал в model context, identity ошибочно зависела от LLM (модель подставила admin `user_id` в аргументы tool).
+- Root cause (эволюция):
+  1. identity зависела от LLM / display_name;
+  2. live tools приходят как `mcp__mariyam_backend__*` — bare-only guard = passthrough;
+  3. primary callback exception раньше fail-open (Hermes fallback);
+  4. `ensure_user` получал `telegram_id` string, backend schema integer;
+  5. SKILL запрещал tool без `origin.user_id` в LLM-контексте (business FAIL, admin safe).
 
 Реальные Telegram ID в этом документе не приводятся.
 
-## 2. Решение
+## 2. Решение (финальная реализация 1.0.3)
 
 - Profile plugin (Hermes-first, не второй мозг):
-  `deploy/hermes_plugins/mariyam_identity_guard/__init__.py` + `plugin.yaml`.
-- Регистрируется через официальный `tool_execution` middleware (Hermes PluginManager).
-- Поток: current session → persisted Telegram source (`sessions.origin_json`, platform=`telegram`) → private mapping → internal `users.id`.
-- Mapping применяется ДО MCP tool call; `effective user_id` переписывается на sender-bound.
-- Identity НЕ определяется по display name и НЕ доверяется LLM-аргументам.
+  `deploy/hermes_plugins/mariyam_identity_guard/__init__.py` + `plugin.yaml` **1.0.3**.
+- `tool_execution` middleware + **fail-closed barrier** (ContextVar).
+- `canonical_tool_name()`: только prefix `mcp__mariyam_backend__` → bare policy name; original name для log/next.
+- Поток: session → `sessions.origin_json` (telegram) → private mapping (`MARIYAM_IDENTITY_MAP_FILE`) → internal `users.id`.
+- `effective user_id` переписывается **до** MCP; LLM args / display_name не authorization.
+- `ensure_user`: `telegram_id` через `_to_pos_int` (str origin OK → int; unsafe → `IDENTITY_UNRESOLVED`).
+- SKILL §1.1: sentinel `user_id: 0`; отсутствие origin в LLM **не** запрещает tool; ensure_user не в обычных msg.
 
 ## 3. Политика
 
-- **Oyijon self-only:** `role=oyijon` всегда принудительно получает свой собственный `user_id`, независимо от запрошенного.
-- **Admin self-target:** `role=admin` без указания target работает на себя; self-target всегда разрешён.
-- **Admin cross-target:** разрешён ТОЛЬКО если tool входит в строгий allowlist
-  (`get_expense_report`, `get_balance_summary`, `get_admin_report_data`, `save_plan_note`)
-  И target входит в `allowed_target_user_ids` из mapping.
-- **Cross-target write/delete запрещены:** любой user-scoped write/delete tool вне self-target блокируется (`IDENTITY_TARGET_FORBIDDEN`).
-- **Unknown/corrupt identity fail-closed:** отсутствующий sender, malformed mapping, неизвестная роль, небезопасные права файла → блок до tool (`IDENTITY_UNRESOLVED` / `IDENTITY_MAPPING_INVALID` / `IDENTITY_MAPPING_PERMISSIONS` / `IDENTITY_GUARD_ERROR`).
-- **Mapping вне git/profile:** файл `MARIYAM_IDENTITY_MAP_FILE` хранится вне репозитория и вне model-visible profile; права POSIX `0600` (plugin отказывает при более широких правах). Raw Telegram ID и содержимое mapping не логируются (маскируются функцией `_mask`).
-
-Текущий allowlist tools (ровно по коду, `USER_SCOPED_TOOLS` + `ADMIN_CROSS_TARGET_TOOLS`):
-
-- User-scoped (14): `save_expense`, `save_income`, `update_expense`, `update_last_expense`, `delete_expense`, `delete_last_expense`, `get_expense_report`, `get_balance_summary`, `save_quran_progress`, `get_quran_progress`, `save_health_note`, `save_alert_event`, `save_plan_note`, `get_admin_report_data`.
-- Admin cross-target разрешён (4): `get_expense_report`, `get_balance_summary`, `get_admin_report_data`, `save_plan_note`.
-- Global (не user-scoped, pass-through, 4): `backup_data`, `get_backup_status`, `get_bot_status`, `log_usage_cost`.
-- `ensure_user`: `telegram_id`/`role`/`display_name` привязываются к sender mapping (LLM не может создать произвольного пользователя).
+- **Oyijon self-only:** всегда свой `user_id`.
+- **Admin self-target / cross-target allowlist:** как в коде (`USER_SCOPED_TOOLS`, `ADMIN_CROSS_TARGET_TOOLS`).
+- **Cross-target write/delete:** `IDENTITY_TARGET_FORBIDDEN`.
+- **Fail-closed codes:** `IDENTITY_UNRESOLVED` / `IDENTITY_TARGET_FORBIDDEN` / `IDENTITY_MAPPING_INVALID` / `IDENTITY_MAPPING_PERMISSIONS` / `IDENTITY_GUARD_ERROR`.
+- Mapping вне git; POSIX **0600**; raw TG id не логируются (`_mask`).
 
 ## 4. История исправлений
 
 - `a1a42b6` — initial identity guard (role-unaware).
-- Первый независимый аудит: **BLOCK** (identity зависела от недостоверного источника).
-- `4e1c519` — role-aware и fail-closed (привязка к sender, блокировка unknown/corrupt).
-- Второй аудит: **BLOCK** из-за отсутствия строгой схемы mapping и proof discovery плагина.
-- `a0011e2` — strict mapping schema (`validate_mapping_schema`) и реальный plugin discovery через Hermes PluginManager.
-- Финальный независимый аудит: **PASS_TO_VPS_PHASE_B**.
-- `dd9261e` — merge всей feature-ветки в `main`
+- Аудит BLOCK → `4e1c519` role-aware fail-closed.
+- Аудит BLOCK → `a0011e2` strict schema + PluginManager discovery.
+- Аудит **PASS_TO_VPS_PHASE_B** → merge `dd9261e` в `main`.
+- Runtime FAIL (MCP bare-only / barrier) → **1.0.1** barrier + **1.0.2** MCP prefix + MAP unit.
+- ensure_user int + SKILL sentinel → **1.0.3**.
+- Stage 5 Telegram E2E 4/4 PASS — см. `EVIDENCE_STAGE_5_E2E_2026-07-12.md`.
 
-## 5. Проверки
+## 5. Проверки (локально, post-1.0.3)
 
-- pre-merge: **43 passed**, ruff clean, `git diff --check` clean.
-- post-merge: **43 passed**, ruff clean, `git diff --check` clean.
-- Реальный Hermes v0.18.2 PluginManager discovery плагина: **PASS** (integration-тест на установленном `hermes_cli`).
-- malformed mapping → `IDENTITY_MAPPING_INVALID` (fail-closed, downstream calls = 0).
-- unknown sender → `IDENTITY_UNRESOLVED` (downstream calls = 0).
-- Raw Telegram IDs отсутствуют в логах/отчётах (маскировка `_mask`).
+- full pytest: **83 passed** (identity suite + skill contract + project).
+- ruff clean; `py_compile` OK; `git diff --check` clean.
+- Offline VPS Hermes 0.18.2: callbacks=2; MCP save `0→20`; ensure_user int tg + oyijon; primary exception → `IDENTITY_GUARD_ERROR` downstream=0.
+- Live E2E: all four tools `requested=0 effective=20` on test session; admin +0.
 
 ## 6. Текущий статус
 
-- Код merged в `main` (`dd9261e`).
-- Plugin на VPS ещё **НЕ установлен** (Фаза B не выполнялась).
-- Gateway не перезапускался для identity guard.
-- Telegram runtime smoke (Этап 5 E2E) **НЕ выполнен**.
-- Phase B требует отдельного разрешения заказчика.
-- Платный smoke требует отдельного лимита (бюджетное правило ТЗ/DECISIONS).
-- Stage 5 остаётся **открытым** (VPS runtime и Telegram E2E pending).
+- Plugin **1.0.3** установлен в profile runtime VPS.
+- Stage 5 (бухгалтерия identity + CRUD) — **ЗАКРЫТ (PASS)**.
+- Admin ошибочные historical rows (**8 / 768000**) **не удалялись**.
+- Final test-user: **1 / 12000** (нон) после E2E msg4.
 - Реальная Ойижон **НЕ подключена**.
+- **ОТКРЫТО (критично, не identity AC):** self-improvement drift SKILL.md после msg4 — runtime изменил security-critical skill + служебное сообщение в Telegram; файл восстановлен на `dfc7e327…`; root-cause не закрыт → **live follow-up / handover запрещены** до минимального фикса (см. Stage 5 evidence §5).

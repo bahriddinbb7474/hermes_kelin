@@ -46,9 +46,9 @@ Hermes сам вызывает MCP tool и получает ответ. Backend 
 
 `нон 12 минг, гўшт 180 минг` создаёт две записи, категории верные, итог 192 000. Monthly report сходится с БД. Исправление `гўштни 150 минг қил` меняет запись. `охиргисини ўчир` удаляет. Категории только фиксированные. *Тесты до handover — на аккаунте админа или test-user (§0.4).*
 
-*Статус (2026-07-12): backend готов (Этап 4). **Сквозной Telegram AC Этапа 5 НЕ тестирован** — 6 бухгалтерских сообщений не отправлялись; `transactions` test-user = 0. Этап 5 **НЕ закрыт**.*
+*Статус (2026-07-13): **Этап 5 ЗАКРЫТ (PASS).** Сквозной Telegram AC на «Тест Ойижон»: create 2×192k → report 192k → update meat 150k (total 162k) → delete last (остался нон 12k). admin **+0** (8/768000; ошибочные historical rows не удалялись). Guard 1.0.3: MCP-prefixed tools, sentinel `user_id:0` → effective 20. Evidence: `EVIDENCE_STAGE_5_E2E_2026-07-12.md`. Реальная Ойижон не подключена. Требования AC не ослаблены.*
 
-> **Уточнение (2026-07-12, после merge `dd9261e`):** в ходе livete-теста обнаружен и устранён **identity-дефект** (Hermes передал tools `user_id` admin вместо test-user; root cause — identity зависела от LLM). Локальная реализация identity guard прошла **43 unit/integration tests** (включая guard); реальный Hermes v0.18.2 PluginManager discovery плагина подтверждён; независимый аудит — **PASS_TO_VPS_PHASE_B**; код **merged в `main` `dd9261e`**. **VPS installation (Фаза B) и Telegram E2E ещё НЕ выполнены** — поэтому Этап 5 **НЕ закрыт**. Сами бизнес-AC расходов (суммы, категории, исправление/удаление) не ослаблены (ТЗ §0.6, `docs/TZ/EVIDENCE_IDENTITY_GUARD_2026-07-12.md`).
+> **Identity runtime (v3.6 + 1.0.3):** детерминированный binding через `mariyam_identity_guard` (не LLM). Исторические FAIL: `EVIDENCE_STAGE5_E2E_FAIL_2026-07-12.md` (не удалять). **Открытый блокер вне AC Этапа 5:** self-improvement drift SKILL.md (см. evidence §5) — live follow-up/handover запрещены до фикса.
 
 ### 6. Напоминания, новости, погода, намаз
 

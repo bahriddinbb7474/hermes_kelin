@@ -29,17 +29,20 @@
   - удалённая тестовая БД `*_test` дополнительно требует `ALLOW_DESTRUCTIVE_TESTS=1`.
 - `ALLOW_DESTRUCTIVE_TESTS=1` НЕ может обойти запрет `hermes`, отсутствие `APP_ENV=test` или отсутствие суффикса `_test`.
 
-> **Статус (2026-07-12, после merge в `main` `dd9261e`):** жёсткий `tests/db_guard.py` (Блок 6Ж, 16 unit-тестов PASS) **уже merged в `main`** через `dd9261e`. Аналогично **identity guard** (`deploy/hermes_plugins/mariyam_identity_guard/`, 43 теста PASS, независимый аудит `PASS_TO_VPS_PHASE_B`) **также merged в `main`**. **VPS installation/runtime (Фаза B) обоих ещё НЕ выполнена** — требует отдельного разрешения. Destructive suite не запускался на production-БД. Обязательны `APP_ENV=test` и БД с окончанием `_test`; production БД `hermes` запрещена безусловно; `localhost`/`127.0.0.1` сами по себе НЕ являются достаточным признаком тестовой БД.
+> **Статус (2026-07-13):** `tests/db_guard.py` в `main`. Identity guard **1.0.3** на VPS runtime; Stage 5 E2E PASS. Destructive suite на production-БД не запускался. Обязательны `APP_ENV=test` и БД с окончанием `_test`; production БД `hermes` запрещена безусловно.
 
-## Детерминированный identity guard (v3.6)
+## Детерминированный identity guard (v3.6 / plugin 1.0.3)
 
-- Sender определяется по **exact Telegram session** (persisted `sessions.origin_json`, platform=`telegram`), а не по аргументам модели/display name.
-- `role=oyijon` — **self-only** (всегда свой internal `user_id`).
-- `role=admin` cross-target — только по allowlist tools (`get_expense_report`, `get_balance_summary`, `get_admin_report_data`, `save_plan_note`) И `allowed_target_user_ids`; cross-target write/delete запрещены.
-- **Fail-closed:** unknown/corrupt identity, неизвестная роль, malformed mapping и небезопасные права mapping-файла блокируются **до MCP tool** (коды `IDENTITY_UNRESOLVED` / `IDENTITY_TARGET_FORBIDDEN` / `IDENTITY_MAPPING_INVALID` / `IDENTITY_MAPPING_PERMISSIONS` / `IDENTITY_GUARD_ERROR`).
-- Mapping **вне git и вне model-visible profile**; файл `MARIYAM_IDENTITY_MAP_FILE` с правами **`chmod 600`** (plugin отказывает при более широких правах).
-- **Raw Telegram ID и содержимое mapping не логируются** (маскируются функцией `_mask`).
-- Плагин находится в репо, но на VPS ещё **НЕ установлен** — runtime (Фаза B) требует отдельного разрешения; до установки identity обеспечивается только allowlist-логикой.
+- Sender определяется по **exact Telegram session** (`sessions.origin_json`, platform=`telegram`), а не по аргументам модели/display name.
+- Live tool names: `mcp__mariyam_backend__*` канонизируются до bare policy name.
+- `role=oyijon` — **self-only** (включая sentinel `user_id: 0` → trusted internal id).
+- `role=admin` cross-target — allowlist tools + `allowed_target_user_ids`; cross-target write/delete запрещены.
+- **Fail-closed** (primary + barrier): `IDENTITY_*`; primary exception → `IDENTITY_GUARD_ERROR`, downstream=0.
+- `ensure_user`: `telegram_id` приводится к **int** (`_to_pos_int`); небезопасное значение → блок.
+- Mapping **вне git**; `MARIYAM_IDENTITY_MAP_FILE` mode **600**; unit + profile `.env` (Hermes может сбросить unit Environment).
+- **Raw Telegram ID и mapping не логируются** (`_mask`).
+- **Runtime VPS: установлен (1.0.3); Stage 5 PASS.** Исторические FAIL evidence сохранены.
+- **ОТКРЫТЫЙ КРИТИЧЕСКИЙ БЛОКЕР:** self-improvement/curator переписал security-critical `skills/mariyam/SKILL.md` и показал служебное сообщение end-user; файл восстановлен; до минимального фикса — **запрет live follow-up/handover**.
 
 ## Приватность
 

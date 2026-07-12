@@ -8,8 +8,10 @@
 #   systemd-analyze --user verify ~/.config/systemd/user/hermes-gateway-mariyam_oyijon.service
 #
 # Это USER-unit (WantedBy=default.target), а НЕ system-unit.
-# Безопасно: секретов в файле НЕТ — только пути окружения (PATH/VIRTUAL_ENV/HERMES_HOME).
+# Безопасно: секретов в файле НЕТ — только пути окружения
+# (PATH/VIRTUAL_ENV/HERMES_HOME/MARIYAM_IDENTITY_MAP_FILE).
 # Реальные токены/пароли берутся из профиля ~/.hermes/profiles/mariyam_oyijon/.env в рантайме.
+# Mapping-файл — вне git/profile; unit передаёт только PATH к нему (не содержимое).
 # Restart=always — gateway сам поднимается после reboot / падения.
 # НЕ трогать /opt/time-agent, time_agent_bot, Time-Agent .env, SQLite volume, logs, backups.
 
@@ -26,6 +28,7 @@ WorkingDirectory=/home/timeagent/.hermes/profiles/mariyam_oyijon
 Environment="PATH=/home/timeagent/.hermes/hermes-agent/venv/bin:/home/timeagent/.hermes/hermes-agent/node_modules/.bin:/home/timeagent/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Environment="VIRTUAL_ENV=/home/timeagent/.hermes/hermes-agent/venv"
 Environment="HERMES_HOME=/home/timeagent/.hermes/profiles/mariyam_oyijon"
+Environment="MARIYAM_IDENTITY_MAP_FILE=/opt/hermes-mariyam-secrets/identity-map.json"
 Restart=always
 RestartSec=5
 RestartForceExitStatus=75

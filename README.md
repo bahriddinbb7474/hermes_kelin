@@ -57,7 +57,7 @@ hermes-mariyam/
 
 ## Текущее состояние (2026-07-12)
 
-ТЗ: **v3.6**. Решение заказчика 2026-07-11/12: для полного тестирования до handover разрешён второй Telegram-аккаунт заказчика с временным test role=oyijon (`display_name="Тест Ойижон"`); настоящий ID Ойижон и seed — только при handover; реальной Ойижон отправка строго запрещена. Решение 2026-07-12: тихая блокировка unauthorized в Hermes v0.18.2 принята как допустимое поведение MVP (ТЗ §0.5, DECISIONS.md). Дополнительно 2026-07-12: детерминированная identity binding зафиксирована в ТЗ v3.6 (§0.6) и прошла независимый аудит `PASS_TO_VPS_PHASE_B`; вся feature-ветка **merged локально в `main` через `dd9261e`** (включая DB guard и identity guard). VPS Phase B ещё не выполнялась.
+ТЗ: **v3.6** (без bump требований). Identity binding runtime: plugin **1.0.3** (MCP-prefix, fail-closed barrier, int telegram_id, SKILL sentinel `user_id:0`). Stage 5 E2E **PASS** 2026-07-13 на временном test-user «Тест Ойижон»; реальная Ойижон не подключена. Тихая блокировка unauthorized принята (ТЗ §0.5). **Открытый критический блокер:** self-improvement drift SKILL.md — live follow-up/handover запрещены до фикса.
 
 Этап 1 (VPS + Hermes + Telegram) — **закрыт по решению заказчика (2026-07-12, ТЗ v3.5)**:
 - ✅ PostgreSQL healthy (порт 127.0.0.1:5432, init-миграции применены);
@@ -79,9 +79,11 @@ hermes-mariyam/
 - 🟡 полный AC (20/20, 0 латиницы) **НЕ пройден** — Сообщения 3–5 (фразы 9–20) не отправлялись; тест остановлен заказчиком, не из-за FAIL.
 - Детали: `docs/TZ/EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md`.
 
-**Этап 5 (бухгалтерия, живой AC) — НЕ тестирован:**
-- 🟡 backend готов; сквозная проверка через Hermes (6 бухгалтерских сообщений) не выполнялась. `transactions` test-user = 0.
-- 🟡 **Identity-дефект обнаружен и устранён локально** (ТЗ §0.6, `docs/TZ/EVIDENCE_IDENTITY_GUARD_2026-07-12.md`): при livete-тесте Hermes передал tools `user_id` admin вместо test-user. Локальная реализация identity guard прошла **43 unit/integration tests**, реальный Hermes v0.18.2 PluginManager discovery подтверждён, независимый аудит — `PASS_TO_VPS_PHASE_B`; код merged в `main` `dd9261e`. **VPS runtime и Telegram E2E ещё НЕ выполнены** → Этап 5 **НЕ закрыт**.
+**Этап 5 (бухгалтерия, живой AC) — ЗАКРЫТ (PASS 2026-07-13):**
+- ✅ identity guard **1.0.3** на VPS; MCP-prefixed tools; sentinel `user_id:0` → effective test-user **20**.
+- ✅ E2E 4/4: create 192k → report → update 162k → delete → final test **1/12000**; admin **8/768000** (+0).
+- ✅ Evidence: `docs/TZ/EVIDENCE_STAGE_5_E2E_2026-07-12.md`, `docs/TZ/EVIDENCE_IDENTITY_GUARD_2026-07-12.md`; FAIL history: `EVIDENCE_STAGE5_E2E_FAIL_2026-07-12.md`.
+- 🛑 **Блокер:** self-improvement изменил runtime SKILL (восстановлен `dfc7e327…`); следующие live-этапы/handover запрещены до фикса.
 
 Текущий allowlist: **admin + временный «Тест Ойижон»** (второй аккаунт заказчика, role=oyijon). Реальная Ойижон отсутствует (до handover).
 

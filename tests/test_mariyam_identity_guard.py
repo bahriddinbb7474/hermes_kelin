@@ -259,6 +259,16 @@ def test_next_call_single_use(resolver, fake_map):
     assert calls["n"] == 1
 
 
+def test_verified_context_resets_after_downstream_exception(resolver, fake_map):
+    with pytest.raises(RuntimeError, match="downstream failed"):
+        _call(
+            "get_expense_report",
+            {"period": "month"},
+            next_side_effect=RuntimeError("downstream failed"),
+        )
+    assert guard._VERIFIED_GUARD_CALL.get() is False
+
+
 # ---- Hermes integration (real middleware chain) ----
 def test_hermes_middleware_chain_exception_fail_closed(monkeypatch):
     """P0 regression: if the guard internally fails before next_call, the
@@ -503,8 +513,9 @@ def test_plugin_discovery_and_registration():
         # Callback must come from the registry the discovery created — we do
         # NOT import or inject the callback manually here.
         callbacks = pm._middleware.get("tool_execution")
-        assert callbacks is not None and len(callbacks) == 1
-        # (the single callback is the discovered module's on_tool_execution_middleware)
+        assert callbacks is not None and len(callbacks) == 2
+        assert callbacks[0].__name__ == "on_tool_execution_middleware"
+        assert callbacks[1].__name__ == "_fail_closed_barrier_middleware"
 
         captured = {}
 
@@ -543,6 +554,444 @@ def test_plugin_discovery_and_registration():
         shutil.rmtree(home, ignore_errors=True)
 
 
+def test_real_agent_runtime_callback_exception_never_falls_open(monkeypatch):
+    """A callback failure must not let Hermes execute the original tool args.
+
+    This drives the installed Hermes agent runtime helper after real plugin
+    discovery; it does not call ``run_tool_execution_middleware`` directly.
+    """
+    import hermes_cli.plugins as hp
+    from agent.tool_executor import _run_agent_tool_execution_middleware
+    from importlib.metadata import version
+
+    expected_runtime_version = os.environ.get("MARIYAM_HERMES_RUNTIME_VERSION")
+    if expected_runtime_version is not None:
+        assert version("hermes-agent") == expected_runtime_version
+
+    home = _make_plugin_home()
+    map_file = Path(home) / "identity_private.json"
+    map_file.write_text(json.dumps(FAKE_MAP))
+    db = Path(home) / "state.db"
+    con = sqlite3.connect(str(db))
+    con.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, origin_json TEXT)")
+    con.execute(
+        "INSERT INTO sessions VALUES (?, ?)",
+        ("sess-oyijon", json.dumps({"platform": "telegram", "user_id": "222222222"})),
+    )
+    con.commit()
+    con.close()
+
+    old_home = os.environ.get("HERMES_HOME")
+    os.environ["HERMES_HOME"] = home
+    os.environ["MARIYAM_IDENTITY_MAP_FILE"] = str(map_file)
+    try:
+        pm = hp.get_plugin_manager()
+        pm.discover_and_load(force=True)
+        callbacks = pm._middleware["tool_execution"]
+        assert len(callbacks) == 2
+        plugin_module = sys.modules[callbacks[0].__module__]
+
+        def boom(*_args, **_kwargs):
+            raise NameError("logger is not defined")
+
+        # Simulate an exception that escapes the primary callback's own error
+        # construction. Hermes currently catches it and otherwise retries the
+        # chain with the original, untrusted args.
+        monkeypatch.setattr(plugin_module, "load_identity_map", boom)
+        monkeypatch.setattr(plugin_module, "_safe_error", boom)
+
+        calls = {"n": 0}
+
+        def execute(next_args):
+            calls["n"] += 1
+            return f"DOWNSTREAM:{next_args['user_id']}"
+
+        agent = type(
+            "RuntimeAgent",
+            (),
+            {
+                "session_id": "sess-oyijon",
+                "_current_turn_id": "turn-1",
+                "_current_api_request_id": "request-1",
+            },
+        )()
+        result, _observed_args = _run_agent_tool_execution_middleware(
+            agent,
+            function_name="save_expense",
+            function_args={"user_id": 1, "items": []},
+            effective_task_id="task-1",
+            tool_call_id="tool-1",
+            execute=execute,
+        )
+
+        assert calls["n"] == 0
+        assert json.loads(result)["error_code"] == "IDENTITY_GUARD_ERROR"
+    finally:
+        if old_home is None:
+            os.environ.pop("HERMES_HOME", None)
+        else:
+            os.environ["HERMES_HOME"] = old_home
+        os.environ.pop("MARIYAM_IDENTITY_MAP_FILE", None)
+        shutil.rmtree(home, ignore_errors=True)
+
+
+# ---- MCP-prefixed live tool names (P0 regression, Stage-5 live FAIL) ----
+MCP_SAVE = "mcp__mariyam_backend__save_expense"
+MCP_ENSURE = "mcp__mariyam_backend__ensure_user"
+MCP_UPDATE = "mcp__mariyam_backend__update_expense"
+MCP_DELETE = "mcp__mariyam_backend__delete_last_expense"
+MCP_REPORT = "mcp__mariyam_backend__get_expense_report"
+MCP_BALANCE = "mcp__mariyam_backend__get_balance_summary"
+MCP_OTHER_SERVER = "mcp__other_backend__save_expense"
+
+
+def test_canonical_tool_name_strips_only_mariyam_backend_prefix():
+    assert guard.canonical_tool_name("save_expense") == "save_expense"
+    assert guard.canonical_tool_name(MCP_SAVE) == "save_expense"
+    assert guard.canonical_tool_name(MCP_ENSURE) == "ensure_user"
+    assert guard.canonical_tool_name(MCP_OTHER_SERVER) == MCP_OTHER_SERVER
+    assert guard.canonical_tool_name("") == ""
+    assert guard.canonical_tool_name(None) is None
+
+
+def test_mcp_prefixed_save_expense_rewrites_oyijon_user(resolver, fake_map):
+    """Live FAIL path: model user_id=1 must become test-user 20."""
+    _, _, calls = _call(MCP_SAVE, {"user_id": 1, "items": []})
+    assert calls["n"] == 1
+    assert calls["args"]["user_id"] == 20
+
+
+def test_mcp_prefixed_sentinel_zero_rewrites_to_oyijon(resolver, fake_map):
+    """SKILL sentinel: model passes user_id=0; guard binds trusted oyijon id."""
+    _, _, calls = _call(MCP_SAVE, {"user_id": 0, "items": []})
+    assert calls["n"] == 1
+    assert calls["args"]["user_id"] == 20
+    # Admin must not be the effective owner.
+    assert calls["args"]["user_id"] != 1
+
+
+def test_mcp_prefixed_sentinel_zero_unresolved_downstream_zero(resolver, monkeypatch):
+    """No mapping → IDENTITY_UNRESOLVED, downstream never runs (admin safe)."""
+    monkeypatch.delenv("MARIYAM_IDENTITY_MAP_FILE", raising=False)
+    _, parsed, calls = _call(MCP_SAVE, {"user_id": 0, "items": []})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_UNRESOLVED"
+
+
+def test_real_agent_runtime_mcp_sentinel_zero_no_display_name(monkeypatch):
+    """Hermes agent path: MCP-prefixed save with user_id=0, no display_name."""
+    import hermes_cli.plugins as hp
+    from agent.tool_executor import _run_agent_tool_execution_middleware
+    from importlib.metadata import version
+
+    expected_runtime_version = os.environ.get("MARIYAM_HERMES_RUNTIME_VERSION")
+    if expected_runtime_version is not None:
+        assert version("hermes-agent") == expected_runtime_version
+
+    home = _make_plugin_home()
+    map_file = Path(home) / "identity_private.json"
+    map_file.write_text(json.dumps(FAKE_MAP))
+    db = Path(home) / "state.db"
+    con = sqlite3.connect(str(db))
+    con.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, origin_json TEXT)")
+    # Trusted session only — no display_name field (LLM context blind).
+    con.execute(
+        "INSERT INTO sessions VALUES (?, ?)",
+        ("sess-oyijon", json.dumps({"platform": "telegram", "user_id": "222222222"})),
+    )
+    con.commit()
+    con.close()
+
+    old_home = os.environ.get("HERMES_HOME")
+    os.environ["HERMES_HOME"] = home
+    os.environ["MARIYAM_IDENTITY_MAP_FILE"] = str(map_file)
+    try:
+        pm = hp.get_plugin_manager()
+        pm.discover_and_load(force=True)
+        assert len(pm._middleware["tool_execution"]) == 2
+
+        calls = {"n": 0, "args": None}
+
+        def execute(next_args):
+            calls["n"] += 1
+            calls["args"] = next_args
+            return f"DOWNSTREAM:{next_args['user_id']}"
+
+        agent = type(
+            "RuntimeAgent",
+            (),
+            {
+                "session_id": "sess-oyijon",
+                "_current_turn_id": "turn-1",
+                "_current_api_request_id": "request-1",
+            },
+        )()
+        result, _ = _run_agent_tool_execution_middleware(
+            agent,
+            function_name=MCP_SAVE,
+            function_args={"user_id": 0, "items": [{"amount_uzs": 12000}]},
+            effective_task_id="task-1",
+            tool_call_id="tool-1",
+            execute=execute,
+        )
+        assert calls["n"] == 1
+        assert calls["args"]["user_id"] == 20
+        assert "display_name" not in calls["args"]
+        assert result == "DOWNSTREAM:20"
+    finally:
+        if old_home is None:
+            os.environ.pop("HERMES_HOME", None)
+        else:
+            os.environ["HERMES_HOME"] = old_home
+        os.environ.pop("MARIYAM_IDENTITY_MAP_FILE", None)
+        shutil.rmtree(home, ignore_errors=True)
+
+
+def test_mcp_prefixed_ensure_user_binds_session_not_model_admin(resolver, fake_map):
+    """Model telegram_id=admin must be replaced by trusted session origin."""
+    _, _, calls = _call(
+        MCP_ENSURE,
+        {"telegram_id": 111111111, "role": "admin", "display_name": "Bahriddin"},
+    )
+    assert calls["n"] == 1
+    assert calls["args"]["telegram_id"] == 222222222
+    assert isinstance(calls["args"]["telegram_id"], int)
+    assert calls["args"]["role"] == "oyijon"
+    assert calls["args"]["display_name"] == "Тест Ойижон"
+
+
+def test_mcp_prefixed_ensure_user_telegram_id_int_from_string_origin(
+    resolver, fake_map
+):
+    """Live FAIL path: origin user_id is str; backend requires int telegram_id.
+
+    Mapping keys stay strings; actor internal user_id stays 20; downstream
+    ensure_user must receive telegram_id as int (not str).
+    """
+    _, _, calls = _call(
+        MCP_ENSURE,
+        {"telegram_id": "111111111", "role": "admin", "display_name": "X"},
+    )
+    assert calls["n"] == 1
+    assert isinstance(calls["args"]["telegram_id"], int)
+    assert calls["args"]["telegram_id"] == 222222222
+    assert not isinstance(calls["args"]["telegram_id"], bool)
+    assert calls["args"]["role"] == "oyijon"
+    # actor_user_id for oyijon is 20 (mapping); ensure_user does not pass user_id
+    # but role binding proves session actor is test-user, not admin.
+    assert calls["args"]["display_name"] == "Тест Ойижон"
+
+
+def test_ensure_user_non_numeric_telegram_fail_closed(resolver, monkeypatch):
+    """If trusted tg cannot be coerced to pos int → no downstream."""
+    monkeypatch.setattr(
+        guard, "resolve_telegram_user_id", lambda _sid: "not-a-numeric-id"
+    )
+    # Map must still resolve if we force a numeric key — instead force bad tg only.
+    # Use real map but replace resolve to return non-coercible value.
+    # load_identity_map still needs entry for that key → map miss → UNRESOLVED
+    # Explicitly: entry exists for garbage key with valid schema.
+    m = {
+        "not-a-numeric-id": {
+            "user_id": 20,
+            "role": "oyijon",
+            "display_name": "T",
+        }
+    }
+    path = Path(os.environ.get("MARIYAM_IDENTITY_MAP_FILE") or "")
+    # When no map file from fixture, set one
+    if not path or not Path(str(path)).exists():
+        # use resolver fixture path via env already set by fake_map usually
+        pass
+    # override load to return our weird key map
+    monkeypatch.setattr(guard, "load_identity_map", lambda: (m, None))
+    _, parsed, calls = _call(
+        MCP_ENSURE,
+        {"telegram_id": 1, "role": "admin", "display_name": "X"},
+    )
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_UNRESOLVED"
+
+
+def test_mcp_prefixed_update_delete_report_same_policy(resolver, fake_map):
+    _, _, c_upd = _call(MCP_UPDATE, {"user_id": 1, "amount": 1})
+    assert c_upd["args"]["user_id"] == 20
+
+    _, _, c_del = _call(MCP_DELETE, {"user_id": 1})
+    assert c_del["args"]["user_id"] == 20
+
+    _, _, c_rep = _call(MCP_REPORT, {"user_id": 1, "period": "month"})
+    assert c_rep["args"]["user_id"] == 20
+
+    _, _, c_bal = _call(MCP_BALANCE, {"user_id": 1})
+    assert c_bal["args"]["user_id"] == 20
+
+
+def test_mcp_prefixed_admin_cross_write_delete_blocked(resolver, fake_map):
+    _, parsed, calls = _call(
+        MCP_SAVE, {"user_id": 20, "items": []}, session_id="sess-admin"
+    )
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_TARGET_FORBIDDEN"
+
+    _, parsed2, calls2 = _call(
+        MCP_DELETE, {"user_id": 20}, session_id="sess-admin"
+    )
+    assert calls2["n"] == 0
+    assert parsed2["error_code"] == "IDENTITY_TARGET_FORBIDDEN"
+
+
+def test_mcp_prefixed_admin_cross_report_allowed(resolver, fake_map):
+    _, _, calls = _call(
+        MCP_REPORT, {"user_id": 20, "period": "month"}, session_id="sess-admin"
+    )
+    assert calls["n"] == 1
+    assert calls["args"]["user_id"] == 20
+
+
+def test_missing_map_env_fail_closed(resolver, monkeypatch):
+    """No MARIYAM_IDENTITY_MAP_FILE → IDENTITY_UNRESOLVED, downstream=0."""
+    monkeypatch.delenv("MARIYAM_IDENTITY_MAP_FILE", raising=False)
+    # No fake_map fixture: use real load_identity_map.
+    _, parsed, calls = _call(MCP_SAVE, {"user_id": 1, "items": []})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_UNRESOLVED"
+
+
+def test_bare_names_still_work(resolver, fake_map):
+    _, _, calls = _call("save_expense", {"user_id": 1, "items": []})
+    assert calls["n"] == 1
+    assert calls["args"]["user_id"] == 20
+
+
+def test_other_mcp_server_prefix_not_rewritten(resolver, fake_map):
+    """Only mariyam_backend prefix is canonicalized; other servers passthrough."""
+    _, _, calls = _call(MCP_OTHER_SERVER, {"user_id": 1, "items": []})
+    assert calls["n"] == 1
+    assert calls["args"]["user_id"] == 1
+
+
+def test_real_agent_runtime_mcp_prefixed_save_rewrites(monkeypatch):
+    """Hermes v0.18.2 agent.tool_executor path with live MCP-prefixed name."""
+    import hermes_cli.plugins as hp
+    from agent.tool_executor import _run_agent_tool_execution_middleware
+    from importlib.metadata import version
+
+    expected_runtime_version = os.environ.get("MARIYAM_HERMES_RUNTIME_VERSION")
+    if expected_runtime_version is not None:
+        assert version("hermes-agent") == expected_runtime_version
+
+    home = _make_plugin_home()
+    map_file = Path(home) / "identity_private.json"
+    map_file.write_text(json.dumps(FAKE_MAP))
+    db = Path(home) / "state.db"
+    con = sqlite3.connect(str(db))
+    con.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, origin_json TEXT)")
+    con.execute(
+        "INSERT INTO sessions VALUES (?, ?)",
+        ("sess-oyijon", json.dumps({"platform": "telegram", "user_id": "222222222"})),
+    )
+    con.commit()
+    con.close()
+
+    old_home = os.environ.get("HERMES_HOME")
+    os.environ["HERMES_HOME"] = home
+    os.environ["MARIYAM_IDENTITY_MAP_FILE"] = str(map_file)
+    try:
+        pm = hp.get_plugin_manager()
+        pm.discover_and_load(force=True)
+        callbacks = pm._middleware["tool_execution"]
+        assert len(callbacks) == 2
+        assert callbacks[0].__name__ == "on_tool_execution_middleware"
+        assert callbacks[1].__name__ == "_fail_closed_barrier_middleware"
+
+        calls = {"n": 0, "args": None}
+
+        def execute(next_args):
+            calls["n"] += 1
+            calls["args"] = next_args
+            return f"DOWNSTREAM:{next_args['user_id']}"
+
+        agent = type(
+            "RuntimeAgent",
+            (),
+            {
+                "session_id": "sess-oyijon",
+                "_current_turn_id": "turn-1",
+                "_current_api_request_id": "request-1",
+            },
+        )()
+
+        result, observed = _run_agent_tool_execution_middleware(
+            agent,
+            function_name=MCP_SAVE,
+            function_args={"user_id": 1, "items": [{"amount_uzs": 12000}]},
+            effective_task_id="task-1",
+            tool_call_id="tool-1",
+            execute=execute,
+        )
+        assert calls["n"] == 1
+        assert calls["args"]["user_id"] == 20
+        assert result == "DOWNSTREAM:20"
+
+        # ensure_user with model admin telegram_id
+        calls2 = {"n": 0, "args": None}
+
+        def execute2(next_args):
+            calls2["n"] += 1
+            calls2["args"] = next_args
+            return "OK"
+
+        result2, _ = _run_agent_tool_execution_middleware(
+            agent,
+            function_name=MCP_ENSURE,
+            function_args={
+                "telegram_id": 111111111,
+                "role": "admin",
+                "display_name": "Bahriddin",
+            },
+            effective_task_id="task-2",
+            tool_call_id="tool-2",
+            execute=execute2,
+        )
+        assert calls2["n"] == 1
+        assert str(calls2["args"]["telegram_id"]) == "222222222"
+        assert calls2["args"]["role"] == "oyijon"
+        assert calls2["args"]["display_name"] == "Тест Ойижон"
+
+        # primary exception still fail-closed with MCP-prefixed name
+        plugin_module = sys.modules[callbacks[0].__module__]
+
+        def boom(*_a, **_k):
+            raise NameError("logger is not defined")
+
+        monkeypatch.setattr(plugin_module, "load_identity_map", boom)
+        monkeypatch.setattr(plugin_module, "_safe_error", boom)
+        calls3 = {"n": 0}
+
+        def execute3(next_args):
+            calls3["n"] += 1
+            return "NO"
+
+        result3, _ = _run_agent_tool_execution_middleware(
+            agent,
+            function_name=MCP_SAVE,
+            function_args={"user_id": 1, "items": []},
+            effective_task_id="task-3",
+            tool_call_id="tool-3",
+            execute=execute3,
+        )
+        assert calls3["n"] == 0
+        assert json.loads(result3)["error_code"] == "IDENTITY_GUARD_ERROR"
+    finally:
+        if old_home is None:
+            os.environ.pop("HERMES_HOME", None)
+        else:
+            os.environ["HERMES_HOME"] = old_home
+        os.environ.pop("MARIYAM_IDENTITY_MAP_FILE", None)
+        shutil.rmtree(home, ignore_errors=True)
+
+
 # ---- Additional ----
 def test_global_tool_passthrough(resolver, fake_map):
     _, _, calls = _call("backup_data", {"target": "db"})
@@ -554,7 +1003,8 @@ def test_ensure_user_rewrites_all_fields(resolver, fake_map):
     _, _, calls = _call(
         "ensure_user", {"telegram_id": 111, "role": "admin", "display_name": "X"}
     )
-    assert str(calls["args"]["telegram_id"]) == "222222222"
+    assert calls["args"]["telegram_id"] == 222222222
+    assert isinstance(calls["args"]["telegram_id"], int)
     assert calls["args"]["role"] == "oyijon"
     assert calls["args"]["display_name"] == "Тест Ойижон"
 

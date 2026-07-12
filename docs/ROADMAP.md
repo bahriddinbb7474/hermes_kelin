@@ -12,7 +12,7 @@
 | 2 | Skill Мариям: стиль, язык, onboarding, кириллица | 🟡 skill установлен в профиль (enabled, sha256==repo); offline-тест языка пройден (24/24 кириллица на выбранной LLM); **один живой ответ кириллицей через Telegram подтверждён**; **PARTIAL живой AC: 8/20 фраз проверены (8/8 кириллица, LATIN_LINES=[]), полный AC (20/20, 0 латиницы) НЕ пройден — тест остановлен заказчиком, не из-за FAIL** (см. EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md) |
 | 3 | Голос: сквозной STT-тест (голос→Whisper→LLM→БД, числа ≥90%), бюджет; TTS отложен (v3.2) | 🟡 **LLM выбрана: `gpt-5.6-luna` через api.n1n.ai (2026-07-12, язык 100%/числа 100%, резерв deepseek-v4-flash)**; 15 записей Ойижон есть; сквозная STT-точность ещё не измерена |
 | 4 | Backend tools (MCP) + БД | ✅ выполнен полностью (2026-07-12): backend tools + PostgreSQL (19 tools, 4 тест-маркера, ТЗ v3.1 AC); systemd verify пройден; stdio MCP зарегистрирован в реальном Hermes, `hermes tools` = ровно 19, реальные tool-calls работают, `ensure_user` идемпотентен |
-| 5 | Бухгалтерия: расходы/доходы/отчёты/баланс/исправление/удаление | ✅ backend-часть готова; 🟡 сквозная проверка через Hermes (6 бухгалтерских сообщений, Этап 5) **НЕ тестирована** (test-user transactions=0); остановлена заказчиком до завершения. **Identity-дефект обнаружен и устранён локально** (ТЗ §0.6, `docs/TZ/EVIDENCE_IDENTITY_GUARD_2026-07-12.md`): Hermes передал tools `user_id` admin вместо test-user; локальная реализация guard прошла 43 unit/integration tests, независимый аудит `PASS_TO_VPS_PHASE_B`, код merged в `main` `dd9261e`. **Этап 5 НЕ закрыт** (VPS runtime Фазы B и Telegram E2E pending) |
+| 5 | Бухгалтерия: расходы/доходы/отчёты/баланс/исправление/удаление | ✅ **закрыт (2026-07-13):** identity guard **1.0.3** (MCP-prefix + fail-closed barrier + int `telegram_id` + SKILL sentinel `user_id:0`); VPS live; Telegram E2E 4/4 PASS на «Тест Ойижон» (create/report/update/delete; effective always 20; admin +0). Evidence: `EVIDENCE_STAGE_5_E2E_2026-07-12.md`, `EVIDENCE_IDENTITY_GUARD_2026-07-12.md`. Исторические FAIL сохранены (`EVIDENCE_STAGE5_E2E_FAIL_…`). Final DB: test **1/12000**, admin **8/768000** (ошибочные rows не удалялись). Реальная Ойижон не подключена. |
 | 6 | Hermes cron: напоминания, утро/вечер, новости, погода, намаз | ⬜ не начат — см. `CRON_AND_REMINDERS.md` |
 | 7 | Admin reports + safety: отчёт 19:30, alerts, recall 100% | ⬜ не начат — backend-tools готовы, нужен Hermes |
 | 8 | Backup/restore/monitoring | ⬜ не начат — `backup_data`/`get_backup_status` намеренно возвращают `NOT_CONFIGURED` |
@@ -20,7 +20,9 @@
 ## Технический долг
 
 - **Очистка тестовых данных production-БД** — ВЫПОЛНЕНА (Блок 6З: остался только `admin`, fixture-таблицы пусты, backup сохранён); требует закрепления финальным аудитом.
-- **DB guard и identity guard — В MERGED В `main`** через `dd9261e` (ТЗ v3.6 §0.6). `tests/db_guard.py` (Блок 6Ж, 16 unit-тестов PASS) и `deploy/hermes_plugins/mariyam_identity_guard/` (43 теста PASS, аудит `PASS_TO_VPS_PHASE_B`) находятся в `main`. VPS runtime (Фаза B) для обоих ещё НЕ выполнялся; destructive suite не запускался.
+- **DB guard** — в `main` (`tests/db_guard.py`); destructive suite на production-БД не запускался.
+- **Identity guard 1.0.3** — VPS runtime + Stage 5 E2E PASS (см. evidence). Локальный commit после Stage 5 — отдельно; push `origin/main` — отдельное разрешение.
+- **КРИТИЧЕСКИЙ ОТКРЫТЫЙ БЛОКЕР:** self-improvement/curator **изменил runtime SKILL.md** после E2E msg4 (sha drift; служебное сообщение в Telegram). SKILL восстановлен (`dfc7e327…`). **Следующие live-этапы и handover запрещены** до минимального фикса самопереписывания security-critical skill.
 - **Тихая блокировка unauthorized решена в ТЗ v3.5** — `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (решение заказчика 2026-07-12, ТЗ §0.5); отдельный gateway-fork не требуется; аудит и merge `d24d01c` в `main` **ВЫПОЛНЕНЫ** (через `dd9261e`); push в `origin/main` остаётся отдельным действием.
 
 ## После MVP

@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import stat
+from contextvars import ContextVar
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -61,6 +62,10 @@ GLOBAL_TOOLS = frozenset(
 # The account-creation tool: identity taken from the session's verified sender.
 ENSURE_USER = "ensure_user"
 
+# Live Hermes MCP tools are exposed as mcp__<server>__<tool>. Only this exact
+# Mariyam backend server prefix is stripped for classification/policy.
+MCP_SERVER_PREFIX = "mcp__mariyam_backend__"
+
 # Admin cross-target allowlist. Only these tools may be driven by admin against
 # an Oyijon-owned user_id (and only if that id is in allowed_target_user_ids).
 # NOT a general allowlist — admin cannot touch arbitrary Oyijon write tools.
@@ -88,6 +93,23 @@ LOG = logging.getLogger("mariyam_identity_guard")
 
 VALID_ROLES = ("admin", "oyijon")
 
+# Hermes isolates a middleware callback failure and continues the chain with
+# the original payload. The primary guard sets this context-local capability
+# only while it delegates; the following barrier blocks a fallback path that
+# did not pass through a verified primary guard.
+_VERIFIED_GUARD_CALL: ContextVar[bool] = ContextVar(
+    "mariyam_identity_guard_verified", default=False
+)
+_GUARD_ERROR_ENVELOPE = json.dumps(
+    {
+        "ok": False,
+        "error_code": "IDENTITY_GUARD_ERROR",
+        "message_ru": "Некорректная идентификация пользователя",
+        "message_uz": "Фойдаланувчи идентификацияси нотўғри",
+    },
+    ensure_ascii=False,
+)
+
 
 # ---------------------------------------------------------------------------
 # Small helpers
@@ -100,9 +122,44 @@ def _mask(value):
     return s[0] + "*" * (len(s) - 2) + s[-1]
 
 
+def canonical_tool_name(tool_name):
+    """Return the bare tool name used for identity policy classification.
+
+    Hermes registers Mariyam MCP tools as ``mcp__mariyam_backend__<tool>``.
+    Policy sets use bare names (``save_expense``, ``ensure_user``, …). Only the
+    exact server prefix ``mcp__mariyam_backend__`` is stripped; other servers
+    and bare names are left unchanged. The original live name must still be
+    preserved by the caller for ``next_call``/logging context.
+    """
+    if not isinstance(tool_name, str) or not tool_name:
+        return tool_name
+    if tool_name.startswith(MCP_SERVER_PREFIX):
+        bare = tool_name[len(MCP_SERVER_PREFIX) :]
+        return bare if bare else tool_name
+    return tool_name
+
+
 def _is_pos_int(value):
     """True if value is a positive int (bool is explicitly rejected)."""
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _to_pos_int(value):
+    """Coerce a trusted id to a positive int, or None if unsafe.
+
+    Accepts int or digit-only str (origin JSON often stores user_id as str).
+    Rejects bool, float, empty, signed, and non-numeric forms.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value > 0 else None
+    if isinstance(value, str):
+        s = value.strip()
+        if s.isdigit():
+            n = int(s)
+            return n if n > 0 else None
+    return None
 
 
 def _state_db_path() -> Path | None:
@@ -265,13 +322,20 @@ def load_identity_map():
 # ---------------------------------------------------------------------------
 def _safe_error(session_id, tool_name, code):
     assert code in SAFE_ERROR_CODES, code
-    if session_id:
-        LOG.warning(
-            "identity_guard BLOCKED session=%s tool=%s code=%s",
-            _mask(session_id),
-            tool_name,
-            code,
-        )
+    try:
+        if session_id:
+            LOG.warning(
+                "identity_guard BLOCKED session=%s tool=%s code=%s",
+                _mask(session_id),
+                tool_name,
+                code,
+            )
+    except Exception:
+        # A temporary/debug logging error must not escape to Hermes, whose
+        # generic middleware handler would otherwise continue with raw args.
+        pass
+    if code == "IDENTITY_GUARD_ERROR":
+        return _GUARD_ERROR_ENVELOPE
     return json.dumps(
         {
             "ok": False,
@@ -320,8 +384,12 @@ def _compute_effective_args(tool_name, args, actor_entry, tg):
 
     if tool_name == ENSURE_USER:
         # Account creation: bind explicitly to the verified sender identity.
+        # Backend schema requires telegram_id: integer; origin may store str.
+        tg_int = _to_pos_int(tg)
+        if tg_int is None:
+            return None, "IDENTITY_UNRESOLVED"
         out = copy.deepcopy(args)
-        out["telegram_id"] = tg
+        out["telegram_id"] = tg_int
         out["role"] = actor_role
         out["display_name"] = actor_entry.get("display_name")
         return out, None
@@ -369,65 +437,88 @@ def on_tool_execution_middleware(**kwargs):
     """tool_execution middleware: enforce identity, fail closed.
 
     Guarantees:
-      * No exception before next_call reaches downstream (all pre-call logic
-        is wrapped; any failure returns a safe block). Terminal (downstream)
-        errors are NOT masked -- next_call is invoked outside the try.
-      * next_call is invoked at most once.
+      * Any primary-callback error returns a safe block.
+      * The registered barrier blocks Hermes' generic fallback when an error
+        escapes this callback before delegation.
+      * Terminal (downstream) errors are not masked.
+      * MCP-prefixed Mariyam tool names are classified by their bare name;
+        the original live name is kept only for logging context.
     """
-    tool_name = kwargs.get("tool_name")
-    args = kwargs.get("args") or {}
-    next_call = kwargs.get("next_call")
-    session_id = kwargs.get("session_id")
-
-    # Global tools: not user-scoped, pass straight through untouched.
-    if tool_name in GLOBAL_TOOLS or (
-        tool_name not in USER_SCOPED_TOOLS and tool_name != ENSURE_USER
-    ):
-        if callable(next_call):
-            return next_call(args)
-        return args
-
-    effective_args = None
     try:
-        id_map, map_err = load_identity_map()
-        if map_err == "IDENTITY_MAPPING_PERMISSIONS":
-            return _safe_error(session_id, tool_name, "IDENTITY_MAPPING_PERMISSIONS")
-        if map_err == "IDENTITY_MAPPING_INVALID":
-            return _safe_error(session_id, tool_name, "IDENTITY_MAPPING_INVALID")
-        if not isinstance(id_map, dict):
-            return _safe_error(session_id, tool_name, "IDENTITY_UNRESOLVED")
+        original_tool_name = kwargs.get("tool_name")
+        tool_name = canonical_tool_name(original_tool_name)
+        args = kwargs.get("args") or {}
+        next_call = kwargs.get("next_call")
+        session_id = kwargs.get("session_id")
 
-        actor = _resolve_actor(session_id, id_map)
-        if actor is None:
-            return _safe_error(session_id, tool_name, "IDENTITY_UNRESOLVED")
-
-        tg = resolve_telegram_user_id(session_id)
-        effective_args, err = _compute_effective_args(tool_name, args, actor, tg)
-        if err is not None:
-            return _safe_error(session_id, tool_name, err)
-
-        if tool_name == ENSURE_USER:
-            _audit_log(
-                tool_name, actor["role"], actor["user_id"], None, actor["user_id"], "ensure_user_bound"
-            )
+        if tool_name in GLOBAL_TOOLS or (
+            tool_name not in USER_SCOPED_TOOLS and tool_name != ENSURE_USER
+        ):
+            effective_args = args
         else:
-            _audit_log(
-                tool_name,
-                actor["role"],
-                actor["user_id"],
-                args.get("user_id"),
-                effective_args.get("user_id"),
-                "oyijon_self" if actor["role"] == "oyijon" else "admin_target",
-            )
-    except Exception:
-        return _safe_error(session_id, tool_name, "IDENTITY_GUARD_ERROR")
+            id_map, map_err = load_identity_map()
+            if map_err == "IDENTITY_MAPPING_PERMISSIONS":
+                return _safe_error(session_id, original_tool_name, "IDENTITY_MAPPING_PERMISSIONS")
+            if map_err == "IDENTITY_MAPPING_INVALID":
+                return _safe_error(session_id, original_tool_name, "IDENTITY_MAPPING_INVALID")
+            if not isinstance(id_map, dict):
+                return _safe_error(session_id, original_tool_name, "IDENTITY_UNRESOLVED")
 
-    # Downstream call OUTSIDE try so its errors are not masked.
-    if callable(next_call):
+            actor = _resolve_actor(session_id, id_map)
+            if actor is None:
+                return _safe_error(session_id, original_tool_name, "IDENTITY_UNRESOLVED")
+
+            tg = resolve_telegram_user_id(session_id)
+            # Policy/classification always use the bare canonical name.
+            effective_args, err = _compute_effective_args(tool_name, args, actor, tg)
+            if err is not None:
+                return _safe_error(session_id, original_tool_name, err)
+
+            if tool_name == ENSURE_USER:
+                # _compute_effective_args already rebinds telegram_id/role/
+                # display_name from trusted session + validated mapping; model
+                # telegram_id/display_name are never authorization sources.
+                _audit_log(
+                    original_tool_name,
+                    actor["role"],
+                    actor["user_id"],
+                    None,
+                    actor["user_id"],
+                    "ensure_user_bound",
+                )
+            else:
+                _audit_log(
+                    original_tool_name,
+                    actor["role"],
+                    actor["user_id"],
+                    args.get("user_id"),
+                    effective_args.get("user_id"),
+                    "oyijon_self" if actor["role"] == "oyijon" else "admin_target",
+                )
+
+        if not callable(next_call):
+            return _safe_error(session_id, original_tool_name, "IDENTITY_GUARD_ERROR")
+    except Exception:
+        return _safe_error(kwargs.get("session_id"), kwargs.get("tool_name"), "IDENTITY_GUARD_ERROR")
+
+    verified_token = _VERIFIED_GUARD_CALL.set(True)
+    try:
         return next_call(effective_args)
-    return effective_args
+    finally:
+        _VERIFIED_GUARD_CALL.reset(verified_token)
+
+
+def _fail_closed_barrier_middleware(**kwargs):
+    """Block Hermes fallback after an unexpected primary callback failure."""
+    if not _VERIFIED_GUARD_CALL.get():
+        return _GUARD_ERROR_ENVELOPE
+    next_call = kwargs.get("next_call")
+    if not callable(next_call):
+        return _GUARD_ERROR_ENVELOPE
+    return next_call(kwargs.get("args"))
 
 
 def register(ctx) -> None:  # pragma: no cover - exercised at runtime on VPS
-    """Register the middleware with the Hermes plugin context."""
+    """Register the primary guard followed by its fail-closed barrier."""
     ctx.register_middleware("tool_execution", on_tool_execution_middleware)
+    ctx.register_middleware("tool_execution", _fail_closed_barrier_middleware)
