@@ -2,7 +2,7 @@
 
 All identity data here is FICTITIOUS. No real Telegram IDs, no real internal
 user_ids. The guard logic is verified offline with mocked resolver/mapping;
-Hermes' real middleware chain and plugin loader are exercised via the
+Hermes' real middleware chain and PluginManager loader are exercised via the
 installed ``hermes_cli`` package (no VPS, no network, no paid calls).
 """
 
@@ -85,23 +85,6 @@ def resolver(monkeypatch):
     monkeypatch.setattr(guard, "resolve_telegram_user_id", _resolve)
 
 
-@pytest.fixture(scope="module")
-def registered_chain():
-    """Register the guard into Hermes' REAL middleware chain (the same
-    ``pm._middleware`` registry that ``run_tool_execution_middleware`` reads),
-    so integration tests exercise the actual execution path."""
-    import hermes_cli.plugins as hp
-
-    pm = hp.get_plugin_manager()
-    pm._middleware.setdefault("tool_execution", [])
-    if guard.on_tool_execution_middleware not in pm._middleware["tool_execution"]:
-        pm._middleware["tool_execution"].append(guard.on_tool_execution_middleware)
-    yield pm
-    # best-effort cleanup so the module-global registry is not polluted
-    if guard.on_tool_execution_middleware in pm._middleware.get("tool_execution", []):
-        pm._middleware["tool_execution"].remove(guard.on_tool_execution_middleware)
-
-
 def _call(tool_name, args, session_id="sess-oyijon", next_side_effect=None):
     calls = {"n": 0, "args": None}
 
@@ -150,9 +133,7 @@ def test_oyijon_cannot_target_other(resolver, fake_map):
 def test_same_display_names_not_mixed(resolver, fake_map):
     # Same (fictitious) display_name handling is irrelevant; identity is by
     # session origin, not name. Admin stays bound to his own id, oyijon to hers.
-    _a, _, admin_calls = _call(
-        "get_expense_report", {"user_id": 1}, session_id="sess-admin"
-    )
+    _a, _, admin_calls = _call("get_expense_report", {"user_id": 1}, session_id="sess-admin")
     _o, _, oyijon_calls = _call("get_expense_report", {}, session_id="sess-oyijon")
     assert admin_calls["args"]["user_id"] == 1
     assert oyijon_calls["args"]["user_id"] == 20
@@ -279,15 +260,21 @@ def test_next_call_single_use(resolver, fake_map):
 
 
 # ---- Hermes integration (real middleware chain) ----
-def test_hermes_middleware_chain_exception_fail_closed(registered_chain, monkeypatch):
+def test_hermes_middleware_chain_exception_fail_closed(monkeypatch):
     """P0 regression: if the guard internally fails before next_call, the
     real Hermes chain must NOT execute the downstream terminal tool."""
     from hermes_cli.middleware import run_tool_execution_middleware
+    import hermes_cli.plugins as hp
 
     def boom():
         raise RuntimeError("plugin blew up")
 
     monkeypatch.setattr(guard, "load_identity_map", boom)
+    # Register the guard into the REAL chain (same path PluginManager uses).
+    pm = hp.get_plugin_manager()
+    pm._middleware.setdefault("tool_execution", [])
+    if guard.on_tool_execution_middleware not in pm._middleware["tool_execution"]:
+        pm._middleware["tool_execution"].append(guard.on_tool_execution_middleware)
 
     captured = {"n": 0}
 
@@ -296,21 +283,25 @@ def test_hermes_middleware_chain_exception_fail_closed(registered_chain, monkeyp
         return "TERMINAL_RESULT"
 
     result = run_tool_execution_middleware(
-        "get_expense_report",
-        {"user_id": 1},
-        terminal,
-        session_id="sess-oyijon",
+        "get_expense_report", {"user_id": 1}, terminal, session_id="sess-oyijon"
     )
     assert captured["n"] == 0
     parsed = json.loads(result)
     assert parsed["error_code"] == "IDENTITY_GUARD_ERROR"
+    if guard.on_tool_execution_middleware in pm._middleware["tool_execution"]:
+        pm._middleware["tool_execution"].remove(guard.on_tool_execution_middleware)
 
 
-def test_hermes_middleware_chain_normal_rewrite(registered_chain, monkeypatch):
+def test_hermes_middleware_chain_normal_rewrite(monkeypatch):
     from hermes_cli.middleware import run_tool_execution_middleware
+    import hermes_cli.plugins as hp
 
     monkeypatch.setattr(guard, "load_identity_map", lambda: (dict(FAKE_MAP), None))
     monkeypatch.setattr(guard, "resolve_telegram_user_id", lambda s: "222222222")
+    pm = hp.get_plugin_manager()
+    pm._middleware.setdefault("tool_execution", [])
+    if guard.on_tool_execution_middleware not in pm._middleware["tool_execution"]:
+        pm._middleware["tool_execution"].append(guard.on_tool_execution_middleware)
 
     captured = {}
 
@@ -319,39 +310,201 @@ def test_hermes_middleware_chain_normal_rewrite(registered_chain, monkeypatch):
         return "TERMINAL_RESULT"
 
     result = run_tool_execution_middleware(
-        "get_expense_report",
-        {"user_id": 1},
-        terminal,
-        session_id="sess-oyijon",
+        "get_expense_report", {"user_id": 1}, terminal, session_id="sess-oyijon"
     )
     assert captured["args"]["user_id"] == 20
     assert result == "TERMINAL_RESULT"
+    if guard.on_tool_execution_middleware in pm._middleware["tool_execution"]:
+        pm._middleware["tool_execution"].remove(guard.on_tool_execution_middleware)
 
 
-# ---- Discovery / deploy ----
-def test_plugin_discovery_and_registration(monkeypatch):
-    """The plugin is discoverable by the official PluginManager and its
-    real ``register()`` path joins Hermes' middleware chain."""
+# ---- Strict mapping schema validation (regression) ----
+def _apply_map_file(tmp_path, monkeypatch, mapping):
+    """Write a real mapping file and point the plugin at it (no loader mock)."""
+    f = tmp_path / "map.json"
+    f.write_text(json.dumps(mapping))
+    monkeypatch.setenv("MARIYAM_IDENTITY_MAP_FILE", str(f))
+
+
+def test_schema_user_id_string_invalid(resolver, monkeypatch, tmp_path):
+    _apply_map_file(tmp_path, monkeypatch, {"111111111": {"user_id": "1", "role": "oyijon", "display_name": "T"}})
+    _, parsed, calls = _call("get_expense_report", {"user_id": 1})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_MAPPING_INVALID"
+
+
+def test_schema_user_id_bool_invalid(resolver, monkeypatch, tmp_path):
+    _apply_map_file(tmp_path, monkeypatch, {"111111111": {"user_id": True, "role": "oyijon", "display_name": "T"}})
+    _, parsed, calls = _call("get_expense_report", {"user_id": 1})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_MAPPING_INVALID"
+
+
+def test_schema_user_id_zero_invalid(resolver, monkeypatch, tmp_path):
+    _apply_map_file(tmp_path, monkeypatch, {"111111111": {"user_id": 0, "role": "oyijon", "display_name": "T"}})
+    _, parsed, calls = _call("get_expense_report", {"user_id": 1})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_MAPPING_INVALID"
+
+
+def test_schema_unknown_role_invalid(resolver, monkeypatch, tmp_path):
+    _apply_map_file(tmp_path, monkeypatch, {"111111111": {"user_id": 1, "role": "superuser", "display_name": "T"}})
+    _, parsed, calls = _call("get_expense_report", {"user_id": 1})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_MAPPING_INVALID"
+
+
+def test_schema_empty_display_name_invalid(resolver, monkeypatch, tmp_path):
+    _apply_map_file(tmp_path, monkeypatch, {"111111111": {"user_id": 1, "role": "oyijon", "display_name": "  "}})
+    _, parsed, calls = _call("get_expense_report", {"user_id": 1})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_MAPPING_INVALID"
+
+
+def test_schema_admin_missing_targets_invalid(resolver, monkeypatch, tmp_path):
+    _apply_map_file(tmp_path, monkeypatch, {"111111111": {"user_id": 1, "role": "admin", "display_name": "T"}})
+    _, parsed, calls = _call("get_expense_report", {"user_id": 1})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_MAPPING_INVALID"
+
+
+def test_schema_admin_targets_not_list_invalid(resolver, monkeypatch, tmp_path):
+    _apply_map_file(
+        tmp_path, monkeypatch,
+        {"111111111": {"user_id": 1, "role": "admin", "display_name": "T", "allowed_target_user_ids": "20"}},
+    )
+    _, parsed, calls = _call("get_expense_report", {"user_id": 1})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_MAPPING_INVALID"
+
+
+def test_schema_admin_target_string_invalid(resolver, monkeypatch, tmp_path):
+    _apply_map_file(
+        tmp_path, monkeypatch,
+        {"111111111": {"user_id": 1, "role": "admin", "display_name": "T", "allowed_target_user_ids": ["20"]}},
+    )
+    _, parsed, calls = _call("get_expense_report", {"user_id": 1})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_MAPPING_INVALID"
+
+
+def test_schema_admin_target_bool_invalid(resolver, monkeypatch, tmp_path):
+    _apply_map_file(
+        tmp_path, monkeypatch,
+        {"111111111": {"user_id": 1, "role": "admin", "display_name": "T", "allowed_target_user_ids": [True]}},
+    )
+    _, parsed, calls = _call("get_expense_report", {"user_id": 1})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_MAPPING_INVALID"
+
+
+def test_schema_admin_target_zero_invalid(resolver, monkeypatch, tmp_path):
+    _apply_map_file(
+        tmp_path, monkeypatch,
+        {"111111111": {"user_id": 1, "role": "admin", "display_name": "T", "allowed_target_user_ids": [0]}},
+    )
+    _, parsed, calls = _call("get_expense_report", {"user_id": 1})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_MAPPING_INVALID"
+
+
+def test_schema_admin_target_duplicate_invalid(resolver, monkeypatch, tmp_path):
+    _apply_map_file(
+        tmp_path, monkeypatch,
+        {"111111111": {"user_id": 1, "role": "admin", "display_name": "T", "allowed_target_user_ids": [20, 20]}},
+    )
+    _, parsed, calls = _call("get_expense_report", {"user_id": 1})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_MAPPING_INVALID"
+
+
+def test_schema_oyijon_nonempty_targets_invalid(resolver, monkeypatch, tmp_path):
+    _apply_map_file(
+        tmp_path, monkeypatch,
+        {"111111111": {"user_id": 20, "role": "oyijon", "display_name": "T", "allowed_target_user_ids": [1]}},
+    )
+    _, parsed, calls = _call("get_expense_report", {"user_id": 1})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_MAPPING_INVALID"
+
+
+def test_schema_valid_admin_mapping(resolver, monkeypatch, tmp_path):
+    _apply_map_file(
+        tmp_path, monkeypatch,
+        {"111111111": {"user_id": 1, "role": "admin", "display_name": "A", "allowed_target_user_ids": [20]}},
+    )
+    _, _, calls = _call("get_expense_report", {"user_id": 20}, session_id="sess-admin")
+    assert calls["args"]["user_id"] == 20
+
+
+def test_schema_valid_oyijon_mapping_self_only(resolver, monkeypatch, tmp_path):
+    _apply_map_file(tmp_path, monkeypatch, {"222222222": {"user_id": 20, "role": "oyijon", "display_name": "O"}})
+    _, _, calls = _call("get_expense_report", {"user_id": 1}, session_id="sess-oyijon")
+    assert calls["args"]["user_id"] == 20
+
+
+def test_schema_runtime_invalid_file_blocks(tmp_path, resolver, monkeypatch):
+    f = tmp_path / "map.json"
+    f.write_text(
+        json.dumps(
+            {
+                "111111111": {
+                    "user_id": "1",
+                    "role": "not_a_role",
+                    "display_name": "Test",
+                    "allowed_target_user_ids": [20],
+                }
+            }
+        )
+    )
+    monkeypatch.setenv("MARIYAM_IDENTITY_MAP_FILE", str(f))
+    _, parsed, calls = _call("save_expense", {"user_id": 1, "items": []})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_MAPPING_INVALID"
+
+
+# ---- Discovery: honest, no manual middleware injection ----
+def test_plugin_discovery_and_registration():
+    """The plugin discovers + enables + registers its middleware entirely
+    through ``PluginManager.discover_and_load()`` — NO manual ``pm._middleware``
+    injection and NO loader mocks. We then drive its own discovered callback
+    (loaded from the real plugin file) through the real Hermes chain, with a
+    real mapping file + a real state.db for the telegram origin."""
     import hermes_cli.plugins as hp
 
     home = _make_plugin_home()
+    # Real mapping file the discovered (file-loaded) module will read.
+    map_file = Path(home) / "identity_private.json"
+    map_file.write_text(json.dumps(FAKE_MAP))
+    # Real state.db with a telegram session origin for sess-oyijon.
+    db = Path(home) / "state.db"
+    con = __import__("sqlite3").connect(str(db))
+    con.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, origin_json TEXT)")
+    con.execute(
+        "INSERT INTO sessions VALUES (?, ?)",
+        ("sess-oyijon", json.dumps({"platform": "telegram", "user_id": "222222222"})),
+    )
+    con.commit()
+    con.close()
+
     old_home = os.environ.get("HERMES_HOME")
     os.environ["HERMES_HOME"] = home
+    os.environ["MARIYAM_IDENTITY_MAP_FILE"] = str(map_file)
     try:
         pm = hp.get_plugin_manager()
         pm.discover_and_load(force=True)
-        # 1) discovered: manifest key present in the manager.
-        assert "mariyam_identity_guard" in pm._plugins, (
-            f"plugin not discovered: {list(pm._plugins)}"
-        )
-        # 2) real register() path -> middleware joins the chain.
-        # Use the imported (mockable) guard instance so the chain exercises
-        # our instrumented copy, not the file-loaded one.
-        pm._middleware["tool_execution"] = [guard.on_tool_execution_middleware]
-        assert pm.has_middleware("tool_execution"), "tool_execution middleware registered"
-        # 3) chain actually invokes the guard (effective target rewritten).
-        monkeypatch.setattr(guard, "load_identity_map", lambda: (dict(FAKE_MAP), None))
-        monkeypatch.setattr(guard, "resolve_telegram_user_id", lambda s: "222222222")
+
+        # Discovered + enabled + middleware registered via the real path.
+        assert "mariyam_identity_guard" in pm._plugins
+        lp = pm._plugins["mariyam_identity_guard"]
+        assert lp.enabled is True
+        assert "tool_execution" in list(lp.middleware_registered)
+
+        # Callback must come from the registry the discovery created — we do
+        # NOT import or inject the callback manually here.
+        callbacks = pm._middleware.get("tool_execution")
+        assert callbacks is not None and len(callbacks) == 1
+        # (the single callback is the discovered module's on_tool_execution_middleware)
 
         captured = {}
 
@@ -361,19 +514,32 @@ def test_plugin_discovery_and_registration(monkeypatch):
 
         from hermes_cli.middleware import run_tool_execution_middleware
 
+        # Normal path: terminal gets rewritten user_id=20, called exactly once.
         result = run_tool_execution_middleware(
-            "get_expense_report",
-            {"user_id": 1},
-            terminal,
-            session_id="sess-oyijon",
+            "get_expense_report", {"user_id": 1}, terminal, session_id="sess-oyijon"
         )
         assert captured["args"]["user_id"] == 20
         assert result == "TERMINAL_RESULT"
+
+        # Malformed mapping path: discovered callback blocks the call.
+        map_file.write_text(json.dumps({"111111111": {"user_id": "1", "role": "nope", "display_name": "T"}}))
+        blocked = {"n": 0}
+
+        def terminal2(args):
+            blocked["n"] += 1
+            return "T"
+
+        res2 = run_tool_execution_middleware(
+            "get_expense_report", {"user_id": 1}, terminal2, session_id="sess-oyijon"
+        )
+        assert blocked["n"] == 0
+        assert json.loads(res2)["error_code"] == "IDENTITY_MAPPING_INVALID"
     finally:
         if old_home is None:
             os.environ.pop("HERMES_HOME", None)
         else:
             os.environ["HERMES_HOME"] = old_home
+        os.environ.pop("MARIYAM_IDENTITY_MAP_FILE", None)
         shutil.rmtree(home, ignore_errors=True)
 
 
@@ -388,7 +554,7 @@ def test_ensure_user_rewrites_all_fields(resolver, fake_map):
     _, _, calls = _call(
         "ensure_user", {"telegram_id": 111, "role": "admin", "display_name": "X"}
     )
-    assert calls["args"]["telegram_id"] == 222222222
+    assert str(calls["args"]["telegram_id"]) == "222222222"
     assert calls["args"]["role"] == "oyijon"
     assert calls["args"]["display_name"] == "Тест Ойижон"
 
@@ -420,7 +586,7 @@ def test_persisted_session_store_reopen_consistent():
     orig = guard._state_db_path
 
     def fake_path():
-        return str(db)
+        return db
 
     guard._state_db_path = fake_path
     try:
