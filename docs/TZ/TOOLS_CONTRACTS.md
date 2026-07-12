@@ -1,7 +1,7 @@
 # Tools Contracts
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (полные примеры вход/выход — §15).
-Реализация: `backend/server.py` (схемы, dispatch) + `backend/db.py` (SQL) в ветке `feature-hermes-mariyam-mvp`. Все 19 tools реализованы и покрыты smoke-тестом через MCP-слой (маркер `MCP_SMOKE_PASSED`).
+Реализация: `backend/server.py` (схемы, dispatch) + `backend/db.py` (SQL) в `main` (merged через `dd9261e`). Все 19 tools реализованы и покрыты smoke-тестом через MCP-слой (маркер `MCP_SMOKE_PASSED`).
 
 ## Общие правила
 
