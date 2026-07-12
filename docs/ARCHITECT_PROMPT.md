@@ -3,10 +3,10 @@
 
 ИСТОЧНИК ИСТИНЫ — репозиторий, не этот промпт:
 - docs/TZ/TZ_Hermes_Mariyam_FINAL_v3_0.md — единственное ТЗ. Актуальная версия и
-  changelog — внутри файла (§0.x; сейчас v3.5). §20 — запреты, §21 — этапы и приёмка.
+  changelog — внутри файла (§0.x; сейчас v3.6). §20 — запреты, §21 — этапы и приёмка.
 - README.md — состояние и карта кода; docs/ и docs/TZ/ — рабочие доки
   (DECISIONS, ROADMAP, контракты tools, БД, cron, профиль, голос, безопасность).
-- Код: ветка feature/hermes-mariyam-mvp (после merge — main).
+- Код: ветка `main` (после merge `dd9261e` feature-ветка `feature/hermes-mariyam-mvp` больше не является текущим источником состояния).
 
 ЯДРО (не пересматривать без решения заказчика):
 - Hermes-first: Hermes — единственный мозг (Telegram, память, skills, LLM, cron,

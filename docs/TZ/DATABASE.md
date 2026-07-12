@@ -1,7 +1,7 @@
 # Database
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (DDL всех таблиц — §13).
-Реализация: `backend/sql/001_init.sql` (схема + seed категорий, идемпотентно) в ветке `feature-hermes-mariyam-mvp`; проверено тестами, включая границу суток Asia/Tashkent (`TZ_BOUNDARY_PASSED`).
+Реализация: `backend/sql/001_init.sql` (схема + seed категорий, идемпотентно) находится в `main` (merged через `dd9261e`); проверено тестами, включая границу суток Asia/Tashkent (`TZ_BOUNDARY_PASSED`). Жёсткий DB guard (`tests/db_guard.py`) также находится в `main`; destructive tests против production-БД не запускались.
 
 ## Назначение
 
