@@ -1,24 +1,40 @@
-"""Deterministic Telegram session identity guard for Mariyam MCP tools.
+"""Deterministic, role-aware, fail-closed Telegram identity guard.
 
-This is a Hermes ``tool_execution`` middleware plugin. It runs BEFORE the
-actual MCP tool call and rewrites/forces the correct internal ``users.id``
-based on the *current Telegram session*, never on model guesses, memory,
-or display name.
+Hermes ``tool_execution`` middleware. Runs BEFORE the MCP tool call and forces
+the correct internal ``users.id`` into tool arguments based on the *current
+Telegram session*, never on model guesses, memory, or display name.
+
+Identity model
+--------------
+``user_id`` in the MCP tools denotes the OWNER of the data, not necessarily
+the sender:
+
+* ``oyijon`` (care receiver) is always bound to her OWN ``user_id``. Any
+  ``user_id`` the model passes is overwritten with her own.
+* ``admin`` (Bahriddin aka) may act on his own data, and may read a limited
+  set of another user's data ONLY when BOTH hold:
+    - the tool is in ``ADMIN_CROSS_TARGET_TOOLS`` (read/report/note only);
+    - the requested ``user_id`` is in his ``allowed_target_user_ids``.
+  Write/delete tools (save_expense, delete_last_expense, ...) are never
+  cross-target.
+
+Fail-closed (P0)
+---------------
+Exceptions thrown inside the guard BEFORE ``next_call`` are caught and turned
+into a safe error result; ``next_call`` is then never invoked, so the
+downstream MCP tool cannot run. Exceptions raised BY the downstream tool are
+NOT masked (the call happens outside the try block).
 
 Chain of trust (no model involvement in identity):
 
-    Telegram session  ->  origin.user_id (from Hermes session store)
-                       ->  private mapping (MARIYAM_IDENTITY_MAP_FILE)
-                       ->  internal users.id
-                       ->  forced into tool arguments
+    Telegram session -> origin.user_id (Hermes session store)
+                     -> private mapping (MARIYAM_IDENTITY_MAP_FILE)
+                     -> actor entry (role, user_id, allowed_target_user_ids)
+                     -> forced into tool arguments
 
-Fail-closed: if the sender cannot be resolved, or the mapping is missing /
-corrupt, the guarded tool is NOT executed and a safe error is returned
-without calling ``next_call``.
-
-No real Telegram IDs, no internal user_ids are present in this file. The
-mapping lives only in the private file referenced by
-``MARIYAM_IDENTITY_MAP_FILE`` (set on the VPS, never in git).
+No real Telegram IDs, no internal user_ids live in this file. The mapping
+lives only in the private file referenced by ``MARIYAM_IDENTITY_MAP_FILE``
+(set on the VPS, never in git).
 """
 
 from __future__ import annotations
@@ -28,6 +44,7 @@ import json
 import logging
 import os
 import sqlite3
+import stat
 from typing import Any
 
 LOG = logging.getLogger("mariyam_identity_guard")
@@ -65,6 +82,39 @@ GLOBAL_TOOLS = frozenset(
     }
 )
 
+# Admin may reach ANOTHER user's data only via these tools (read/report/note).
+ADMIN_CROSS_TARGET_TOOLS = frozenset(
+    {
+        "get_expense_report",
+        "get_balance_summary",
+        "get_admin_report_data",
+        "save_plan_note",
+    }
+)
+
+ERROR_MESSAGES = {
+    "IDENTITY_UNRESOLVED": (
+        "Не удалось безопасно определить пользователя",
+        "Фойдаланувчини хавфсиз аниқлаб бўлмади",
+    ),
+    "IDENTITY_TARGET_FORBIDDEN": (
+        "Этот инструмент запрещён для чужих данных",
+        "Бу восита бошқа фойдаланувчи маълумотлари учун ман этилган",
+    ),
+    "IDENTITY_MAPPING_INVALID": (
+        "Файл привязки пользователей недействителен",
+        "Фойдаланувчилар боғловчи файли яроқсиз",
+    ),
+    "IDENTITY_MAPPING_PERMISSIONS": (
+        "Файл привязки недоступен по правам доступа",
+        "Боғловчи файлга рухсат бўйича кириш маҳ бўлмади",
+    ),
+    "IDENTITY_GUARD_ERROR": (
+        "Внутренняя ошибка защиты идентификации",
+        "Идентификация ҳимоясида ички хатолик",
+    ),
+}
+
 
 def _mask(value: Any) -> str:
     """Mask an identifier for logging (no raw Telegram ID ever logged)."""
@@ -93,8 +143,9 @@ def resolve_telegram_user_id(session_id: str | None) -> str | None:
     """Return the Telegram ``user_id`` (origin) for a Hermes session.
 
     Reads the official Hermes session store (state.db), column ``id`` =
-    session_id, field ``origin_json.user_id``. Never uses display_name,
-    chat_name, or session title.
+    session_id, field ``origin_json.user_id``. Requires ``platform ==
+    telegram`` and a non-empty ``user_id``. Never uses display_name,
+    user_name, chat_name, or session title.
     """
     if not session_id:
         return None
@@ -113,67 +164,185 @@ def resolve_telegram_user_id(session_id: str | None) -> str | None:
         if not row or not row[0]:
             return None
         origin = json.loads(row[0])
+        if origin.get("platform") != "telegram":
+            return None
         uid = origin.get("user_id")
-        return str(uid) if uid is not None else None
+        return str(uid) if uid not in (None, "") else None
     except Exception as exc:  # pragma: no cover - defensive
         LOG.debug("resolve_telegram_user_id failed: %s", exc)
         return None
 
 
-def load_identity_map() -> dict[str, Any] | None:
-    """Load the private Telegram-id -> internal-user mapping.
+class MappingError(Exception):
+    """Raised by validate_mapping_file / load_identity_map with an error code."""
 
-    Returns None if the file is missing or corrupt (fail-closed trigger).
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+def validate_mapping_file(path: str, enforce_posix_permissions: bool = True) -> None:
+    """Validate the private mapping file.
+
+    Raises ``MappingError`` with a specific code on any problem:
+      * file missing / unreadable  -> IDENTITY_UNRESOLVED
+      * corrupt JSON / not a dict  -> IDENTITY_MAPPING_INVALID
+      * wrong POSIX mode (non-0600) -> IDENTITY_MAPPING_PERMISSIONS
+
+    ``enforce_posix_permissions`` is True at runtime on POSIX systems
+    (``os.name == "posix"``); tests may force it to exercise the 0600 check
+    on any OS.
     """
-    path = os.environ.get("MARIYAM_IDENTITY_MAP_FILE")
     if not path or not os.path.exists(path):
-        return None
+        raise MappingError("IDENTITY_UNRESOLVED")
+    if enforce_posix_permissions:
+        try:
+            mode = stat.S_IMODE(os.stat(path).st_mode)
+        except OSError as exc:
+            raise MappingError("IDENTITY_UNRESOLVED") from exc
+        if mode != 0o600:
+            raise MappingError("IDENTITY_MAPPING_PERMISSIONS")
     try:
         with open(path, "r", encoding="utf-8") as fh:
             data = json.load(fh)
-        if not isinstance(data, dict):
-            return None
-        return data
-    except Exception as exc:  # pragma: no cover - defensive
-        LOG.debug("load_identity_map failed: %s", exc)
-        return None
+    except Exception as exc:
+        raise MappingError("IDENTITY_MAPPING_INVALID") from exc
+    if not isinstance(data, dict):
+        raise MappingError("IDENTITY_MAPPING_INVALID")
 
 
-def _safe_error(session_id: str | None, tool_name: str | None) -> str:
+def load_identity_map() -> tuple[dict[str, Any] | None, str | None]:
+    """Load the private mapping.
+
+    Returns ``(mapping_dict, None)`` on success, or ``(None, error_code)`` on
+    any failure (fail-closed trigger). The error code distinguishes a
+    permissions problem from a missing/corrupt mapping.
+    """
+    path = os.environ.get("MARIYAM_IDENTITY_MAP_FILE")
+    if not path:
+        return None, "IDENTITY_UNRESOLVED"
+    enforce = os.name == "posix"
+    try:
+        validate_mapping_file(path, enforce_posix_permissions=enforce)
+    except MappingError as exc:
+        return None, exc.code
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except Exception:
+        return None, "IDENTITY_MAPPING_INVALID"
+    if not isinstance(data, dict):
+        return None, "IDENTITY_MAPPING_INVALID"
+    return data, None
+
+
+def _safe_error(
+    session_id: str | None,
+    tool_name: str | None,
+    code: str,
+    actor_role: str | None = None,
+    actor_uid: int | None = None,
+    requested: Any = None,
+    effective: Any = None,
+    decision: str = "blocked",
+) -> str:
     """Fail-closed result: no tool executed, model sees a safe error.
 
     The Telegram origin is NEVER included in the message or logs.
     """
     LOG.warning(
-        "identity_guard BLOCKED session=%s tool=%s (fail-closed)",
+        "identity_guard BLOCKED session=%s tool=%s code=%s",
         _mask(session_id),
         tool_name,
+        code,
+    )
+    ru, uz = ERROR_MESSAGES.get(
+        code,
+        ("Внутренняя ошибка защиты идентификации", "Идентификация ҳимоясида ички хатолик"),
     )
     payload = {
         "ok": False,
-        "error_code": "IDENTITY_UNRESOLVED",
-        "message_ru": "Не удалось безопасно определить пользователя",
-        "message_uz": "Фойдаланувчини хавфсиз аниқлаб бўлмади",
+        "error_code": code,
+        "message_ru": ru,
+        "message_uz": uz,
     }
     return json.dumps(payload, ensure_ascii=False)
 
 
-def _resolve_internal_user_id(
-    session_id: str | None, id_map: dict[str, Any] | None
-) -> tuple[int | None, str | None]:
-    """Return (internal_user_id, telegram_id) or (None, None) on failure."""
+def _audit_log(
+    tool_name: str,
+    actor_role: str,
+    actor_uid: int,
+    requested: Any,
+    effective: Any,
+    rewritten: bool,
+    decision: str,
+) -> None:
+    """Safe audit log: internal ids + decision only, never raw Telegram id."""
+    LOG.info(
+        "identity_guard tool=%s actor=%s actor_user_id=%s requested=%s effective=%s decision=%s",
+        tool_name,
+        actor_role,
+        actor_uid,
+        requested,
+        effective,
+        decision,
+    )
+
+
+def _resolve_actor(
+    session_id: str | None, id_map: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Return the actor mapping entry, or None if unresolved."""
     tg_id = resolve_telegram_user_id(session_id)
     if not tg_id:
-        return None, None
-    if not isinstance(id_map, dict):
-        return None, tg_id
+        return None
     entry = id_map.get(tg_id)
-    if not isinstance(entry, dict) or "user_id" not in entry:
-        return None, tg_id
-    internal = entry["user_id"]
-    if not isinstance(internal, int):
-        return None, tg_id
-    return internal, tg_id
+    if not isinstance(entry, dict) or "user_id" not in entry or "role" not in entry:
+        return None
+    return entry
+
+
+def _compute_effective_args(
+    tool_name: str,
+    args: dict[str, Any],
+    actor: dict[str, Any],
+    tg_id: str | None,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Compute (effective_args, error_code). error_code None means allowed."""
+    actor_uid = actor["user_id"]
+    actor_role = actor["role"]
+    allowed = actor.get("allowed_target_user_ids", []) or []
+    requested = args.get("user_id")
+
+    if tool_name == ENSURE_USER:
+        # Setup/handover only: force every identity field from the sender.
+        out = copy.deepcopy(args)
+        out["telegram_id"] = int(tg_id) if str(tg_id).isdigit() else tg_id
+        out["role"] = actor_role
+        out["display_name"] = actor.get("display_name")
+        return out, None
+
+    if actor_role == "oyijon":
+        # Always own data; any requested user_id is overwritten.
+        out = copy.deepcopy(args)
+        out["user_id"] = actor_uid
+        return out, None
+
+    # Admin.
+    if requested is None:
+        # Never guess a cross-target; default to self.
+        out = copy.deepcopy(args)
+        out["user_id"] = actor_uid
+        return out, None
+    if requested == actor_uid:
+        return copy.deepcopy(args), None
+    # Cross-target: allow only read/report/note tools to allowed ids.
+    if tool_name in ADMIN_CROSS_TARGET_TOOLS and requested in allowed:
+        out = copy.deepcopy(args)
+        out["user_id"] = requested
+        return out, None
+    return None, "IDENTITY_TARGET_FORBIDDEN"
 
 
 def on_tool_execution_middleware(**kwargs: Any) -> Any:
@@ -183,54 +352,58 @@ def on_tool_execution_middleware(**kwargs: Any) -> Any:
     next_call = kwargs.get("next_call")
     session_id = kwargs.get("session_id")
 
-    # Global / system tools: pass through unchanged.
+    # Global / system tools: pass through unchanged (no guard applied).
     if tool_name in GLOBAL_TOOLS:
         if callable(next_call):
             return next_call(args)
         return args
-
     # Only guard user-scoped tools and ensure_user; everything else passes.
-    guarded = tool_name in USER_SCOPED_TOOLS or tool_name == ENSURE_USER
-    if not guarded:
+    if tool_name not in USER_SCOPED_TOOLS and tool_name != ENSURE_USER:
         if callable(next_call):
             return next_call(args)
         return args
 
-    internal_uid, tg_id = _resolve_internal_user_id(
-        session_id, load_identity_map()
-    )
-    if internal_uid is None:
-        # Fail-closed: do NOT call the tool.
-        return _safe_error(session_id, tool_name)
+    # Everything that can fail is inside try; any exception -> safe block,
+    # next_call is NEVER reached, so downstream MCP tool cannot execute.
+    try:
+        id_map, map_err = load_identity_map()
+        if map_err is not None:
+            return _safe_error(session_id, tool_name, map_err)
+        tg_id = resolve_telegram_user_id(session_id)
+        actor = _resolve_actor(session_id, id_map) if tg_id else None
+        if actor is None:
+            return _safe_error(session_id, tool_name, "IDENTITY_UNRESOLVED")
+        effective_args, err = _compute_effective_args(
+            tool_name, copy.deepcopy(args), actor, tg_id
+        )
+        if err is not None:
+            return _safe_error(session_id, tool_name, err)
+        requested = args.get("user_id")
+        effective = effective_args.get("user_id")
+        rewritten = requested != effective
+        decision = (
+            "oyijon_self_forced"
+            if actor["role"] == "oyijon"
+            else ("admin_self" if effective == actor["user_id"] else "allowed_cross_target")
+        )
+        _audit_log(
+            tool_name,
+            actor["role"],
+            actor["user_id"],
+            requested,
+            effective,
+            rewritten,
+            decision,
+        )
+    except Exception as exc:  # P0: never let an exception reach downstream.
+        LOG.debug("identity_guard internal error: %s", exc)
+        return _safe_error(session_id, tool_name, "IDENTITY_GUARD_ERROR")
 
-    args = copy.deepcopy(args)
-
-    if tool_name == ENSURE_USER:
-        # Force every identity field from the private mapping; never accept
-        # model-generated identity.
-        id_map = load_identity_map() or {}
-        entry = id_map.get(tg_id or "")
-        if isinstance(entry, dict):
-            if str(tg_id).isdigit():
-                args["telegram_id"] = int(tg_id)
-            else:
-                args["telegram_id"] = tg_id
-            args["role"] = entry.get("role", args.get("role"))
-            args["display_name"] = entry.get("display_name", args.get("display_name"))
-    else:
-        # Force the resolved internal user_id, overriding any model value.
-        args["user_id"] = internal_uid
-
-    LOG.info(
-        "identity_guard session=%s user_id=%s tool=%s rewritten=true",
-        _mask(session_id),
-        internal_uid,
-        tool_name,
-    )
-
+    # Downstream call is OUTSIDE the try block, so its own errors are not
+    # masked. next_call is invoked at most once.
     if callable(next_call):
-        return next_call(args)
-    return args
+        return next_call(effective_args)
+    return effective_args
 
 
 def register(ctx) -> None:  # pragma: no cover - exercised at runtime on VPS

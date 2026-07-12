@@ -229,6 +229,69 @@ sudo systemctl start hermes-mariyam.service
 - `.env`, `.venv/`, `__pycache__/` и docs не должны попадать в Docker image; проверка — `IMAGE_CLEAN`.
 - Если старый image уже собирался с `.env`, удалить старые images, выполнить `docker builder prune`, сменить `POSTGRES_PASSWORD`.
 
+## Mariyam identity guard
+
+Role-aware, fail-closed `tool_execution` middleware, который привязывает
+MCP tools к правильному внутреннему `users.id` по текущей Telegram-сессии.
+Plugin: `deploy/hermes_plugins/mariyam_identity_guard/`.
+
+Шаги будущей **Фазы B** (выполнять только по отдельному разрешению):
+
+1. Скопировать plugin в профиль Hermes:
+
+   ```text
+   deploy/hermes_plugins/mariyam_identity_guard
+   → <HERMES_HOME>/plugins/mariyam_identity_guard
+   ```
+
+2. Включить plugin в `config.yaml` профиля:
+
+   ```yaml
+   plugins:
+     enabled:
+       - mariyam_identity_guard
+   ```
+
+3. Создать приватный mapping-файл (только фиктивные/реальные ID вне git):
+
+   ```text
+   /opt/hermes-mariyam-secrets/identity-map.json
+   ```
+
+4. Установить владельца и права (strict 0600 — plugin откажет при более
+   широких правах):
+
+   ```bash
+   chown timeagent:timeagent /opt/hermes-mariyam-secrets/identity-map.json
+   chmod 600 /opt/hermes-mariyam-secrets/identity-map.json
+   ```
+
+5. Добавить в Gateway environment:
+
+   ```text
+   MARIYAM_IDENTITY_MAP_FILE=/opt/hermes-mariyam-secrets/identity-map.json
+   ```
+
+6. Будущая проверка после restart Gateway:
+
+   ```text
+   plugin loaded
+   tool_execution middleware registered
+   mapping mode 0600
+   Gateway active
+   PostgreSQL healthy
+   ```
+
+7. Будущий runtime smoke (без raw Telegram IDs в отчёте):
+
+   ```text
+   original target
+   effective target
+   tool result
+   ```
+
+НЕ выполнять эти шаги сейчас.
+
 ## FORBIDDEN — что НЕ трогать
 
 - `/opt/time-agent`, `time_agent_bot`, Time-Agent `.env`, SQLite volume, logs, backups.
