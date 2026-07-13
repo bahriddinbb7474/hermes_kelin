@@ -1,7 +1,7 @@
 # Tools Contracts
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (полные примеры вход/выход — §15).
-Реализация: `backend/server.py` + `backend/db.py` в `main`. **Runtime сейчас: ровно 19 tools** (`MCP_SMOKE_PASSED`). **Target после Этапа 5.1: 21** (+ `set_monthly_budget`, `get_monthly_budget_status`).
+Реализация: `backend/server.py` + `backend/db.py`. **Repo/worktree implementation: 21 tools (OFFLINE PASS). Текущий VPS runtime: 19 tools; Stage 5.1 LIVE PENDING.** Новые tools: `set_monthly_budget`, `get_monthly_budget_status`.
 
 ## Общие правила
 
@@ -18,22 +18,22 @@
 - один пул соединений на процесс;
 - `NOT_CONFIGURED` вместо ложного успеха.
 
-## Детерминированная identity binding (v3.6 / guard 1.0.3)
+## Детерминированная identity binding (repo 1.0.4 / VPS 1.0.3)
 
 - Для user-scoped tools effective `user_id` переписывается identity guard до backend.
 - Новые user-scoped tools Этапа 5.1 (`set_monthly_budget`, `get_monthly_budget_status`) — **тоже** под guard (self-only для oyijon).
 - Malformed/unknown → fail-closed `IDENTITY_*`.
 
-## MVP tools (runtime = 19)
+## Базовые 19 tools (repo и текущий VPS)
 
 - `ensure_user`, `save_expense`, `save_income`, `update_expense`, `update_last_expense`, `delete_expense`, `delete_last_expense`, `get_expense_report`, `get_balance_summary`, `save_quran_progress`, `get_quran_progress`, `save_health_note`, `save_alert_event`, `save_plan_note`, `get_admin_report_data`, `backup_data`, `get_backup_status`, `get_bot_status`, `log_usage_cost`.
 
-## Target tools Этапа 5.1 (+2 → 21)
+## Реализованные offline tools Этапа 5.1 (+2 → repo 21)
 
 - `set_monthly_budget` — upsert план категории на месяц.
 - `get_monthly_budget_status` — planned/actual/remaining + by_category usage_percent.
 
-## Расширения (v3.7, до/после миграции)
+## Расширения (v3.7 requirements; реализованы offline)
 
 **save_expense items (optional):** `item_name_normalized`, `quantity`, `unit` (canonical units; unit only with quantity).
 
@@ -54,8 +54,8 @@
 | `delete_last_expense` | user_id | |
 | `get_expense_report` | user_id | period default month; compare/trend optional |
 | `get_balance_summary` | user_id | |
-| `set_monthly_budget` | user_id, month, category_code, planned_amount_uzs | **target 5.1** |
-| `get_monthly_budget_status` | user_id, month | **target 5.1** |
+| `set_monthly_budget` | user_id, month, category_code, planned_amount_uzs | реализован offline; VPS pending |
+| `get_monthly_budget_status` | user_id, month | реализован offline; VPS pending |
 | `save_quran_progress` | user_id | |
 | `get_quran_progress` | user_id | |
 | `save_health_note` | user_id, note | |

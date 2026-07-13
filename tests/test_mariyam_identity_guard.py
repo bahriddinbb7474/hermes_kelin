@@ -189,6 +189,64 @@ def test_admin_missing_user_defaults_self(resolver, fake_map):
     assert calls["args"]["user_id"] == 1
 
 
+# ---- Stage 5.1 monthly-budget tools (plugin 1.0.4) ----
+STAGE51_BUDGET_TOOLS = ("set_monthly_budget", "get_monthly_budget_status")
+
+
+@pytest.mark.parametrize("tool_name", STAGE51_BUDGET_TOOLS)
+def test_stage51_budget_bare_sentinel_rewrites_to_owner(tool_name, resolver, fake_map):
+    _, _, calls = _call(tool_name, {"user_id": 0})
+    assert calls["n"] == 1
+    assert calls["args"]["user_id"] == 20
+
+
+@pytest.mark.parametrize("tool_name", STAGE51_BUDGET_TOOLS)
+def test_stage51_budget_prefixed_sentinel_rewrites_to_owner(tool_name, resolver, fake_map):
+    _, _, calls = _call(f"mcp__mariyam_backend__{tool_name}", {"user_id": 0})
+    assert calls["n"] == 1
+    assert calls["args"]["user_id"] == 20
+
+
+@pytest.mark.parametrize("tool_name", STAGE51_BUDGET_TOOLS)
+def test_stage51_budget_oyijon_foreign_target_rewrites_self(tool_name, resolver, fake_map):
+    _, _, calls = _call(tool_name, {"user_id": 1})
+    assert calls["n"] == 1
+    assert calls["args"]["user_id"] == 20
+
+
+@pytest.mark.parametrize("tool_name", STAGE51_BUDGET_TOOLS)
+def test_stage51_budget_admin_self_allowed(tool_name, resolver, fake_map):
+    _, _, calls = _call(tool_name, {"user_id": 1}, session_id="sess-admin")
+    assert calls["n"] == 1
+    assert calls["args"]["user_id"] == 1
+
+
+@pytest.mark.parametrize("tool_name", STAGE51_BUDGET_TOOLS)
+def test_stage51_budget_admin_cross_target_blocked(tool_name, resolver, fake_map):
+    _, parsed, calls = _call(tool_name, {"user_id": 20}, session_id="sess-admin")
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_TARGET_FORBIDDEN"
+
+
+@pytest.mark.parametrize("tool_name", STAGE51_BUDGET_TOOLS)
+def test_stage51_budget_primary_exception_downstream_zero(
+    tool_name, resolver, monkeypatch
+):
+    monkeypatch.setattr(
+        guard,
+        "load_identity_map",
+        lambda: (_ for _ in ()).throw(RuntimeError("primary failed")),
+    )
+    _, parsed, calls = _call(tool_name, {"user_id": 0})
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_GUARD_ERROR"
+
+
+def test_stage51_budget_policy_classification_is_strict():
+    assert set(STAGE51_BUDGET_TOOLS) <= guard.USER_SCOPED_TOOLS
+    assert set(STAGE51_BUDGET_TOOLS).isdisjoint(guard.ADMIN_CROSS_TARGET_TOOLS)
+
+
 # ---- Fail-closed ----
 def test_missing_mapping_blocks(resolver, monkeypatch):
     monkeypatch.setattr(guard, "load_identity_map", lambda: (None, "IDENTITY_UNRESOLVED"))

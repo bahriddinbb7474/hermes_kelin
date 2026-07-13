@@ -235,73 +235,58 @@ Role-aware, fail-closed `tool_execution` middleware, который привяз
 MCP tools к правильному внутреннему `users.id` по текущей Telegram-сессии.
 Plugin: `deploy/hermes_plugins/mariyam_identity_guard/`.
 
-Шаги будущей **Фазы B** (выполнять только по отдельному разрешению):
+### Уже выполненный VPS baseline
 
-1. Скопировать plugin в профиль Hermes (runtime-путь именно профиля):
+- Identity guard **1.0.3** установлен и включён в runtime profile.
+- Приватный mapping находится вне git, имеет strict mode `0600`; Gateway Environment с `MARIYAM_IDENTITY_MAP_FILE` настроен.
+- `display.tool_progress: "off"` настроен.
+- MCP-prefix `mcp__mariyam_backend__<tool>` канонизируется до bare policy name; неизвестные/неразрешённые вызовы блокируются fail-closed.
+- Stage 5 controlled Telegram E2E на «Тест Ойижон» — **PASS**.
+- Текущий VPS runtime остаётся на **19 tools / plugin 1.0.3**. Это baseline, а не будущая Phase B.
 
-   ```text
-   deploy/hermes_plugins/mariyam_identity_guard
-   → /home/timeagent/.hermes/profiles/mariyam_oyijon/plugins/mariyam_identity_guard
-   ```
+Значения mapping, реальные Telegram ID и секреты в git/отчёты не добавлять. Реальную Ойижон до handover не подключать.
 
-2. Включить plugin в `config.yaml` профиля:
+## Skill protect (security-critical SKILL.md)
 
-   ```yaml
-   plugins:
-     enabled:
-       - mariyam_identity_guard
-   display:
-     tool_progress: "off"
-   ```
+После Stage 5 E2E self-improvement fork переписал `skills/mariyam/SKILL.md` и отправил
+служебное сообщение в Telegram. Root cause (Hermes v0.18.x):
 
-3. Создать приватный mapping-файл (только фиктивные/реальные ID вне git):
+- `agent/turn_finalizer.py` → `_spawn_background_review(review_skills=True)`
+  когда `skills.creation_nudge_interval > 0` и tool `skill_manage` доступен;
+- `agent/background_review.py` вызывает `skill_manage` и шлёт
+  `💾 Self-improvement review: …` через `background_review_callback`.
 
-   ```text
-   /opt/hermes-mariyam-secrets/identity-map.json
-   ```
+**Минимальный поддерживаемый fix (без Hermes core):**
 
-4. Установить владельца и права (strict 0600 — plugin откажет при более
-   широких правах):
+1. Слить в `~/.hermes/profiles/mariyam_oyijon/config.yaml` файл
+   `deploy/hermes_profile_mariyam_oyijon/config.skill-protect.snippet.yaml`
+   (ключи: `creation_nudge_interval: 0`, `write_approval: true`,
+   `memory_notifications: "off"`, `agent.disabled_toolsets: [skills]`).
+2. Skill остаётся **читаемым** через `skills.enabled: [mariyam]` (prompt).
+3. Restart только `hermes-gateway-mariyam_oyijon.service`.
+4. Verify: sha SKILL = `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; offline `pytest tests/test_mariyam_skill_protection.py`.
 
-   ```bash
-   chown timeagent:timeagent /opt/hermes-mariyam-secrets/identity-map.json
-   chmod 600 /opt/hermes-mariyam-secrets/identity-map.json
-   ```
+Опционально (filesystem belt, не вместо config): `chmod a-w` на
+`…/skills/mariyam/SKILL.md` после deploy skill.
 
-5. Добавить в Gateway user-unit environment (файл
-   `deploy/hermes-gateway-mariyam_oyijon.service` + live unit):
+**VPS apply — только по отдельному разрешению.**
 
-   ```text
-   Environment="MARIYAM_IDENTITY_MAP_FILE=/opt/hermes-mariyam-secrets/identity-map.json"
-   ```
+## Будущий Stage 5.1 live deploy (НЕ ВЫПОЛНЯТЬ без разрешения)
 
-   Без этой переменной plugin fail-closed (`IDENTITY_UNRESOLVED`) и **не**
-   вызывает MCP tools. Проверка: `systemctl --user show … -p Environment`
-   содержит ключ `MARIYAM_IDENTITY_MAP_FILE` (значение — путь, не содержимое map).
+Строгая последовательность:
 
-   Live Hermes передаёт MCP tools как `mcp__mariyam_backend__<tool>`;
-   plugin 1.0.2+ канонизирует только этот server-prefix до bare-имени
-   (`save_expense`, `ensure_user`, …) для policy. Другие server-prefix не
-   трогаются.
-6. Будущая проверка после restart Gateway:
+1. Сделать backup production-БД и runtime profile Мариям.
+2. Применить migration 002 (`backend/sql/002_stage51_quantity_budget.sql`) с `ON_ERROR_STOP=1`.
+3. Установить backend из repo с inventory **21 tools**.
+4. Обновить identity plugin **1.0.3 → 1.0.4**.
+5. Применить profile-scoped skill-protect config.
+6. Установить canonical `skills/mariyam/SKILL.md` из repo в runtime profile.
+7. Проверить SHA-256 SKILL: `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`.
+8. Перезапустить только Hermes Gateway профиля Мариям.
+9. Проверить runtime inventory = **21**, plugin = **1.0.4**, Gateway active и отсутствие drift SKILL.
+10. Провести controlled E2E только на временном test-user «Тест Ойижон», по одному сообщению и с DB-проверкой после каждого.
 
-   ```text
-   plugin loaded
-   tool_execution middleware registered
-   mapping mode 0600
-   Gateway active
-   PostgreSQL healthy
-   ```
-
-7. Будущий runtime smoke (без raw Telegram IDs в отчёте):
-
-   ```text
-   original target
-   effective target
-   tool result
-   ```
-
-НЕ выполнять эти шаги сейчас.
+Не указывать в командах/отчётах Telegram ID, токены, mapping или другие секреты.
 
 ## FORBIDDEN — что НЕ трогать
 

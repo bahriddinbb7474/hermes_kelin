@@ -1,0 +1,34 @@
+# Skill protect for profile mariyam_oyijon (ТЗ security-critical SKILL.md)
+# Merge into: ~/.hermes/profiles/mariyam_oyijon/config.yaml
+# Root cause (Stage 5 E2E, 2026-07-13): post-turn background self-improvement
+# fork (agent/background_review.py + turn_finalizer.py) called skill_manage
+# and delivered "💾 Self-improvement review: Patched SKILL.md…" to Telegram.
+#
+# Hermes sources of truth (v0.18.x):
+# - agent/agent_init.py: skills.creation_nudge_interval → _skill_nudge_interval
+# - agent/turn_finalizer.py: review_skills only if interval>0 AND skill_manage present
+# - agent/background_review.py: notify line + background_review_callback
+# - display.memory_notifications: off | on | verbose
+# - skills.write_approval: stage skill writes instead of immediate commit
+# - agent.disabled_toolsets: gateway/run.py loads into AIAgent
+# - toolset name "skills" → skills_list, skill_view, skill_manage (toolsets.py)
+
+skills:
+  enabled:
+    - mariyam
+  # Disable post-turn skill self-improvement fork (default was 10 turns).
+  creation_nudge_interval: 0
+  # If skill_manage is ever re-enabled, stage writes for human approval
+  # (applies to foreground AND background review fork).
+  write_approval: true
+
+display:
+  # No "💾 Self-improvement review: …" messages to end users (Telegram).
+  memory_notifications: "off"
+  tool_progress: false
+
+agent:
+  # Remove skill_manage / skills_list / skill_view tools from the agent.
+  # Skill content still loads from skills.enabled (mariyam remains readable).
+  disabled_toolsets:
+    - skills

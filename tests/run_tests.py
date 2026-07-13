@@ -15,7 +15,7 @@ sys.path.insert(0, REPO_ROOT)
 
 # Предохранитель: тесты делают TRUNCATE ... RESTART IDENTITY CASCADE.
 # Проверка цели выполняется ДО создания pool и любого подключения к БД.
-from tests.db_guard import validate_destructive_test_target
+from tests.db_guard import validate_destructive_test_target  # noqa: E402 - sys.path must be set first
 
 try:
     validate_destructive_test_target(
@@ -26,9 +26,9 @@ try:
 except Exception as exc:  # noqa: BLE001 - guard reports a clean refusal reason
     sys.exit(f"REFUSED: {exc}")
 
-from backend import db
-from backend.config import get_pool
-from backend.server import call_tool, list_tools
+from backend import db  # noqa: E402 - import only after destructive-target guard
+from backend.config import get_pool  # noqa: E402 - import only after destructive-target guard
+from backend.server import call_tool, list_tools  # noqa: E402 - import only after destructive-target guard
 
 
 async def reset_db(pool):
@@ -179,13 +179,14 @@ async def test_mcp_smoke(pool):
     expected = [
         "ensure_user", "save_expense", "save_income", "update_expense", "update_last_expense",
         "delete_expense", "delete_last_expense", "get_expense_report", "get_balance_summary",
+        "set_monthly_budget", "get_monthly_budget_status",
         "save_quran_progress", "get_quran_progress", "save_health_note", "save_alert_event",
         "save_plan_note", "get_admin_report_data", "backup_data", "get_backup_status",
         "get_bot_status", "log_usage_cost",
     ]
     assert names == expected, names
     required_sets = [tuple(t.inputSchema.get("required", [])) for t in tools]
-    assert len(tools) == 19
+    assert len(tools) == 21
     assert all("required" in t.inputSchema for t in tools)
     assert len(set(required_sets)) > 10, required_sets
 

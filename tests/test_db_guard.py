@@ -1,5 +1,4 @@
 """Unit tests for tests.db_guard (Блок 6Ж). No database connection is made."""
-import os
 import unittest
 
 from tests.db_guard import (

@@ -2,6 +2,8 @@
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md`
 
+**Статус v3.8:** архитектура не менялась. Stage 5.1 repo/worktree — **OFFLINE PASS** (21 tools, plugin 1.0.4); текущий VPS runtime — **LIVE PENDING** (19 tools, plugin 1.0.3).
+
 ## Принцип Hermes-first
 
 Hermes Agent — единственный "мозг" проекта: понимает речь, ведёт стиль Мариям, хранит мягкую память, выбирает когда вызвать tool, работает с Telegram, voice, cron и LLM.
@@ -15,7 +17,7 @@ Telegram (Ойижон / Бахриддин ака)
   -> Hermes Telegram Gateway + allowlist
   -> Hermes Profile: mariyam_oyijon
        memory, skill, LLM, STT/TTS, cron
-  -> Hermes profile plugin `mariyam_identity_guard`   (v3.6, узкий слой)
+  -> Hermes profile plugin `mariyam_identity_guard`   (repo 1.0.4 / VPS 1.0.3, узкий слой)
        tool_execution middleware: current session
        -> persisted Telegram source -> private mapping -> internal users.id
        (не router, не второй мозг; только детерминированная привязка sender)
@@ -32,7 +34,7 @@ Hermes делает:
 
 - общение с Ойижон и админом;
 - понимание бытовых фраз и голоса;
-- классификацию расходов, нормализацию сумм, **item_name_normalized / quantity / unit** (v3.7);
+- классификацию расходов, нормализацию сумм, **item_name_normalized / quantity / unit** (Stage 5.1 offline ready);
 - формулировку всех ответов, отчётов и **осторожных финансовых советов** (не выдумывать цены/экономию);
 - cron: утро, вечер, новости, 19:30, onboarding, heartbeat;
 - веб-поиск для новостей и фактических вопросов.
@@ -40,12 +42,12 @@ Hermes делает:
 Backend делает:
 
 - сохраняет расходы, доходы, прогресс Корана, health notes, alerts, plan notes, usage costs;
-- **v3.7:** хранит quantity/unit; агрегирует by_category / by_item / compare / trend / plan-fact;
+- **Stage 5.1 repo implementation:** хранит quantity/unit; агрегирует by_category / by_item / compare / trend / plan-fact;
 - возвращает отчётные числа и факты (**без прозы и советов**);
 - валидирует категории, суммы, валюты, роли, даты, units;
 - делает backup/status/heartbeat данные.
 
-LLM memory **не** источник финансовой аналитики (v3.7).
+LLM memory **не** источник финансовой аналитики.
 
 ## Запрещённые backend-heavy решения
 

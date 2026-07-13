@@ -36,9 +36,9 @@
 
 Основной и обязательный канал MVP — Telegram. Семейная группа, веб-дашборд, кнопочный UI и CRM в MVP не нужны.
 
-## Где мы сейчас (2026-07-12)
+## Где мы сейчас (2026-07-13)
 
-ТЗ: **v3.7** (2026-07-13: Этап 5.1 analytics/monthly plan — PLANNED/NOT STARTED; runtime tools 19, target 21). v3.6 identity binding runtime PASS (plugin 1.0.3, Stage 5 E2E). Test-user «Тест Ойижон» allowed pre-handover; real Oyijon not connected. Silent denial accepted (v3.5).
+ТЗ: **v3.8**. Этап 5.1 — **OFFLINE PASS / LIVE PENDING**. Repo/worktree: tools **21**, plugin **1.0.4**, migration 002, skill-protect и SKILL SHA `b1231182…`. VPS runtime: tools **19**, plugin **1.0.3**, Stage 5.1 и skill-protect не развёрнуты. Test-user «Тест Ойижон» allowed pre-handover; real Oyijon not connected.
 
 На VPS выполнено (Этап 1, технически):
 - PostgreSQL поднят и **healthy** (контейнер `hermes_mariyam_postgres`, порт 127.0.0.1:5432, init-миграции применены).
@@ -57,9 +57,9 @@
 - **DB guard (`tests/db_guard.py`) находится в `main`** (merged через `dd9261e`; 16 unit-тестов PASS). Destructive suite на production-БД не запускался.
 - **Identity guard 1.0.3** — VPS runtime + Stage 5 E2E PASS (`EVIDENCE_IDENTITY_GUARD_2026-07-12.md`, `EVIDENCE_STAGE_5_E2E_2026-07-12.md`). MCP-prefix, fail-closed barrier, int `telegram_id`, SKILL sentinel `user_id:0`.
 - **Этап 5 (бухгалтерия): ЗАКРЫТ (PASS 2026-07-13)** — E2E 4/4; final test **1/12000**, admin **8/768000**; runtime tools **19**.
-- **Этап 5.1 (аналитика + monthly plan): NOT STARTED** (ТЗ **v3.7**) — quantity/unit, by_item, compare/trend, plan/fact; target tools **21**; live 5.1 **запрещены** до SKILL drift fix.
-- **КРИТИЧЕСКИЙ ОТКРЫТЫЙ БЛОКЕР:** self-improvement изменил runtime SKILL.md + служебное сообщение в Telegram; SKILL восстановлен (`dfc7e327…`); live follow-up/handover **запрещены** до минимального фикса.
-- **Утверждённая цель (v3.7):** Мариям = бытовой финансовый аналитик (группы, товары, quantity, compare, plan/fact, осторожные советы); backend считает факты, Hermes объясняет; memory ≠ источник аналитики.
+- **Этап 5.1: OFFLINE PASS / LIVE PENDING** (ТЗ **v3.8**) — repo реализует quantity/unit, by_item, compare/trend, plan/fact и 21 tool; VPS остаётся на 19 tools / plugin 1.0.3.
+- **Skill-protect:** fix и SHA/contract tests готовы offline; на VPS ещё не применены. Live follow-up/handover запрещены до отдельного разрешения.
+- Мариям = бытовой финансовый аналитик; backend считает факты, Hermes объясняет; memory ≠ источник аналитики.
 - очистка тестовых данных БД — выполнена, закрепить аудитом;
 - **Этап 2 (язык): PARTIAL 8/20, НЕ закрыт** — 8 из 20 фраз проверены (8/8 кириллица, `LATIN_LINES: []`), полный AC (20/20, 0 латиницы) не пройден; тест остановлен заказчиком, не из-за FAIL (см. `docs/TZ/EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md`);
 - STT end-to-end — не выполнен;

@@ -55,9 +55,9 @@ hermes-mariyam/
 
 Настроить Hermes profile `mariyam_oyijon`, Telegram allowlist, skill личности Мариям, память, сквозной STT-тест на реальном голосе (TTS отложен — ТЗ v3.2, ответы только текстом), маленький MCP backend с PostgreSQL для точных данных, бухгалтерию с исправлением/удалением, Hermes cron для напоминаний и отчётов, safety alerts, backup/restore и мониторинг.
 
-## Текущее состояние (2026-07-12)
+## Текущее состояние (2026-07-13)
 
-ТЗ: **v3.7** (Этап 5.1 analytics/monthly plan — PLANNED). Identity binding runtime: plugin **1.0.3**. Stage 5 E2E **PASS** 2026-07-13; runtime tools **19**, target after 5.1 = **21**. Реальная Ойижон не подключена. **Открытый критический блокер:** self-improvement drift SKILL.md — live follow-up / Stage 5.1 live / handover запрещены до фикса.
+ТЗ: **v3.8**. Stage 5.1 — **OFFLINE PASS / LIVE PENDING**: repo/worktree содержит **21 tool**, identity plugin **1.0.4**, migration 002 и SKILL SHA `b1231182…`; текущий VPS runtime остаётся на **19 tools / plugin 1.0.3**, Stage 5.1 там не развёрнут. Skill-protect готов offline, но на VPS не применён. Реальная Ойижон не подключена; live deploy/E2E — только по отдельному разрешению.
 
 Этап 1 (VPS + Hermes + Telegram) — **закрыт по решению заказчика (2026-07-12, ТЗ v3.5)**:
 - ✅ PostgreSQL healthy (порт 127.0.0.1:5432, init-миграции применены);
@@ -71,7 +71,7 @@ hermes-mariyam/
 - ✅ Очистка тестовых данных production-БД выполнена (Блок 6З): остался только `admin` (id=1), все fixture-таблицы пусты; backup перед очисткой сохранён;
 - ✅ **Вся feature-ветка merged локально в `main` через `dd9261e`** (DB guard `tests/db_guard.py` и identity guard `deploy/hermes_plugins/mariyam_identity_guard/` включены; commit systemd `d24d01c` вошёл в merge).
 
-**Формальный аудит и merge в `main` Этапа 1 — ВЫПОЛНЕНЫ** (локальный commit `dd9261e`; push в `origin/main` ещё НЕ выполнен — по решению заказчика push отдельный). VPS Phase B (установка identity guard на VPS) ещё не выполнялась.
+**Формальный аудит и merge в `main` Этапа 1 — ВЫПОЛНЕНЫ** (локальный commit `dd9261e`; push в `origin/main` ещё НЕ выполнен — по решению заказчика push отдельный). VPS Phase B выполнена: identity guard **1.0.3** установлен, Stage 5 Telegram E2E PASS. Stage 5.1 остаётся **OFFLINE PASS / LIVE PENDING**: VPS = **19 tools / plugin 1.0.3**, repo/worktree = **21 tools / plugin 1.0.4**.
 
 **Этап 2 (язык, живой AC) — PARTIAL 8/20, НЕ закрыт:**
 - ✅ 8 из 20 фраз проверены (Сообщения 1–2, по 4 фразы) со второго аккаунта «Тест Ойижон»;
@@ -83,9 +83,9 @@ hermes-mariyam/
 - ✅ identity guard **1.0.3**; E2E 4/4; runtime tools **19**.
 - ✅ Evidence: `docs/TZ/EVIDENCE_STAGE_5_E2E_2026-07-12.md`.
 
-**Этап 5.1 (аналитика + monthly plan) — NOT STARTED (ТЗ v3.7):**
-- ⬜ quantity/unit, by_item, compare/trend, plan/fact; target tools **21**.
-- 🛑 Live 5.1 / handover **запрещены** до фикса self-improvement SKILL drift.
+**Этап 5.1 (аналитика + monthly plan) — OFFLINE PASS / LIVE PENDING (ТЗ v3.8):**
+- ✅ Repo: quantity/unit, by_item, compare/trend, plan/fact; tools **21**; plugin **1.0.4**; migration 002 готова; SKILL SHA `b1231182…`.
+- ⏳ VPS: tools **19**, plugin **1.0.3**; production migration/deploy/E2E не выполнялись. Этап не закрыт до live E2E.
 
 Текущий allowlist: **admin + временный «Тест Ойижон»** (второй аккаунт заказчика, role=oyijon). Реальная Ойижон отсутствует (до handover).
 

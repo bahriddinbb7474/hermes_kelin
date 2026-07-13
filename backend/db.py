@@ -2,7 +2,9 @@
 Источник истины: TZ_Hermes_Mariyam_FINAL_v3_0.md, разделы 13, 15.
 Backend validates and stores already-parsed data; returns exact facts/numbers.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
+from math import isfinite
 
 from .config import TASHKENT, parse_dt
 
@@ -13,6 +15,8 @@ SOURCE_TYPES = ("text", "voice", "admin")
 DETECTED_BY = ("llm", "keyword", "both")
 SERVICE_TYPES = ("stt", "tts", "llm")
 ROLES = ("oyijon", "admin")
+# Stage 5.1 — physical quantity units (ТЗ v3.7)
+CANONICAL_UNITS = ("kg", "g", "l", "ml", "pcs", "pack")
 
 
 def _one_of(field: str, value, allowed: tuple[str, ...], *, allow_none: bool = False):
@@ -20,6 +24,34 @@ def _one_of(field: str, value, allowed: tuple[str, ...], *, allow_none: bool = F
         return
     if value not in allowed:
         raise ValueError(f"INVALID_INPUT: {field} must be one of {', '.join(allowed)}")
+
+
+def _normalize_qty_unit(item: dict) -> tuple[float | None, str | None]:
+    """Validate optional quantity/unit on a save_expense item. Returns (qty, unit)."""
+    has_qty = "quantity" in item and item.get("quantity") is not None
+    has_unit = "unit" in item and item.get("unit") is not None
+
+    if not has_qty and not has_unit:
+        return None, None
+
+    if has_unit and not has_qty:
+        raise ValueError("INVALID_INPUT: unit requires quantity")
+
+    qty_raw = item.get("quantity")
+    if isinstance(qty_raw, bool) or not isinstance(qty_raw, (int, float, Decimal)):
+        raise ValueError("INVALID_INPUT: quantity must be a number")
+    qty = float(qty_raw)
+    if not isfinite(qty) or qty <= 0:
+        raise ValueError("INVALID_INPUT: quantity must be finite and > 0")
+
+    unit = None
+    if has_unit:
+        unit = item.get("unit")
+        if not isinstance(unit, str):
+            raise ValueError("INVALID_INPUT: unit must be a string")
+        unit = unit.strip().lower()
+        _one_of("unit", unit, CANONICAL_UNITS)
+    return qty, unit
 
 
 async def ensure_user(pool, telegram_id: int, role: str, display_name: str) -> tuple[int, bool]:
@@ -64,12 +96,20 @@ async def save_expense(pool, user_id, items, occurred_at, source_type, source_te
                 amount = int(round(float(it["amount_uzs"])))
                 if amount < 0:
                     raise ValueError("BAD_AMOUNT")
+                qty, unit = _normalize_qty_unit(it)
+                item_norm = it.get("item_name_normalized")
+                if item_norm is not None and not isinstance(item_norm, str):
+                    raise ValueError("INVALID_INPUT: item_name_normalized must be a string")
+                if isinstance(item_norm, str):
+                    item_norm = item_norm.strip() or None
                 tid = await conn.fetchval(
                     """INSERT INTO transactions
                        (user_id, type, amount, currency, category_code, item_name,
+                        item_name_normalized, quantity, unit,
                         source_text, source_type, occurred_at)
-                       VALUES ($1,'expense',$2,'UZS',$3,$4,$5,$6,$7) RETURNING id""",
+                       VALUES ($1,'expense',$2,'UZS',$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id""",
                     user_id, amount, cat, it.get("item_name"),
+                    item_norm, qty, unit,
                     source_text, source_type, occurred,
                 )
                 saved_ids.append(tid)
@@ -115,11 +155,17 @@ async def update_expense(pool, user_id, expense_id, fields):
         amt = int(round(float(fields["amount_uzs"])))
         if amt < 0:
             raise ValueError("BAD_AMOUNT")
-        sets.append(f"amount=${idx}"); params.append(amt); idx += 1
+        sets.append(f"amount=${idx}")
+        params.append(amt)
+        idx += 1
     if cat is not None:
-        sets.append(f"category_code=${idx}"); params.append(cat); idx += 1
+        sets.append(f"category_code=${idx}")
+        params.append(cat)
+        idx += 1
     if "item_name" in fields:
-        sets.append(f"item_name=${idx}"); params.append(fields["item_name"]); idx += 1
+        sets.append(f"item_name=${idx}")
+        params.append(fields["item_name"])
+        idx += 1
     if not sets:
         raise ValueError("INVALID_INPUT: fields is empty, nothing to update")
     row = await pool.fetchrow(
@@ -190,7 +236,95 @@ def _period_bounds(period: str, from_dt=None, to_dt=None):
     return s, e
 
 
-async def expense_report(pool, user_id, period, from_dt=None, to_dt=None, category_code=None):
+def _shift_month(dt_tashkent: datetime, delta: int) -> datetime:
+    """Shift calendar month in Asia/Tashkent (day=1, midnight)."""
+    y, m = dt_tashkent.year, dt_tashkent.month + delta
+    while m > 12:
+        y += 1
+        m -= 12
+    while m < 1:
+        y -= 1
+        m += 12
+    return dt_tashkent.replace(year=y, month=m, day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def _previous_period_bounds(
+    start: datetime, end: datetime, *, calendar_month: bool = False
+) -> tuple[datetime, datetime]:
+    """Previous period; calendar month uses exact Tashkent month boundaries."""
+    if calendar_month:
+        start_t = start.astimezone(TASHKENT)
+        prev_start_t = _shift_month(start_t, -1)
+        return prev_start_t.astimezone(timezone.utc), start_t.astimezone(timezone.utc)
+    duration = end - start
+    return start - duration, start
+
+
+def _build_by_item(rows) -> list[dict]:
+    """Group expense fact-rows into by_item analytics (only non-empty item_name_normalized)."""
+    groups: dict[tuple[str, str | None], list] = {}
+    for r in rows:
+        name = r["item_name_normalized"]
+        if not name:
+            continue
+        key = (name, r["category_code"])
+        groups.setdefault(key, []).append(r)
+
+    by_item = []
+    for (name, cat), items in groups.items():
+        total = sum(int(x["amount"]) for x in items)
+        purchase_count = len(items)
+        qty_by_unit: dict[str, float] = {}
+        all_have_qty_unit = True
+        units_seen: set[str] = set()
+        for x in items:
+            q, u = x["quantity"], x["unit"]
+            if q is None or u is None:
+                all_have_qty_unit = False
+                continue
+            u = str(u)
+            units_seen.add(u)
+            qty_by_unit[u] = qty_by_unit.get(u, 0.0) + float(q)
+
+        avg = None
+        if all_have_qty_unit and len(units_seen) == 1 and qty_by_unit:
+            only_unit = next(iter(units_seen))
+            qsum = qty_by_unit[only_unit]
+            if qsum > 0:
+                avg = round(total / qsum, 4)
+
+        by_item.append({
+            "item_name_normalized": name,
+            "category_code": cat,
+            "total_uzs": total,
+            "purchase_count": purchase_count,
+            "quantity_by_unit": {
+                u: (int(v) if float(v).is_integer() else round(v, 3))
+                for u, v in sorted(qty_by_unit.items())
+            },
+            "average_unit_price_uzs": avg,
+        })
+    by_item.sort(key=lambda x: (-x["total_uzs"], x["item_name_normalized"]))
+    return by_item
+
+
+async def expense_report(
+    pool,
+    user_id,
+    period,
+    from_dt=None,
+    to_dt=None,
+    category_code=None,
+    compare_previous: bool = False,
+    trend_months: int = 3,
+):
+    if not isinstance(compare_previous, bool):
+        raise ValueError("INVALID_INPUT: compare_previous must be boolean")
+    if isinstance(trend_months, bool) or not isinstance(trend_months, int):
+        raise ValueError("INVALID_INPUT: trend_months must be integer 1..12")
+    if trend_months < 1 or trend_months > 12:
+        raise ValueError("INVALID_INPUT: trend_months must be integer 1..12")
+
     start, end = _period_bounds(period, from_dt, to_dt)
     args = [user_id, start, end]
     cat_filter = ""
@@ -216,8 +350,81 @@ async def expense_report(pool, user_id, period, from_dt=None, to_dt=None, catego
          "sum_uzs": int(r["sum_uzs"])} for r in rows
     ]
     top = by_cat[0]["category_code"] if by_cat else None
-    return {"period": period, "currency": "UZS",
-            "total_uzs": total, "by_category": by_cat, "top_category": top}
+
+    # Detail rows for by_item (legacy NULL normalized names excluded from groups)
+    detail = await pool.fetch(
+        f"""SELECT amount, category_code, item_name_normalized, quantity, unit
+            FROM transactions
+            WHERE user_id=$1 AND type='expense'
+              AND occurred_at >= $2 AND occurred_at < $3
+              {cat_filter}""",
+        *args,
+    )
+    by_item = _build_by_item(detail)
+
+    result = {
+        "period": period,
+        "currency": "UZS",
+        "total_uzs": total,
+        "by_category": by_cat,
+        "top_category": top,
+        "by_item": by_item,
+    }
+
+    if compare_previous:
+        p_start, p_end = _previous_period_bounds(
+            start, end, calendar_month=(period == "month")
+        )
+        p_args = [user_id, p_start, p_end]
+        p_cat = ""
+        if category_code:
+            p_cat = " AND category_code = $4"
+            p_args.append(category_code)
+        prev_total = await pool.fetchval(
+            f"""SELECT COALESCE(SUM(amount),0) FROM transactions
+                WHERE user_id=$1 AND type='expense'
+                  AND occurred_at >= $2 AND occurred_at < $3{p_cat}""",
+            *p_args,
+        )
+        prev_total = int(prev_total)
+        change_uzs = total - prev_total
+        change_percent = None if prev_total == 0 else round(100.0 * change_uzs / prev_total, 4)
+        result["previous_period"] = {
+            "total_uzs": prev_total,
+            "change_uzs": change_uzs,
+            "change_percent": change_percent,
+        }
+
+    # monthly_series: last trend_months calendar months ending at period end (Tashkent)
+    end_t = end.astimezone(TASHKENT)
+    # last complete boundary is end; series months are those with month_start < end
+    # use the month that contains (end - 1 microsecond) as the newest month
+    newest = (end_t - timedelta(microseconds=1)).replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0
+    )
+    series = []
+    for i in range(trend_months - 1, -1, -1):
+        m_start = _shift_month(newest, -i)
+        m_end = _shift_month(m_start, 1)
+        s_utc = m_start.astimezone(timezone.utc)
+        e_utc = m_end.astimezone(timezone.utc)
+        s_args = [user_id, s_utc, e_utc]
+        s_cat = ""
+        if category_code:
+            s_cat = " AND category_code = $4"
+            s_args.append(category_code)
+        m_total = await pool.fetchval(
+            f"""SELECT COALESCE(SUM(amount),0) FROM transactions
+                WHERE user_id=$1 AND type='expense'
+                  AND occurred_at >= $2 AND occurred_at < $3{s_cat}""",
+            *s_args,
+        )
+        series.append({
+            "month": m_start.date().isoformat(),
+            "total_uzs": int(m_total),
+        })
+    result["monthly_series"] = series
+    return result
 
 
 async def balance_summary(pool, user_id, period):
@@ -235,6 +442,117 @@ async def balance_summary(pool, user_id, period):
     inc, exp = int(inc), int(exp)
     return {"currency": "UZS", "income_uzs": inc, "expense_uzs": exp,
             "remaining_uzs": inc - exp}
+
+
+def _budget_month(month: str) -> date:
+    """Parse the canonical YYYY-MM-01 budget key."""
+    if not isinstance(month, str):
+        raise ValueError("INVALID_INPUT: month must be YYYY-MM-01")
+    try:
+        parsed = date.fromisoformat(month)
+    except ValueError as exc:
+        raise ValueError("INVALID_INPUT: month must be YYYY-MM-01") from exc
+    if parsed.day != 1 or parsed.isoformat() != month:
+        raise ValueError("INVALID_INPUT: month must be YYYY-MM-01")
+    return parsed
+
+
+def _budget_amount(value) -> Decimal:
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
+        raise ValueError("BAD_AMOUNT")
+    amount = Decimal(str(value))
+    if not amount.is_finite() or amount < 0:
+        raise ValueError("BAD_AMOUNT")
+    return amount
+
+
+def _json_number(value: Decimal | int):
+    value = Decimal(value)
+    return int(value) if value == value.to_integral_value() else float(value)
+
+
+async def set_monthly_budget(
+    pool, user_id, month, category_code, planned_amount_uzs, note=None
+):
+    month_date = _budget_month(month)
+    amount = _budget_amount(planned_amount_uzs)
+    if not await valid_category(pool, category_code):
+        raise ValueError("BAD_CATEGORY:" + str(category_code))
+    row = await pool.fetchrow(
+        """WITH ins AS (
+               INSERT INTO monthly_budget_plans
+                   (user_id, month, category_code, planned_amount_uzs, note)
+               VALUES ($1,$2,$3,$4,$5)
+               ON CONFLICT (user_id, month, category_code) DO NOTHING
+               RETURNING id
+           ), upd AS (
+               UPDATE monthly_budget_plans
+               SET planned_amount_uzs=$4, note=$5, updated_at=now()
+               WHERE user_id=$1 AND month=$2 AND category_code=$3
+                 AND NOT EXISTS (SELECT 1 FROM ins)
+               RETURNING id
+           )
+           SELECT id, true AS created FROM ins
+           UNION ALL
+           SELECT id, false AS created FROM upd
+           LIMIT 1""",
+        user_id, month_date, category_code, amount, note,
+    )
+    if not row:
+        raise RuntimeError("monthly budget upsert returned no row")
+    return {"plan_id": row["id"], "created": row["created"]}
+
+
+async def get_monthly_budget_status(pool, user_id, month):
+    month_date = _budget_month(month)
+    start_t = datetime(month_date.year, month_date.month, 1, tzinfo=TASHKENT)
+    end_t = _shift_month(start_t, 1)
+    rows = await pool.fetch(
+        """WITH planned AS (
+               SELECT category_code, planned_amount_uzs AS planned_uzs
+               FROM monthly_budget_plans
+               WHERE user_id=$1 AND month=$2
+           ), actual AS (
+               SELECT category_code, SUM(amount)::numeric AS actual_uzs
+               FROM transactions
+               WHERE user_id=$1 AND type='expense' AND currency='UZS'
+                 AND occurred_at >= $3 AND occurred_at < $4
+               GROUP BY category_code
+           )
+           SELECT COALESCE(p.category_code, a.category_code) AS category_code,
+                  COALESCE(p.planned_uzs, 0)::numeric AS planned_uzs,
+                  COALESCE(a.actual_uzs, 0)::numeric AS actual_uzs
+           FROM planned p
+           FULL OUTER JOIN actual a ON a.category_code = p.category_code
+           ORDER BY COALESCE(p.category_code, a.category_code) NULLS LAST""",
+        user_id,
+        month_date,
+        start_t.astimezone(timezone.utc),
+        end_t.astimezone(timezone.utc),
+    )
+    planned_total = Decimal(0)
+    actual_total = Decimal(0)
+    by_category = []
+    for row in rows:
+        planned = Decimal(row["planned_uzs"])
+        actual = Decimal(row["actual_uzs"])
+        planned_total += planned
+        actual_total += actual
+        usage = None if planned == 0 else round(float(actual / planned * 100), 4)
+        by_category.append({
+            "category_code": row["category_code"],
+            "planned_uzs": _json_number(planned),
+            "actual_uzs": _json_number(actual),
+            "difference_uzs": _json_number(planned - actual),
+            "usage_percent": usage,
+        })
+    return {
+        "month": month_date.isoformat(),
+        "planned_total_uzs": _json_number(planned_total),
+        "actual_total_uzs": _json_number(actual_total),
+        "remaining_uzs": _json_number(planned_total - actual_total),
+        "by_category": by_category,
+    }
 
 
 async def save_quran_progress(pool, user_id, surah, juz, page, note):

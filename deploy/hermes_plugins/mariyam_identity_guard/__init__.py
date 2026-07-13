@@ -40,6 +40,8 @@ USER_SCOPED_TOOLS = frozenset(
         "delete_last_expense",
         "get_expense_report",
         "get_balance_summary",
+        "set_monthly_budget",
+        "get_monthly_budget_status",
         "save_quran_progress",
         "get_quran_progress",
         "save_health_note",

@@ -116,9 +116,18 @@
 - `get_expense_report`: compare_previous, trend_months, by_item, previous_period, monthly_series;
 - backend = факты; Hermes = нормализация + объяснения + осторожные советы;
 - LLM memory ≠ источник финансовой аналитики;
-- Этап 5.1 = **PLANNED / NOT STARTED**; live 5.1 **запрещены** до фикса self-improvement SKILL drift;
-- runtime tools = **19**, target = **21**.
+- Этап 5.1 = **OFFLINE PASS / LIVE PENDING**; live deploy/E2E — только по отдельному разрешению;
+- repo tools/plugin = **21/1.0.4**; VPS runtime = **19/1.0.3**.
+
+## Решение заказчика (2026-07-13) — канонический SKILL и защита
+
+- Единственный канонический файл в git: `skills/mariyam/SKILL.md`.
+- Отдельная protected copy SKILL в git **не создаётся**: дубликат мог бы расходиться с источником истины.
+- Защита обеспечивается profile-scoped skill-protect config и постоянными SHA/contract tests.
+- Canonical Stage 5.1 SHA-256: `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`.
+- Копирование repo SKILL в runtime profile выполняется только при будущем отдельно разрешённом deploy, с последующей проверкой SHA.
+- Stage 5.1: **OFFLINE PASS / LIVE PENDING**; repo tools/plugin = **21/1.0.4**, VPS runtime = **19/1.0.3**.
 
 ## Версионность ТЗ
 
-Исполнять только `TZ_Hermes_Mariyam_FINAL_v3_0.md` (внутри — версия **3.7**, раздел 0.1–0.7 = changelog): §0.1 — v3.0→3.1; §0.2 — TTS/STT; §0.3 — Ойижон не до handover; §0.4 — test-user; §0.5 — silent denial; §0.6 — identity binding; §0.7 — analytics & monthly plan. Старые v1/v2/review-файлы не использовать как рабочие требования.
+Исполнять только `TZ_Hermes_Mariyam_FINAL_v3_0.md` (внутри — версия **3.8**, раздел 0.1–0.8 = changelog): §0.1 — v3.0→3.1; §0.2 — TTS/STT; §0.3 — Ойижон не до handover; §0.4 — test-user; §0.5 — silent denial; §0.6 — identity binding; §0.7 — analytics & monthly plan requirements; §0.8 — OFFLINE PASS / LIVE PENDING status. Старые v1/v2/review-файлы не использовать как рабочие требования.

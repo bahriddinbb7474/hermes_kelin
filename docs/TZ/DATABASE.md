@@ -1,7 +1,7 @@
 # Database
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (DDL всех таблиц — §13).
-Реализация: `backend/sql/001_init.sql` (схема + seed категорий, идемпотентно) находится в `main` (merged через `dd9261e`); проверено тестами, включая границу суток Asia/Tashkent (`TZ_BOUNDARY_PASSED`). Жёсткий DB guard (`tests/db_guard.py`) также находится в `main`; destructive tests против production-БД не запускались.
+Реализация: `backend/sql/001_init.sql` + идемпотентная migration `002_stage51_quantity_budget.sql`. Migration 002 реализована и проверена offline двойным применением на чистой PostgreSQL 16; **на production/VPS ещё не применялась**. Жёсткий DB guard (`tests/db_guard.py`) блокирует destructive tests против production-БД.
 
 ## Назначение
 
@@ -13,8 +13,8 @@ PostgreSQL хранит точные данные. Hermes memory хранит т
 
 - `users` — Telegram ID, роль `oyijon`/`admin`, имя, язык, timezone.
 - `expense_categories` — фиксированные категории и подкатегории расходов.
-- `transactions` — расходы и доходы: сумма, валюта, категория, предмет, description, source, время. **v3.7 (target):** nullable `item_name_normalized`, `quantity`, `unit` (`kg|g|l|ml|pcs|pack`); unit только с quantity; quantity>0; старые rows без quantity валидны.
-- `monthly_budget_plans` — **v3.7 target:** plan на `(user_id, month, category_code)`: planned_amount_uzs, note, timestamps.
+- `transactions` — расходы и доходы: сумма, валюта, категория, предмет, description, source, время. **Migration 002 (offline ready):** nullable `item_name_normalized`, `quantity`, `unit` (`kg|g|l|ml|pcs|pack`); unit только с quantity; quantity>0; старые rows без quantity валидны.
+- `monthly_budget_plans` — **migration 002 (offline ready):** plan на `(user_id, month, category_code)`: planned_amount_uzs, note, timestamps.
 - `quran_progress` — сура/жуз/страница/заметка и дата обновления.
 - `health_notes` — заметки о самочувствии с severity, без диагноза.
 - `alert_events` — срочные события: тип, severity, исходная фраза, ответ бота, `detected_by`, отправлено ли админу.
