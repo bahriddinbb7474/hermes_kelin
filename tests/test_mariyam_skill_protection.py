@@ -36,9 +36,9 @@ SKILL = REPO / "skills" / "mariyam" / "SKILL.md"
 GUARD_INIT = (
     REPO / "deploy" / "hermes_plugins" / "mariyam_identity_guard" / "__init__.py"
 )
-# Canonical Stage-5.1 SKILL bytes (must not drift via self-improvement).
+# Canonical Stage-5.2 SKILL bytes (must not drift via self-improvement).
 EXPECTED_SKILL_SHA256 = (
-    "b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4"
+    "b3afd9ecfb16a4d4618be898573a84c00ae24a1c3b41e8ae57823912b9ac9d18"
 )
 PROFILE_SCOPED_DIR = "hermes_profile_mariyam_oyijon"
 SELF_IMPROVEMENT_MARKERS = (

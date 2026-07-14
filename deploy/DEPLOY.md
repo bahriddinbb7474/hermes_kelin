@@ -264,7 +264,7 @@ Plugin: `deploy/hermes_plugins/mariyam_identity_guard/`.
    `memory_notifications: "off"`, `agent.disabled_toolsets: [skills]`).
 2. Skill остаётся **читаемым** через `skills.enabled: [mariyam]` (prompt).
 3. Restart только `hermes-gateway-mariyam_oyijon.service`.
-4. Verify: sha SKILL = `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; offline `pytest tests/test_mariyam_skill_protection.py`.
+4. Verify: sha SKILL = `b3afd9ecfb16a4d4618be898573a84c00ae24a1c3b41e8ae57823912b9ac9d18`; offline `pytest tests/test_mariyam_skill_protection.py`.
 
 Опционально (filesystem belt, не вместо config): `chmod a-w` на
 `…/skills/mariyam/SKILL.md` после deploy skill.

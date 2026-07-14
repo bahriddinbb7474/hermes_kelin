@@ -68,13 +68,15 @@ AC (измеримые):
 11. Identity guard на все новые user-scoped tools (`set_monthly_budget`, `get_monthly_budget_status`).
 12. Реальная Ойижон до handover не подключается.
 
-### 5.2. Простые семейные отчёты — PLANNED / NOT IMPLEMENTED
+### 5.2. Простые семейные отчёты — OFFLINE PASS / LIVE PENDING
 
 1. Первый ответ — общая таблица `Харажат гуруҳи | Режа | Сарфланди | Қолди`, затем ровно один мягкий вопрос о деталях.
-2. Product details только по просьбе: planned/actual quantity и amount.
+2. Product details только по просьбе; питание раскрывается по товарам. Planned quantity/amount показывается только из точного tool result, иначе `айтилмаган`.
 3. Unknown = `айтилмаган`, не 0; units не смешиваются; quantity не угадывается; суммы только tools.
 4. User-facing текст не содержит JSON, tool names, `plan/fact`, `usage_percent` и сложные финансовые термины.
-5. Реализация позднее через canonical SKILL и существующие 21 tools; текущий SKILL не меняется.
+5. Canonical SKILL и постоянные Stage 5.2 contract-тесты готовы offline; SHA-защита обновлена; inventory = 21 tools.
+6. Backend, БД, plugin и Hermes core не изменены; migration 002 остаётся active, migrations 003/004/005 отсутствуют.
+7. VPS/profile не менялись, Telegram E2E и платные API не выполнялись, реальная Ойижон не подключалась. До отдельного E2E этап не закрыт.
 
 ### 5.3. Семейный и продуктовый план — PLANNED / NOT IMPLEMENTED
 

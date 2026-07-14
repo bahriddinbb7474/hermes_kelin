@@ -1,8 +1,8 @@
-# Техническое задание v3.10 — FINAL
+# Техническое задание v3.11 — FINAL
 # Hermes Agent «Мариям» — ИИ келинчак для Ойижон
 
 **Статус:** ФИНАЛЬНЫЙ, единый источник истины (single source of truth)
-**Версия:** 3.10 — решение заказчика от 2026-07-14: planned-этапы домашних финансов, цикла утверждения плана, коммунальных кабинетов read-only и обязательных платежей (см. 0.10). Stage 5.1 остаётся CLOSED / LIVE PASS по v3.9 (см. 0.9). 3.8 — offline milestone; 3.7 — требования аналитики; 3.6 — identity binding; 3.5 — silent denial; 3.4 — test-user; 3.3 — Ойижон до handover не подключать; 3.2 — TTS off; 3.1 — ревизия аудита. Имя файла не меняется, документ остаётся единственным источником истины.
+**Версия:** 3.11 — offline-реализация Stage 5.2 через canonical SKILL и постоянные contract-тесты (см. 0.11); live deploy/Telegram E2E не выполнялись. Требования planned-этапов Stage 5.2–6 приняты в v3.10 (см. 0.10). Stage 5.1 остаётся CLOSED / LIVE PASS по v3.9 (см. 0.9). 3.8 — offline milestone; 3.7 — требования аналитики; 3.6 — identity binding; 3.5 — silent denial; 3.4 — test-user; 3.3 — Ойижон до handover не подключать; 3.2 — TTS off; 3.1 — ревизия аудита. Имя файла не меняется, документ остаётся единственным источником истины.
 **Проект:** персональный Telegram ИИ-агент для пожилой женщины из Узбекистана
 **Имя агента:** Мариям · **Образ:** ИИ келинчак
 **Основной пользователь:** Ойижон · **Администратор:** Бахриддин ака
@@ -128,6 +128,19 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
 8. **Не входит:** автоматическая оплата, банковские credentials/карты и банковское приложение, write/payment действия коммунального кабинета, лечебная диета/универсальная норма мяса, backend scheduler/router/orchestrator, изменение Hermes core, газ/вода без подтверждения кабинетов.
 
 Ни migration 003/004/005, ни planned tools, ни cron-цикл, ни utility connector на момент v3.10 **не реализованы и не развёрнуты**. Текущий runtime остаётся **21 tools**.
+
+### 0.11. Изменения v3.10 → v3.11 (2026-07-14) — Stage 5.2 offline implementation
+
+Требования Stage 5.2 из §0.10 и §21 реализованы только в repo/worktree:
+
+1. Canonical `skills/mariyam/SKILL.md` получил отдельный раздел простых семейных отчётов: общая таблица первой, ровно один мягкий вопрос, детали только по просьбе, unknown=`айтилмаган`, user-facing units и запрет технического текста.
+2. Добавлен постоянный contract `tests/test_mariyam_skill_stage52.py`; Stage 5.1, identity, language и medical safety contracts сохранены полным suite.
+3. Repo canonical SKILL SHA-256 = `b3afd9ecfb16a4d4618be898573a84c00ae24a1c3b41e8ae57823912b9ac9d18`; SHA-защита обновлена. Отдельная git-copy не создавалась.
+4. Offline verification: targeted **110 passed**; полный `pytest -q` = **159 passed, 2 skipped**; `ruff check .`, `python -m compileall backend tests`, `git diff --check` — PASS; inventory = **21 tools**.
+5. Backend, БД, identity plugin и Hermes core не менялись. Migration 002 остаётся единственной active migration; migrations 003/004/005 отсутствуют. Plugin остаётся **1.0.4**.
+6. VPS/profile не менялись: runtime остаётся **21 tools / plugin 1.0.4 / migration 002**, runtime SKILL остаётся Stage 5.1 SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4` до отдельно разрешённого deploy.
+7. Telegram E2E и платные API не выполнялись; реальная Ойижон не подключалась.
+8. **Вердикт Stage 5.2: OFFLINE PASS / LIVE PENDING.** Этап не закрыт без отдельного Telegram E2E. Evidence: `../EVIDENCE_STAGE_5_2_OFFLINE_2026-07-14.md`.
 
 Исполнитель реализует проект **строго по разделам 5–21**, сдаёт этапами (раздел 15) и на каждом этапе выполняет acceptance criteria. Что делать запрещено — раздел 20.
 
@@ -1181,9 +1194,9 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 
 > **Статус v3.9: CLOSED / LIVE PASS.** Repo и VPS runtime = **21 tools / plugin 1.0.4**; migration 002 применена; canonical SKILL и skill-protect активны. Controlled E2E подтвердил quantity/unit, analytics, compare/trend, budget plan/fact и identity; cleanup восстановил DB baseline. Evidence: `../EVIDENCE_STAGE_5_1_LIVE_2026-07-13.md`.
 
-### Этап 5.2 — Простые семейные отчёты для Ойижон (v3.10)
+### Этап 5.2 — Простые семейные отчёты для Ойижон (v3.10 requirements; v3.11 offline status)
 
-**Статус: PLANNED / NOT IMPLEMENTED.** Реализуется позднее через canonical `skills/mariyam/SKILL.md` и существующие 21 tools; на docs-only design step SKILL/runtime не меняются.
+**Статус: OFFLINE PASS / LIVE PENDING.** Canonical `skills/mariyam/SKILL.md`, Stage 5.2 contract-тесты и SHA-защита готовы offline; inventory остаётся 21. VPS/profile не менялись, Telegram E2E не выполнялся, поэтому Stage 5.2 не CLOSED и не LIVE PASS.
 
 **Язык для Ойижон:** сложные термины заменяются только в user-facing тексте: бюджет → `оила харажатлари режаси`; план → `режа`; факт → `амалда сарфланган / сарфланди`; остаток → `қолган пул`; категория → `харажат гуруҳи`; отклонение → `режадан кўп ёки кам`; тренд → `ойлар бўйича ўзгариш`; аналитика → `ҳисоб-китобни кўриб чиқиш`. Внутренние tool fields/contracts остаются техническими.
 
