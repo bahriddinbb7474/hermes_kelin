@@ -36,15 +36,15 @@
 
 Основной и обязательный канал MVP — Telegram. Семейная группа, веб-дашборд, кнопочный UI и CRM в MVP не нужны.
 
-## Где мы сейчас (2026-07-13)
+## Где мы сейчас (2026-07-14)
 
-ТЗ: **v3.8**. Этап 5.1 — **OFFLINE PASS / LIVE PENDING**. Repo/worktree: tools **21**, plugin **1.0.4**, migration 002, skill-protect и SKILL SHA `b1231182…`. VPS runtime: tools **19**, plugin **1.0.3**, Stage 5.1 и skill-protect не развёрнуты. Test-user «Тест Ойижон» allowed pre-handover; real Oyijon not connected.
+ТЗ: **v3.9**. Этап 5.1 — **CLOSED / LIVE PASS**. Repo/VPS: tools **21**, plugin **1.0.4**, migration 002 active, skill-protect **4/4**, SKILL SHA `b1231182…`. Test-user «Тест Ойижон» используется только pre-handover; реальная Ойижон не подключена.
 
 На VPS выполнено (Этап 1, технически):
 - PostgreSQL поднят и **healthy** (контейнер `hermes_mariyam_postgres`, порт 127.0.0.1:5432, init-миграции применены).
 - Hermes Agent **v0.18.2** (upstream `3b2ef789`) установлен под `timeagent`.
 - Профиль `mariyam_oyijon` создан; модель **`gpt-5.6-luna` через api.n1n.ai** (утверждена 2026-07-12, резерв `deepseek-v4-flash`; DECISIONS.md); allowlist содержит **только ID администратора** (до тестов) — в ходе частичного живого теста временно добавлен test-user «Тест Ойижон» (второй аккаунт заказчика, role=oyijon), остаётся для следующих этапов.
-- Backend зарегистрирован как **stdio MCP** (`mariyam_backend`): Hermes видит ровно 19 tools, реальные tool-calls работают, `ensure_user` (admin) выполнен идемпотентно.
+- Backend зарегистрирован как **stdio MCP** (`mariyam_backend`): inventory/dispatch/discovery = **21/21/21**, реальные tool-calls работают, `ensure_user` (admin) выполнен идемпотентно.
 - Skill Мариям установлен в профиль (enabled, sha256 совпадает с репо).
 - Telegram Gateway установлен как **systemd user-service** (`hermes-gateway-mariyam_oyijon.service`), `active`/`enabled`; `loginctl enable-linger timeagent` выполнен (Блок 6И).
 - **Первый живой ответ получен**: бот ответил Бахриддин ака в Telegram на узбекской кириллице (gateway реально принимает/обрабатывает сообщения).
@@ -52,13 +52,13 @@
 - allowlist блокирует чужой аккаунт **до** LLM/tools/БД (`PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL`); точный текст отказа `Кечирасиз, бу шахсий ёрдамчи.` не обязателен для Hermes v0.18.2 (решение заказчика 2026-07-12, ТЗ §0.5).
 - Очистка тестовых данных production-БД выполнена (Блок 6З): остался только `admin`, fixture-таблицы пусты.
 
-Открыто:
-- **Этап 1 закрыт по решению заказчика (2026-07-12, ТЗ v3.5):** `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (тихая блокировка принята). **Аудит и merge коммита `d24d01c` (systemd unit) в `main` ВЫПОЛНЕНЫ** — вся feature-ветка merged локально в `main` через `dd9261e` (push в `origin/main` ещё НЕ выполнен).
+Статусы и открытые работы:
+- **Этап 1 закрыт по решению заказчика (2026-07-12, ТЗ v3.5):** `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (тихая блокировка принята). **Аудит и merge коммита `d24d01c` (systemd unit) в `main` ВЫПОЛНЕНЫ** — вся feature-ветка merged в `main` через `dd9261e`.
 - **DB guard (`tests/db_guard.py`) находится в `main`** (merged через `dd9261e`; 16 unit-тестов PASS). Destructive suite на production-БД не запускался.
-- **Identity guard 1.0.3** — VPS runtime + Stage 5 E2E PASS (`EVIDENCE_IDENTITY_GUARD_2026-07-12.md`, `EVIDENCE_STAGE_5_E2E_2026-07-12.md`). MCP-prefix, fail-closed barrier, int `telegram_id`, SKILL sentinel `user_id:0`.
-- **Этап 5 (бухгалтерия): ЗАКРЫТ (PASS 2026-07-13)** — E2E 4/4; final test **1/12000**, admin **8/768000**; runtime tools **19**.
-- **Этап 5.1: OFFLINE PASS / LIVE PENDING** (ТЗ **v3.8**) — repo реализует quantity/unit, by_item, compare/trend, plan/fact и 21 tool; VPS остаётся на 19 tools / plugin 1.0.3.
-- **Skill-protect:** fix и SHA/contract tests готовы offline; на VPS ещё не применены. Live follow-up/handover запрещены до отдельного разрешения.
+- **Identity guard 1.0.4** — VPS runtime + Stage 5/5.1 E2E PASS (`TZ/EVIDENCE_IDENTITY_GUARD_2026-07-12.md`, `TZ/EVIDENCE_STAGE_5_E2E_2026-07-12.md`, `EVIDENCE_STAGE_5_1_LIVE_2026-07-13.md`). MCP-prefix, fail-closed barrier, int `telegram_id`, SKILL sentinel `user_id:0`.
+- **Этап 5 (бухгалтерия): ЗАКРЫТ (PASS 2026-07-13)** — E2E 4/4; final test **1/12000**, admin **8/768000**; на момент acceptance runtime tools **19**, затем расширены Stage 5.1 до 21.
+- **Этап 5.1: CLOSED / LIVE PASS** (ТЗ **v3.9**) — quantity/unit, by_item, compare/trend, plan/fact и identity подтверждены live; runtime 21 tools / plugin 1.0.4.
+- **Skill-protect:** active **4/4**, canonical SKILL SHA подтверждён, `tool_progress` off.
 - Мариям = бытовой финансовый аналитик; backend считает факты, Hermes объясняет; memory ≠ источник аналитики.
 - очистка тестовых данных БД — выполнена, закрепить аудитом;
 - **Этап 2 (язык): PARTIAL 8/20, НЕ закрыт** — 8 из 20 фраз проверены (8/8 кириллица, `LATIN_LINES: []`), полный AC (20/20, 0 латиницы) не пройден; тест остановлен заказчиком, не из-за FAIL (см. `docs/TZ/EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md`);

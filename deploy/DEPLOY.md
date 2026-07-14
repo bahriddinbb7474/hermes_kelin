@@ -235,14 +235,14 @@ Role-aware, fail-closed `tool_execution` middleware, который привяз
 MCP tools к правильному внутреннему `users.id` по текущей Telegram-сессии.
 Plugin: `deploy/hermes_plugins/mariyam_identity_guard/`.
 
-### Уже выполненный VPS baseline
+### Текущий VPS baseline
 
-- Identity guard **1.0.3** установлен и включён в runtime profile.
+- Identity guard **1.0.4** установлен и включён в runtime profile.
 - Приватный mapping находится вне git, имеет strict mode `0600`; Gateway Environment с `MARIYAM_IDENTITY_MAP_FILE` настроен.
 - `display.tool_progress: "off"` настроен.
 - MCP-prefix `mcp__mariyam_backend__<tool>` канонизируется до bare policy name; неизвестные/неразрешённые вызовы блокируются fail-closed.
 - Stage 5 controlled Telegram E2E на «Тест Ойижон» — **PASS**.
-- Текущий VPS runtime остаётся на **19 tools / plugin 1.0.3**. Это baseline, а не будущая Phase B.
+- Текущий VPS runtime: tools/dispatch/MCP discovery **21/21/21**, plugin **1.0.4**, migration 002 active, Stage 5.1 **CLOSED / LIVE PASS**.
 
 Значения mapping, реальные Telegram ID и секреты в git/отчёты не добавлять. Реальную Ойижон до handover не подключать.
 
@@ -269,11 +269,11 @@ Plugin: `deploy/hermes_plugins/mariyam_identity_guard/`.
 Опционально (filesystem belt, не вместо config): `chmod a-w` на
 `…/skills/mariyam/SKILL.md` после deploy skill.
 
-**VPS apply — только по отдельному разрешению.**
+**VPS apply выполнен по отдельному разрешению:** skill-protect active 4/4, `tool_progress` off, canonical SKILL SHA подтверждён. Любое повторное применение — только по новому разрешению.
 
-## Будущий Stage 5.1 live deploy (НЕ ВЫПОЛНЯТЬ без разрешения)
+## Выполненный Stage 5.1 live deploy (история выполнения)
 
-Строгая последовательность:
+Последовательность выполнена controlled deploy:
 
 1. Сделать backup production-БД и runtime profile Мариям.
 2. Применить migration 002 (`backend/sql/002_stage51_quantity_budget.sql`) с `ON_ERROR_STOP=1`.
@@ -283,8 +283,8 @@ Plugin: `deploy/hermes_plugins/mariyam_identity_guard/`.
 6. Установить canonical `skills/mariyam/SKILL.md` из repo в runtime profile.
 7. Проверить SHA-256 SKILL: `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`.
 8. Перезапустить только Hermes Gateway профиля Мариям.
-9. Проверить runtime inventory = **21**, plugin = **1.0.4**, Gateway active и отсутствие drift SKILL.
-10. Провести controlled E2E только на временном test-user «Тест Ойижон», по одному сообщению и с DB-проверкой после каждого.
+9. Проверить runtime inventory = **21**, plugin = **1.0.4**, Gateway active и отсутствие drift SKILL — PASS.
+10. Провести controlled E2E только на временном test-user «Тест Ойижон», по одному сообщению и с DB-проверкой после каждого — PASS; cleanup восстановил baseline.
 
 Не указывать в командах/отчётах Telegram ID, токены, mapping или другие секреты.
 

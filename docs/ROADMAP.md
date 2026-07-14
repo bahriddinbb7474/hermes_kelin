@@ -12,8 +12,8 @@
 | 2 | Skill Мариям: стиль, язык, onboarding, кириллица | 🟡 skill установлен в профиль (enabled, sha256==repo); offline-тест языка пройден (24/24 кириллица на выбранной LLM); **один живой ответ кириллицей через Telegram подтверждён**; **PARTIAL живой AC: 8/20 фраз проверены (8/8 кириллица, LATIN_LINES=[]), полный AC (20/20, 0 латиницы) НЕ пройден — тест остановлен заказчиком, не из-за FAIL** (см. EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md) |
 | 3 | Голос: сквозной STT-тест (голос→Whisper→LLM→БД, числа ≥90%), бюджет; TTS отложен (v3.2) | 🟡 **LLM выбрана: `gpt-5.6-luna` через api.n1n.ai (2026-07-12, язык 100%/числа 100%, резерв deepseek-v4-flash)**; 15 записей Ойижон есть; сквозная STT-точность ещё не измерена |
 | 4 | Backend tools (MCP) + БД | ✅ выполнен полностью (2026-07-12): backend tools + PostgreSQL (19 tools, 4 тест-маркера, ТЗ v3.1 AC); systemd verify пройден; stdio MCP зарегистрирован в реальном Hermes, `hermes tools` = ровно 19, реальные tool-calls работают, `ensure_user` идемпотентен |
-| 5 | Бухгалтерия: расходы/доходы/отчёты/баланс/исправление/удаление | ✅ **закрыт (2026-07-13):** identity guard **1.0.3**; Telegram E2E 4/4 PASS; evidence `EVIDENCE_STAGE_5_E2E_2026-07-12.md`. Runtime tools **19**. |
-| 5.1 | Аналитика расходов + месячный план (quantity/unit, compare/trend, plan/fact, осторожные советы) | 🟡 **OFFLINE PASS / LIVE PENDING** (ТЗ v3.8 §0.8): repo tools **21**, plugin **1.0.4**, migration 002/SKILL contract готовы; VPS остаётся tools **19**, plugin **1.0.3**. Этап не закрыт до live E2E. |
+| 5 | Бухгалтерия: расходы/доходы/отчёты/баланс/исправление/удаление | ✅ **закрыт (2026-07-13):** на момент acceptance identity guard **1.0.3**, runtime tools **19**; Telegram E2E 4/4 PASS; evidence `EVIDENCE_STAGE_5_E2E_2026-07-12.md`. Текущий runtime после Stage 5.1 указан следующей строкой. |
+| 5.1 | Аналитика расходов + месячный план (quantity/unit, compare/trend, plan/fact, осторожные советы) | ✅ **CLOSED / LIVE PASS** (ТЗ v3.9 §0.9): migration 002 active; tools/dispatch/discovery **21/21/21**; plugin **1.0.4**; canonical SKILL + skill-protect active; controlled E2E и cleanup PASS. |
 | 6 | Hermes cron: напоминания, утро/вечер, новости, погода, намаз | ⬜ не начат — см. `CRON_AND_REMINDERS.md` |
 | 7 | Admin reports + safety: отчёт 19:30, alerts, recall 100% | ⬜ не начат — backend-tools готовы, нужен Hermes |
 | 8 | Backup/restore/monitoring | ⬜ не начат — `backup_data`/`get_backup_status` намеренно возвращают `NOT_CONFIGURED` |
@@ -22,10 +22,18 @@
 
 - **Очистка тестовых данных production-БД** — ВЫПОЛНЕНА (Блок 6З: остался только `admin`, fixture-таблицы пусты, backup сохранён); требует закрепления финальным аудитом.
 - **DB guard** — в `main` (`tests/db_guard.py`); destructive suite на production-БД не запускался.
-- **Identity guard 1.0.3** — VPS runtime + Stage 5 E2E PASS (см. evidence).
-- **Этап 5.1** — **OFFLINE PASS / LIVE PENDING** (ТЗ v3.8): repo 21/1.0.4; VPS 19/1.0.3; live deploy/E2E не выполнялись.
-- **Skill-protect:** mitigation и постоянные SHA/contract tests готовы offline; VPS apply ещё не выполнялся. Live 5.1 запрещён до отдельного разрешения и controlled E2E.
-- **Тихая блокировка unauthorized решена в ТЗ v3.5** — `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (решение заказчика 2026-07-12, ТЗ §0.5); отдельный gateway-fork не требуется; аудит и merge `d24d01c` в `main` **ВЫПОЛНЕНЫ** (через `dd9261e`); push в `origin/main` остаётся отдельным действием.
+- **Identity guard на момент Stage 5: 1.0.3** — Stage 5 E2E PASS (см. historical evidence); текущий runtime после Stage 5.1 = 1.0.4.
+- **Этап 5.1** — **CLOSED / LIVE PASS** (ТЗ v3.9): runtime 21/1.0.4; migration 002, canonical SKILL и skill-protect active; live E2E/cleanup PASS.
+- **Skill-protect:** active 4/4; постоянные SHA/contract tests остаются обязательными.
+- **Тихая блокировка unauthorized решена в ТЗ v3.5** — `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (решение заказчика 2026-07-12, ТЗ §0.5); отдельный gateway-fork не требуется; аудит и merge `d24d01c` в `main` **ВЫПОЛНЕНЫ** (через `dd9261e`).
+
+## Перед handover
+
+- Выполнить отдельный Telegram vision smoke: **фото/скриншот → объяснение узбекской кириллицей**.
+- Сначала использовать native image input Hermes и текущую модель.
+- Backend и Hermes core не менять.
+- Отдельную vision-модель подключать только если текущий model path не принимает изображения.
+- Это будущая проверка и не блокер Stage 5.1.
 
 ## После MVP
 

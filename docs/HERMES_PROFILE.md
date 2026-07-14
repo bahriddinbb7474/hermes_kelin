@@ -6,9 +6,9 @@
 
 Предварительно нужны (Этап 0): Telegram Bot Token, **только Telegram ID администратора (Бахриддин ака)**. Telegram ID Ойижон запрашивается **перед финальной передачей** (решение v3.3, ТЗ §0.3, §21) — сейчас его подключать нельзя.
 
-**Статус выполнения (2026-07-12):** шаги 1–9 выполнены — Hermes v0.18.2, профиль создан, allowlist = **admin + временный test-user «Тест Ойижон»** (второй аккаунт заказчика, role=oyijon, добавлен для e2e-тестов, ТЗ §0.4), skill установлен (enabled, sha256==repo), stdio MCP `mariyam_backend` зарегистрирован (`hermes tools` = ровно 19), seed admin через `ensure_user` идемпотентен, Telegram Gateway запущен (user-systemd, `active`/`enabled`, `loginctl enable-linger` выполнен), reboot/autostart пройден. **Шаг 10 (AC 20 фраз через Telegram) — PARTIAL 8/20, НЕ закрыт** (8/8 кириллица на выборке; Сообщения 3–5 не отправлялись; см. EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md).
+**Статус выполнения (2026-07-14):** шаги 1–9 выполнены — Hermes v0.18.2, профиль создан, allowlist = **admin + временный test-user «Тест Ойижон»** (второй аккаунт заказчика, role=oyijon, ТЗ §0.4), canonical skill установлен, stdio MCP `mariyam_backend` зарегистрирован (`hermes tools` = ровно 21), seed admin идемпотентен, Telegram Gateway `active`/`enabled`, reboot/autostart пройден. **Шаг 10 (AC 20 фраз через Telegram) — PARTIAL 8/20, НЕ закрыт** (8/8 кириллица на выборке; см. EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md).
 
-> **Stage 5.1 status (2026-07-13):** repo/worktree = tools **21**, plugin **1.0.4**, SKILL SHA `b1231182…`, skill-protect ready offline. Текущий VPS profile остаётся tools **19**, plugin **1.0.3**; migration/deploy/SKILL/skill-protect Stage 5.1 там ещё не применены. LIVE PENDING.
+> **Stage 5.1 status (2026-07-14): CLOSED / LIVE PASS.** Repo/VPS = tools **21**, plugin **1.0.4**, migration 002 active, SKILL SHA `b1231182…`, skill-protect **4/4**, `tool_progress` off. Controlled E2E и cleanup PASS.
 
 **Модель профиля:** `gpt-5.6-luna` через api.n1n.ai (`provider: custom`, `base_url: https://api.n1n.ai/v1`, ключ `N1N_API_KEY` в профильном `.env`, 600). Резерв: `deepseek/deepseek-v4-flash` (DECISIONS.md, 2026-07-12).
 
@@ -17,7 +17,7 @@
 3. Подключить Telegram Gateway: bot token — только через env/конфиг вне git.
 4. Настроить **allowlist**: начальное состояние — только Telegram ID администратора (Бахриддин ака). Для одобренных end-to-end тестов допустимо **временно** добавить второй аккаунт заказчика как test-user «Тест Ойижон» (ТЗ §0.4) — добавлять его прямо сейчас не требуется. Реальный ID Ойижон — только при handover (ТЗ §19). Проверить негативный тест: любой ID вне allowlist **не может** вызвать agent session / LLM / tools / БД. Допустимы два варианта отказа — короткий текст `Кечирасиз, бу шахсий ёрдамчи.` либо тихая блокировка; в обоих случаях строго обязательно отсутствие agent session / LLM-вызова / tool-вызова / обращения к БД (результат `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL`, ТЗ §0.5).
 5. Установить skill из `skills/mariyam/SKILL.md` в профиль.
-5a. **Skill protect (обязательно при будущем Stage 5.1 deploy; offline ready):** слить в `config.yaml` профиля
+5a. **Skill protect (активен в runtime; обязателен при любом переустановочном deploy):** слить в `config.yaml` профиля
     `deploy/hermes_profile_mariyam_oyijon/config.skill-protect.snippet.yaml`:
     - `skills.creation_nudge_interval: 0` — выключить post-turn skill self-improvement;
     - `skills.write_approval: true` — skill_manage не пишет сразу (staging);
@@ -37,7 +37,7 @@
            MCP_TRANSPORT: stdio
            DATABASE_URL: ${DATABASE_URL}   # из /opt/hermes-mariyam-secrets/backend.env
    ```
-7. Проверить `hermes tools`: до Stage 5.1 deploy на VPS видны 19 tools; после будущего deploy должны быть ровно **21** (список — `TOOLS_CONTRACTS.md`). Выдать tool-permissions.
+7. Проверить `hermes tools`: текущий VPS runtime должен показывать ровно **21** (список — `TOOLS_CONTRACTS.md`). Выдать tool-permissions.
 8. Seed пользователей через `ensure_user` (или SQL из `deploy/DEPLOY.md`). **Обязателен `role=admin` (Бахриддин ака).** Опционально разрешён **временный test-user** для end-to-end тестов: `role=oyijon`, `display_name="Тест Ойижон"`, **только на втором Telegram-аккаунте, контролируемом заказчиком**. **Это НЕ реальная Ойижон** — настоящий ID Ойижон и настоящий seed выполняются только при финальной передаче (ТЗ §0.4, §21). Перед handover временный test-user и его данные удаляются. Записать полученные `user_id` в память профиля; tools принимают именно `user_id`, не telegram_id.
 9. Настроить автозапуск Hermes (systemd user-service + `loginctl enable-linger`), проверить подъём после `reboot`.
 10. Прогнать AC Этапа 2: 20 тест-фраз → ответы только узбекская кириллица (0 латинских букв).

@@ -116,8 +116,8 @@
 - `get_expense_report`: compare_previous, trend_months, by_item, previous_period, monthly_series;
 - backend = факты; Hermes = нормализация + объяснения + осторожные советы;
 - LLM memory ≠ источник финансовой аналитики;
-- Этап 5.1 = **OFFLINE PASS / LIVE PENDING**; live deploy/E2E — только по отдельному разрешению;
-- repo tools/plugin = **21/1.0.4**; VPS runtime = **19/1.0.3**.
+- Этап 5.1 требования зафиксированы в v3.7; live status закрыт решением v3.9 ниже.
+- repo tools/plugin = **21/1.0.4**.
 
 ## Решение заказчика (2026-07-13) — канонический SKILL и защита
 
@@ -125,9 +125,26 @@
 - Отдельная protected copy SKILL в git **не создаётся**: дубликат мог бы расходиться с источником истины.
 - Защита обеспечивается profile-scoped skill-protect config и постоянными SHA/contract tests.
 - Canonical Stage 5.1 SHA-256: `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`.
-- Копирование repo SKILL в runtime profile выполняется только при будущем отдельно разрешённом deploy, с последующей проверкой SHA.
-- Stage 5.1: **OFFLINE PASS / LIVE PENDING**; repo tools/plugin = **21/1.0.4**, VPS runtime = **19/1.0.3**.
+- Копирование repo SKILL в runtime profile выполнено при разрешённом deploy с последующей проверкой SHA.
+- Stage 5.1: **CLOSED / LIVE PASS**; repo/VPS tools/plugin = **21/1.0.4**, skill-protect active 4/4.
+
+## Решения заказчика (2026-07-14) — Stage 5.1 live acceptance
+
+- Migration 002 применена; schema verification = **3 columns / 1 table / 1 index**.
+- Runtime tools/dispatch/MCP discovery = **21/21/21**; identity plugin **1.0.4**; canonical SKILL SHA `b1231182…`; skill-protect **4/4**, `tool_progress` off.
+- Controlled E2E на временном test-user подтвердил quantity/unit, analytics, previous month, 3-month trend, budget plan/fact и identity.
+- Provider gate соблюдён: 6/7 requests, retry=0, exact cost $0.222808, dashboard delta $0.22.
+- Cleanup восстановил DB baseline; admin не изменён; реальная Ойижон не подключалась.
+- **Stage 5.1 = CLOSED / LIVE PASS.** Дополнительные правки этапа не требуются.
+
+## Решение заказчика (2026-07-14) — vision smoke перед handover
+
+- Перед handover выполнить отдельный Telegram vision smoke: фото/скриншот → объяснение узбекской кириллицей.
+- Сначала использовать native image input Hermes и текущую модель.
+- Backend и Hermes core не менять.
+- Отдельную vision-модель подключать только если текущий model path не принимает изображения.
+- Это будущая проверка, не блокер Stage 5.1.
 
 ## Версионность ТЗ
 
-Исполнять только `TZ_Hermes_Mariyam_FINAL_v3_0.md` (внутри — версия **3.8**, раздел 0.1–0.8 = changelog): §0.1 — v3.0→3.1; §0.2 — TTS/STT; §0.3 — Ойижон не до handover; §0.4 — test-user; §0.5 — silent denial; §0.6 — identity binding; §0.7 — analytics & monthly plan requirements; §0.8 — OFFLINE PASS / LIVE PENDING status. Старые v1/v2/review-файлы не использовать как рабочие требования.
+Исполнять только `TZ_Hermes_Mariyam_FINAL_v3_0.md` (внутри — версия **3.9**, раздел 0.1–0.9 = changelog): §0.1 — v3.0→3.1; §0.2 — TTS/STT; §0.3 — Ойижон не до handover; §0.4 — test-user; §0.5 — silent denial; §0.6 — identity binding; §0.7 — analytics & monthly plan requirements; §0.8 — offline milestone; §0.9 — CLOSED / LIVE PASS. Старые v1/v2/review-файлы не использовать как рабочие требования.

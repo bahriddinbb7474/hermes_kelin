@@ -16,7 +16,7 @@
 
 Бот отвечает в Telegram (аккаунт админа или временный test-user «Тест Ойижон» на втором аккаунте заказчика, ТЗ §0.4). **Негативный тест: любой ID вне allowlist** блокируется и не может читать данные/tools — допустимы два варианта отказа (короткий текст `Кечирасиз, бу шахсий ёрдамчи.` либо тихая блокировка), но в обоих случаях строго обязательно отсутствие agent session / LLM-вызова / tool-вызова / обращения к БД / чтения данных (результат `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL`, ТЗ §0.5). **Telegram реальной Ойижон не подключается и не получает сообщений/onboarding/cron до handover (§0.3–0.4).**
 
-*Статус (2026-07-13): технически подтверждено — живой Telegram-ответ админу (узбекская кириллица, 0 латиницы); allowlist security PASS (чужой аккаунт блокируется адаптером до LLM/tools/БД); systemd user-service `hermes-gateway-mariyam_oyijon.service` `active`/`enabled`; `loginctl enable-linger` = yes; reboot/autostart пройден (PostgreSQL healthy, контейнер Time-Agent поднялся, `/opt/time-agent` нетронут). **Принято заказчиком по v3.5:** тихая блокировка unauthorized принимается (`PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL`); формальное закрытие Этапа 1 по функциональной безопасности — допустимы оба варианта отказа (текст либо тихая блокировка) при обязательном отсутствии agent session/LLM/tool/БД/чтения данных. **Аудит выполнен; вся feature-ветка merged локально в `main` через `dd9261e`; push в `origin/main` ещё НЕ выполнен. VPS Phase B выполнена: identity guard 1.0.3 установлен, Stage 5 Telegram E2E PASS. Stage 5.1 остаётся OFFLINE PASS / LIVE PENDING: VPS = 19 tools / plugin 1.0.3; repo/worktree = 21 tools / plugin 1.0.4.** Этап 1 остаётся **закрытым**; acceptance criteria не изменены и не ослаблены.*
+*Статус (2026-07-14): технически подтверждено — живой Telegram-ответ админу (узбекская кириллица, 0 латиницы); allowlist security PASS; systemd user-service `active`/`enabled`; reboot/autostart пройден. **Принято заказчиком по v3.5:** тихая блокировка unauthorized принимается (`PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL`) при обязательном отсутствии agent session/LLM/tool/БД/чтения данных. Stage 5 и Stage 5.1 E2E PASS; текущий runtime = 21 tools / plugin 1.0.4. Этап 1 остаётся **закрытым**; acceptance criteria не изменены и не ослаблены.*
 
 ### 1.5. Финальная передача (pre-handover, v3.4)
 
@@ -48,11 +48,11 @@ Hermes сам вызывает MCP tool и получает ответ. Backend 
 
 *Статус (2026-07-13): **Этап 5 ЗАКРЫТ (PASS).** Сквозной Telegram AC на «Тест Ойижон»: create 2×192k → report 192k → update meat 150k (total 162k) → delete last (остался нон 12k). admin **+0** (8/768000; ошибочные historical rows не удалялись). Guard 1.0.3: MCP-prefixed tools, sentinel `user_id:0` → effective 20. Evidence: `EVIDENCE_STAGE_5_E2E_2026-07-12.md`. Реальная Ойижон не подключена. Требования AC не ослаблены.*
 
-> **Identity VPS runtime (v3.6 + 1.0.3):** детерминированный binding через `mariyam_identity_guard` (не LLM). Исторические FAIL: `EVIDENCE_STAGE5_E2E_FAIL_2026-07-12.md` (не удалять). Self-improvement drift mitigation готова offline (repo skill-protect + SHA/contract tests), но VPS apply ещё не выполнялся; live follow-up/handover/Stage 5.1 live — только после отдельного разрешения.
+> **Identity VPS runtime (v3.6 + plugin 1.0.4):** детерминированный binding через `mariyam_identity_guard` (не LLM). Исторические FAIL: `EVIDENCE_STAGE5_E2E_FAIL_2026-07-12.md` (не удалять). Skill-protect active 4/4; Stage 5.1 identity live PASS.
 
-### 5.1. Аналитика расходов и месячный план (v3.8 status; требования v3.7)
+### 5.1. Аналитика расходов и месячный план (v3.9 status; требования v3.7)
 
-**Статус: OFFLINE PASS / LIVE PENDING.** Repo/worktree = **21 tools**, plugin **1.0.4**, migration 002 и SKILL contract готовы. VPS runtime = **19 tools**, plugin **1.0.3**; production migration/deploy/Telegram E2E не выполнялись. Этап окончательно не закрыт до live E2E.
+**Статус: CLOSED / LIVE PASS.** Migration 002 active; tools/dispatch/discovery **21/21/21**; plugin **1.0.4**; canonical SKILL и skill-protect active. Controlled E2E подтвердил все AC, identity и узбекскую кириллицу; cleanup восстановил DB baseline. Evidence: `../EVIDENCE_STAGE_5_1_LIVE_2026-07-13.md`.
 
 AC (измеримые):
 1. Отчёт показывает основные группы расходов.

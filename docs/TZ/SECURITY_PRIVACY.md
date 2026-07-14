@@ -29,9 +29,9 @@
   - удалённая тестовая БД `*_test` дополнительно требует `ALLOW_DESTRUCTIVE_TESTS=1`.
 - `ALLOW_DESTRUCTIVE_TESTS=1` НЕ может обойти запрет `hermes`, отсутствие `APP_ENV=test` или отсутствие суффикса `_test`.
 
-> **Статус (2026-07-13):** `tests/db_guard.py` в `main`. Identity guard **1.0.3** на VPS runtime; Stage 5 E2E PASS. Destructive suite на production-БД не запускался. Обязательны `APP_ENV=test` и БД с окончанием `_test`; production БД `hermes` запрещена безусловно.
+> **Статус (2026-07-14):** `tests/db_guard.py` в `main`. Identity guard **1.0.4** на VPS runtime; Stage 5 и Stage 5.1 E2E PASS. Destructive suite на production-БД не запускался. Обязательны `APP_ENV=test` и БД с окончанием `_test`; production БД `hermes` запрещена безусловно.
 
-## Детерминированный identity guard (repo 1.0.4 / VPS 1.0.3)
+## Детерминированный identity guard (repo/VPS 1.0.4)
 
 - Sender определяется по **exact Telegram session** (`sessions.origin_json`, platform=`telegram`), а не по аргументам модели/display name.
 - Live tool names: `mcp__mariyam_backend__*` канонизируются до bare policy name.
@@ -42,8 +42,8 @@
 - `ensure_user`: `telegram_id` приводится к **int** (`_to_pos_int`); небезопасное значение → блок.
 - Mapping **вне git**; `MARIYAM_IDENTITY_MAP_FILE` mode **600**; unit + profile `.env` (Hermes может сбросить unit Environment).
 - **Raw Telegram ID и mapping не логируются** (`_mask`).
-- **Repo/worktree:** plugin **1.0.4**, Stage 5.1 policy offline PASS. **VPS runtime:** plugin **1.0.3**, Stage 5 PASS; Stage 5.1 не развёрнут.
-- **Skill-protect OFFLINE READY / VPS PENDING:** config snippet + SHA/contract tests готовы. Canonical SKILL — только `skills/mariyam/SKILL.md`, SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; отдельной git-copy нет. VPS apply/restart — только по отдельному разрешению.
+- **Repo/VPS runtime:** plugin **1.0.4**; Stage 5.1 identity policy live E2E PASS.
+- **Skill-protect ACTIVE 4/4:** canonical SKILL — только `skills/mariyam/SKILL.md`, SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; отдельной git-copy нет; `tool_progress` off.
 
 ## Приватность
 
