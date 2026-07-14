@@ -57,18 +57,18 @@ hermes-mariyam/
 
 ## Текущее состояние (2026-07-14)
 
-ТЗ: **v3.9**. Stage 5.1 — **CLOSED / LIVE PASS**: repo и VPS runtime содержат **21 tool**, identity plugin **1.0.4**, migration 002 применена, canonical SKILL SHA `b1231182…`, skill-protect **4/4**, `tool_progress` off. Controlled E2E подтвердил quantity/unit, analytics, compare/trend, budget plan/fact и identity. Реальная Ойижон не подключена.
+ТЗ: **v3.10**. Stage 5.1 остаётся **CLOSED / LIVE PASS**: repo и VPS runtime содержат **21 tool**, identity plugin **1.0.4**, migration 002 применена, canonical SKILL SHA `b1231182…`, skill-protect **4/4**, `tool_progress` off. Stage 5.2–6 household finance/utility additions — **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 и tool counts 22/25/27 не являются runtime. Реальная Ойижон не подключена.
 
 Этап 1 (VPS + Hermes + Telegram) — **закрыт по решению заказчика (2026-07-12, ТЗ v3.5)**:
 - ✅ PostgreSQL healthy (порт 127.0.0.1:5432, init-миграции применены);
 - ✅ Hermes Agent v0.18.2 установлен (профиль `mariyam_oyijon` создан; модель `gpt-5.6-luna` через api.n1n.ai — утверждена 2026-07-12, язык 100%/числа 100%; в allowlist сейчас admin + временный test-user «Тест Ойижон», допустимый для e2e-тестов — ТЗ §0.4);
-- ✅ MCP stdio зарегистрирован (`mariyam_backend`): Hermes видит ровно **19 tools**, реальные tool-calls работают; `ensure_user` (admin) выполнен идемпотентно;
+- ✅ На момент Stage 4 acceptance MCP stdio `mariyam_backend` показывал ровно **19 tools**; реальные tool-calls работали, `ensure_user` был идемпотентен. Текущий runtime после Stage 5.1 = 21 tools;
 - ✅ skill mariyam установлен в профиль (enabled, sha256 совпадает с репо);
 - ✅ Telegram Gateway установлен как **systemd user-service** (`hermes-gateway-mariyam_oyijon.service`; user-unit, `Restart=always`, без секретов); `loginctl enable-linger timeagent` выполнен; unit `active`/`enabled` (Блок 6И);
 - ✅ **Живой ответ получен**: бот ответил Бахриддин ака в Telegram на узбекской кириллице (gateway реально принимает и обрабатывает сообщения);
 - ✅ Негативный allowlist-тест выполнен: аккаунт вне allowlist блокируется адаптером **до** LLM/tools/БД — `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (решение заказчика 2026-07-12, ТЗ §0.5; точный текст отказа `Кечирасиз, бу шахсий ёрдамчи.` не обязателен для Hermes v0.18.2);
 - ✅ Автозапуск + reboot-тест пройдены: после общего `sudo reboot` (VPS общий с Time-Agent) Gateway поднялся автоматически, ровно один процесс, PostgreSQL healthy, контейнер Time-Agent снова работает, `/opt/time-agent` не трогался (Блок 6И);
-- ✅ Очистка тестовых данных production-БД выполнена (Блок 6З): остался только `admin` (id=1), все fixture-таблицы пусты; backup перед очисткой сохранён;
+- ✅ На момент Блока 6З очистка production-БД оставила только `admin`, fixture-таблицы были пусты, backup сохранён; позднее для pre-handover E2E добавлен временный test-user;
 - ✅ **Вся feature-ветка merged локально в `main` через `dd9261e`** (DB guard `tests/db_guard.py` и identity guard `deploy/hermes_plugins/mariyam_identity_guard/` включены; commit systemd `d24d01c` вошёл в merge).
 
 **Формальный аудит и merge в `main` Этапа 1 — ВЫПОЛНЕНЫ.** VPS Phase B выполнена: Stage 5 Telegram E2E PASS. Текущий runtime после Stage 5.1 = **21 tools / plugin 1.0.4**; Stage 5.1 закрыт live acceptance.
@@ -83,9 +83,16 @@ hermes-mariyam/
 - ✅ На момент Stage 5 acceptance: identity guard **1.0.3**, E2E 4/4, runtime tools **19**; текущий runtime после Stage 5.1 указан ниже.
 - ✅ Evidence: `docs/TZ/EVIDENCE_STAGE_5_E2E_2026-07-12.md`.
 
-**Этап 5.1 (аналитика + monthly plan) — CLOSED / LIVE PASS (ТЗ v3.9):**
+**Этап 5.1 (аналитика + monthly plan) — CLOSED / LIVE PASS (решение v3.9, сохранено в v3.10):**
 - ✅ Runtime: quantity/unit, by_item, compare/trend, plan/fact; tools/dispatch/discovery **21/21/21**; plugin **1.0.4**; migration 002 active; SKILL SHA `b1231182…`; skill-protect **4/4**.
 - ✅ Controlled E2E на «Тест Ойижон»: identity PASS, 6/7 provider requests, retry=0; cleanup восстановил DB baseline. Evidence: `docs/EVIDENCE_STAGE_5_1_LIVE_2026-07-13.md`.
+
+**Planned v3.10 — NOT IMPLEMENTED:**
+- Stage 5.2: простые family reports для Ойижон через canonical SKILL и текущие 21 tools;
+- Stage 5.3/5.3A: product plan, migration 003, approval cycle 25/27/28/1; planned count 21→22 после approval tool;
+- Stage 5.4: researched official utility cabinet, deterministic read-only connector, migration 004, planned count 25;
+- Stage 6 extension: recurring obligations, migration 005, Hermes cron, planned final count 27;
+- current runtime остаётся **21**; code/VPS/SKILL на design step не менялись.
 
 Текущий allowlist: **admin + временный «Тест Ойижон»** (второй аккаунт заказчика, role=oyijon). Реальная Ойижон отсутствует (до handover).
 

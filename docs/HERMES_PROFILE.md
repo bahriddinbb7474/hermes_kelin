@@ -10,12 +10,15 @@
 
 > **Stage 5.1 status (2026-07-14): CLOSED / LIVE PASS.** Repo/VPS = tools **21**, plugin **1.0.4**, migration 002 active, SKILL SHA `b1231182…`, skill-protect **4/4**, `tool_progress` off. Controlled E2E и cleanup PASS.
 
+> **v3.10 design:** Stage 5.2–6 additions — **PLANNED / NOT IMPLEMENTED**. Текущий profile/runtime не меняется: 21 tools, plugin 1.0.4, migration 002. Planned cron jobs, utility connector и SKILL changes сейчас не создавать.
+
 **Модель профиля:** `gpt-5.6-luna` через api.n1n.ai (`provider: custom`, `base_url: https://api.n1n.ai/v1`, ключ `N1N_API_KEY` в профильном `.env`, 600). Резерв: `deepseek/deepseek-v4-flash` (DECISIONS.md, 2026-07-12).
 
 1. Установить Hermes Agent на VPS по официальной документации (репозиторий NousResearch; ссылки — в конце ТЗ). Зафиксировать версию: `hermes --version` — от неё зависят точные имена конфиг-полей ниже.
 2. Создать профиль `mariyam_oyijon`.
 3. Подключить Telegram Gateway: bot token — только через env/конфиг вне git.
-4. Настроить **allowlist**: начальное состояние — только Telegram ID администратора (Бахриддин ака). Для одобренных end-to-end тестов допустимо **временно** добавить второй аккаунт заказчика как test-user «Тест Ойижон» (ТЗ §0.4) — добавлять его прямо сейчас не требуется. Реальный ID Ойижон — только при handover (ТЗ §19). Проверить негативный тест: любой ID вне allowlist **не может** вызвать agent session / LLM / tools / БД. Допустимы два варианта отказа — короткий текст `Кечирасиз, бу шахсий ёрдамчи.` либо тихая блокировка; в обоих случаях строго обязательно отсутствие agent session / LLM-вызова / tool-вызова / обращения к БД (результат `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL`, ТЗ §0.5).
+4. Настроить **allowlist**: начальное состояние — только Telegram ID администратора (Бахриддин ака). Для pre-handover E2E уже добавлен второй аккаунт заказчика как временный test-user «Тест Ойижон» (ТЗ §0.4); перед handover он удаляется. Реальный ID Ойижон — только при handover (ТЗ §19). Любой ID вне allowlist не может вызвать agent session / LLM / tools / БД; допустимы short denial или silent block (`PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL`).
+
 5. Установить skill из `skills/mariyam/SKILL.md` в профиль.
 5a. **Skill protect (активен в runtime; обязателен при любом переустановочном deploy):** слить в `config.yaml` профиля
     `deploy/hermes_profile_mariyam_oyijon/config.skill-protect.snippet.yaml`:
@@ -41,6 +44,13 @@
 8. Seed пользователей через `ensure_user` (или SQL из `deploy/DEPLOY.md`). **Обязателен `role=admin` (Бахриддин ака).** Опционально разрешён **временный test-user** для end-to-end тестов: `role=oyijon`, `display_name="Тест Ойижон"`, **только на втором Telegram-аккаунте, контролируемом заказчиком**. **Это НЕ реальная Ойижон** — настоящий ID Ойижон и настоящий seed выполняются только при финальной передаче (ТЗ §0.4, §21). Перед handover временный test-user и его данные удаляются. Записать полученные `user_id` в память профиля; tools принимают именно `user_id`, не telegram_id.
 9. Настроить автозапуск Hermes (systemd user-service + `loginctl enable-linger`), проверить подъём после `reboot`.
 10. Прогнать AC Этапа 2: 20 тест-фраз → ответы только узбекская кириллица (0 латинских букв).
+
+### Planned profile gates v3.10 — не выполнять сейчас
+
+- Stage 5.2: user-facing finance wording реализовать позднее только в canonical SKILL.
+- Stage 5.3A: до создания cron cycle проверить Hermes v0.18.2 cron identity; trusted job id → private mapping 0600 → internal user id; unknown job fail closed.
+- Stage 5.4: utility credentials не помещать в profile/model-visible env; только VPS connector secrets. Hermes browser с открытыми credentials запрещён.
+- Vision smoke перед handover сначала через native image input текущего model path; отдельная vision-модель только после фактического FAIL.
 
 > **Запрет до handover (v3.4):** до отдельного финального разрешения заказчика бот **не пишет** реальной Ойижон — любые сообщения, onboarding и cron-доставка в её Telegram запрещены. Тесты (Telegram, allowlist, tools, cron, alerts) выполняются на аккаунте админа или на временном test-user «Тест Ойижон» (второй аккаунт заказчика, ТЗ §0.4).
 

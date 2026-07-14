@@ -46,7 +46,7 @@
 - **Telegram Ойижон не подключается до финальной готовности.** Запрещены любые сообщения, onboarding и cron-доставка в её Telegram до отдельного финального разрешения заказчика.
 - **Все тесты — только на аккаунтах заказчика.** Тесты Telegram, allowlist, tools, cron и alerts выполняются через Telegram Бахриддин ака. Второй пользователь для теста (если нужен) — второй Telegram-аккаунт, контролируемый заказчиком.
 - **Этап 0:** сейчас обязателен только Telegram ID администратора. Telegram ID Ойижон запрашивается перед финальной передачей.
-- **Текущий allowlist содержит только ID администратора** (Бахриддин ака).
+- **На дату этого решения (2026-07-11) allowlist содержал только ID администратора**; позже решением v3.4 добавлен временный test-user для pre-handover E2E.
 - **`tencent/hy3:free` — временная тестовая модель**, не финальный выбор. Финальная LLM выбирается после узбекского мини-теста.
 - **Финальная передача:** перед подключением Ойижон — очистить тестовые данные/память/cron, добавить реальный ID Ойижон в allowlist, выполнить `ensure_user` role=oyijon (seed) и мягкий onboarding. Только после этого бот начинает отвечать Ойижон (ТЗ §0.3, §21).
 
@@ -139,12 +139,28 @@
 
 ## Решение заказчика (2026-07-14) — vision smoke перед handover
 
-- Перед handover выполнить отдельный Telegram vision smoke: фото/скриншот → объяснение узбекской кириллицей.
+- Перед handover выполнить Telegram vision smoke: скрин телефона с вопросом, фото счётчика, скрин коммунального кабинета или квитанции → объяснение узбекской кириллицей.
 - Сначала использовать native image input Hermes и текущую модель.
 - Backend и Hermes core не менять.
-- Отдельную vision-модель подключать только если текущий model path не принимает изображения.
+- Числа подтверждаются перед ручным сохранением; deterministic portal sync не требует подтверждения каждого snapshot.
+- Отдельную vision-модель подключать только после фактического FAIL текущего model path.
 - Это будущая проверка, не блокер Stage 5.1.
+
+## Решение заказчика (2026-07-14) — ТЗ v3.10: household finance и utility cabinets
+
+- Stage 5.1 **не переоткрывать**: CLOSED / LIVE PASS; current runtime **21 tools / plugin 1.0.4 / migration 002**.
+- Stage 5.2–6 additions — **PLANNED / NOT IMPLEMENTED**; docs-only update не меняет code, VPS, Telegram, API, migrations, canonical SKILL или runtime.
+- Stage 5.2: простые user-facing family reports без сложных финансовых терминов; общий report первым, details только по просьбе; unknown=`айтилмаган`; JSON/tool fields скрыты.
+- Stage 5.3: последовательный family planning dialog, product quantity/unit/amount и nutrition guidance. Один web search на cycle, cache 30 дней; WHO/FAO/официальный Минздрав Узбекистана; не medical prescription и не universal meat norm.
+- Migration 003 planned: `monthly_budget_items` + `monthly_plan_cycles`. Existing budget tools расширяются без нового count; Stage 5.3 count остаётся 21.
+- Stage 5.3A: approval cycle 25/27/28/1; с 28 числа максимум одно admin notification/day до approve либо начала следующего месяца. `approve_monthly_plan` действует только до начала планового месяца; Oyijon self-only, admin narrow future-month target allowlist. После начала месяца cycle закрыт, активный plan корректирует только Oyijon self-only; admin edit текущего plan в v3.10 не заявлен. Planned count 22; cron identity gate обязателен, unknown job fail closed/downstream=0.
+- Stage 5.4: electricity official cabinet only read-only после 9-point research gate. Priority official API → export/endpoint → narrow deterministic connector. Migration 004 + 3 tools planned, count 25. Газ/вода — только после подтверждения кабинетов.
+- Utility credentials только VPS secrets и никогда LLM/PostgreSQL/git/SKILL/Telegram/logи; account masked; payments/top-up/settings/cards запрещены; drift fail closed; daily sync max 1, tariff check max weekly.
+- Identity: `set_utility_threshold` — Oyijon self-only; admin narrow cross-target только `allowed_target_user_ids` и только threshold, без portal/payment/settings/transactions.
+- Stage 6 extension: migration 005 recurring obligations + 2 tools; Hermes cron only; planned final count 27. `upsert_recurring_obligation`/`get_recurring_obligations` — Oyijon self-only, admin narrow cross-target только `allowed_target_user_ids`, без прав на transactions. Paid mark не создаёт duplicate expense.
+- Operations budget: nutrition search 1/cycle + 30-day cache; utility sync daily max; no paid utility APIs/always-on extra agents без разрешения; target 10–15 USD/month.
+- Out of scope: automatic payment, bank credentials/cards/app, utility writes, treatment diet/universal meat norm, backend scheduler/router/orchestrator, Hermes core changes, gas/water without confirmed cabinets.
 
 ## Версионность ТЗ
 
-Исполнять только `TZ_Hermes_Mariyam_FINAL_v3_0.md` (внутри — версия **3.9**, раздел 0.1–0.9 = changelog): §0.1 — v3.0→3.1; §0.2 — TTS/STT; §0.3 — Ойижон не до handover; §0.4 — test-user; §0.5 — silent denial; §0.6 — identity binding; §0.7 — analytics & monthly plan requirements; §0.8 — offline milestone; §0.9 — CLOSED / LIVE PASS. Старые v1/v2/review-файлы не использовать как рабочие требования.
+Исполнять только `TZ_Hermes_Mariyam_FINAL_v3_0.md` (внутри — версия **3.10**, раздел 0.1–0.10 = changelog): §0.9 — Stage 5.1 CLOSED / LIVE PASS; §0.10 — planned household finance, approval cycle, utility read-only и recurring obligations. Старые v1/v2/review-файлы не использовать как рабочие требования.

@@ -38,6 +38,33 @@
 
 Пользовательские напоминания создаются из речи в любой момент — отдельной таблицы не требуют.
 
+## Planned v3.10 schedules — NOT IMPLEMENTED
+
+### Обязательный cron identity gate
+
+До Stage 5.3A проверить фактический Hermes v0.18.2 cron context. Любой cron, вызывающий user-scoped tool: `trusted cron job id → private mapping mode 0600 → internal users.id`. `user_id` от LLM не доверяется. Unknown job → fail closed, downstream tool call = 0. Допустимо узкое расширение profile plugin; Hermes core/backend router не менять.
+
+### Monthly plan cycle 25/27/28/1
+
+- **25:** создать ровно один draft следующего месяца, отправить Ойижон один раз, `waiting_oyijon`.
+- **27:** при отсутствии ответа одно мягкое повторное сообщение; draft/rows не дублировать.
+- **28 число:** `waiting_admin`; с 28 числа максимум одно admin notification в сутки до approve либо до начала следующего месяца; stop immediately после approve; по возможности объединить с 19:30 report.
+- **1 число до утра:** valid draft auto-approve; иначе copy last approved; empty/corrupt не approve; нет обоих → admin alert; `auto_approved`. После начала месяца approval-cycle закрыт; активный plan корректирует только Oyijon self-only, admin edit текущего plan в v3.10 не заявлен.
+
+### Utility sync и threshold
+
+- Sync не чаще одного раза в сутки; tariff check не чаще раза в неделю.
+- При low prepaid balance — первое reminder, затем одно через два дня, если still low; stop после top-up; identical reminder не чаще одного за два дня.
+- Если threshold не пересечён, Telegram message не создаётся. После двух sync errors уведомляется только Бахриддин ака.
+
+### Recurring obligations
+
+- Reminder заранее, в due date и один мягкий repeat после overdue.
+- Stop после paid; next due date только по approved repeat rule.
+- Paid не создаёт duplicate expense. Storage — не scheduler; только Hermes cron.
+
+Все эти расписания **PLANNED / NOT IMPLEMENTED** и не создаются на текущем docs-only шаге.
+
 ## Как создаются напоминания
 
 Ойижон или Бахриддин ака говорят естественной фразой. Hermes понимает время и смысл, создаёт cron-задачу и подтверждает простыми словами.

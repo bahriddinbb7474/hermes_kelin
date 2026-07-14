@@ -20,7 +20,7 @@
 
 ### 1.5. Финальная передача (pre-handover, v3.4)
 
-Выполняется только по отдельному финальному разрешению заказчика: удалён временный test-user «Тест Ойижон» (из allowlist и из БД со связанными записями transactions/health_notes/quran_progress/alert_events/plan_notes); очищены тестовые память/cron; реальный ID Ойижон добавлен в allowlist; выполнен `ensure_user` role=oyijon (seed); пройден мягкий onboarding. Только после этого бот отвечает Ойижон.
+Выполняется только по отдельному финальному разрешению заказчика: удалён временный test-user «Тест Ойижон» (из allowlist и из БД со связанными записями transactions/health_notes/quran_progress/alert_events/plan_notes); очищены тестовые память/cron; реальный ID Ойижон добавлен в allowlist; выполнен `ensure_user` role=oyijon (seed); пройден мягкий onboarding. Только после этого бот отвечает Ойижон. Перед handover vision smoke: phone screenshot, meter photo, utility cabinet/receipt screenshot; 3/3 ответы узбекской кириллицей. Manual values подтверждены до save; portal sync snapshots не требуют подтверждения каждого значения; отдельная vision-модель только после фактического FAIL current model path.
 
 > **До handover (v3.4):** Этапы 2, 5, 6, 7 проверяются на аккаунте администратора (Бахриддин ака) или временном test-user (`role=oyijon`, `display_name="Тест Ойижон"`) на втором аккаунте заказчика. **Не на Telegram реальной Ойижон** (ТЗ §0.4).
 
@@ -40,7 +40,7 @@ Hermes сам вызывает MCP tool и получает ответ. Backend 
 
 Дополнительно (ТЗ v3.1): один пул соединений (число соединений не растёт после ≥50 вызовов); `ensure_user` идемпотентен; smoke-тест через MCP-слой (`call_tool`) для всех tools включая ошибочные пути; per-tool inputSchema с `required`; docker-образ без `.env`/`.venv`; тестовый предохранитель против боевой БД; systemd unit проходит `systemd-analyze verify`.
 
-**Статус (2026-07-12): этап выполнен полностью.** Backend-часть проверена на чистой БД — маркеры `ALL_TOOL_TESTS_PASSED`, `TZ_BOUNDARY_PASSED`, `POOL_STABLE_PASSED`, `MCP_SMOKE_PASSED`, `IMAGE_CLEAN`; `systemd-analyze verify` пройден на VPS. Интеграция подтверждена на реальном Hermes: stdio MCP `mariyam_backend` зарегистрирован, `hermes tools` показывает ровно 19 tools, реальные tool-calls работают, `ensure_user` (admin) идемпотентен. Сами acceptance criteria не менялись.
+**Статус (2026-07-12): этап выполнен полностью.** На момент Stage 4 acceptance backend и real Hermes показывали ровно 19 tools; маркеры `ALL_TOOL_TESTS_PASSED`, `TZ_BOUNDARY_PASSED`, `POOL_STABLE_PASSED`, `MCP_SMOKE_PASSED`, `IMAGE_CLEAN`, `systemd-analyze verify`, real tool-calls и идемпотентный `ensure_user` PASS. Текущий runtime после Stage 5.1 = 21 tools. Сами acceptance criteria Stage 4 не менялись.
 
 ### 5. Бухгалтерия
 
@@ -68,9 +68,43 @@ AC (измеримые):
 11. Identity guard на все новые user-scoped tools (`set_monthly_budget`, `get_monthly_budget_status`).
 12. Реальная Ойижон до handover не подключается.
 
-### 6. Напоминания, новости, погода, намаз
+### 5.2. Простые семейные отчёты — PLANNED / NOT IMPLEMENTED
+
+1. Первый ответ — общая таблица `Харажат гуруҳи | Режа | Сарфланди | Қолди`, затем ровно один мягкий вопрос о деталях.
+2. Product details только по просьбе: planned/actual quantity и amount.
+3. Unknown = `айтилмаган`, не 0; units не смешиваются; quantity не угадывается; суммы только tools.
+4. User-facing текст не содержит JSON, tool names, `plan/fact`, `usage_percent` и сложные финансовые термины.
+5. Реализация позднее через canonical SKILL и существующие 21 tools; текущий SKILL не меняется.
+
+### 5.3. Семейный и продуктовый план — PLANNED / NOT IMPLEMENTED
+
+1. Семь вопросов/шагов задаются последовательно; save только после подтверждения draft.
+2. Item содержит planned/actual quantity/unit/amount; минимум planned quantity или amount.
+3. Один nutrition web search на cycle, cache 30 дней, WHO/FAO/официальный Минздрав Узбекистана, source+date.
+4. Нет diagnosis/treatment diet/universal meat norm; medical restrictions → согласовать с врачом; exact quantities только после family confirmation.
+5. Migration 003 и product contracts реализованы и протестированы только в будущем этапе; tool count после Stage 5.3 остаётся 21.
+
+### 5.3A. Утверждение 25/27/28/1 — PLANNED / NOT IMPLEMENTED
+
+1. 25: один draft/одно сообщение; 27: один repeat без duplicate; 28 число: `waiting_admin`, с 28 числа максимум одно admin reminder/day до approve либо начала следующего месяца; 1: safe auto-approve/copy/fail path до утра.
+2. Все шесть statuses валидируются; empty/corrupt plan не auto-approved.
+3. `approve_monthly_plan` не меняет transactions и действует только до начала планового месяца; Oyijon self-only; admin narrow target/future-month allowlist. После начала месяца approval-cycle закрыт; активный plan корректирует только Oyijon self-only; admin edit текущего plan в v3.10 не заявлен.
+4. Cron identity test: trusted job maps deterministically; unknown job fail closed, downstream=0; Hermes core/backend router unchanged.
+5. Migration 003 cycles + tool implemented в будущем; planned count 22, current runtime 21.
+
+### 5.4. Коммунальные кабинеты read-only — PLANNED / NOT IMPLEMENTED
+
+1. Pre-code report закрывает 9 portal gates; official API/export приоритетнее connector; credentials никогда не доступны LLM.
+2. Read-only structured fields совпадают с кабинетом и имеют sync date; writes/payments/cards невозможны; account masked; drift fail closed.
+3. Threshold задан admin; reminders 0/2-day cadence и stop after top-up; no threshold breach = no Telegram message.
+4. Daily sync max 1; tariff check max weekly; two sync failures → admin only.
+5. Migration 004 + 3 user-scoped tools реализованы в будущем; planned count 25, current runtime 21. `set_utility_threshold`: Oyijon self-only; admin narrow cross-target только `allowed_target_user_ids` и только threshold, без portal/payment/settings/transactions. Газ/вода — только после подтверждения.
+
+### 6. Напоминания, обязательные платежи, новости, погода, намаз
 
 `эртага 10 да эслат` приходит вовремя через Hermes cron. Вечерний вопрос не повторяется навязчиво. Новости 3-5 пунктов, кириллица, без тревоги. Погода и намаз корректны для Ташкента. *Cron Ойижон до handover тестируется только на втором аккаунте заказчика через test-user (§0.4); реальной Ойижон не отправляется.*
+
+**v3.10 obligation extension — PLANNED / NOT IMPLEMENTED:** internet/loan/tax/utility/other; reminder before/due/one overdue; stop after paid; next date from approved repeat rule; no duplicate expense. Migration 005 + `upsert_recurring_obligation`/`get_recurring_obligations`; оба tools — Oyijon self-only, admin narrow cross-target только `allowed_target_user_ids`, без прав на transactions; planned final count 27, current runtime 21; storage не scheduler.
 
 ### 7. Админ-отчёты и safety
 

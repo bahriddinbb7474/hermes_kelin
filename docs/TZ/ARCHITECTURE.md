@@ -2,7 +2,7 @@
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md`
 
-**Статус v3.9:** архитектура не менялась. Stage 5.1 — **CLOSED / LIVE PASS**; repo и VPS runtime = 21 tools / plugin 1.0.4, migration 002 и skill-protect активны.
+**Статус v3.10:** архитектура не меняется. Stage 5.1 — **CLOSED / LIVE PASS**; current repo/VPS runtime = 21 tools / plugin 1.0.4, migration 002 и skill-protect active. Stage 5.2–6 additions ниже — **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют.
 
 ## Принцип Hermes-first
 
@@ -38,6 +38,8 @@ Hermes делает:
 - формулировку всех ответов, отчётов и **осторожных финансовых советов** (не выдумывать цены/экономию);
 - cron: утро, вечер, новости, 19:30, onboarding, heartbeat;
 - веб-поиск для новостей и фактических вопросов.
+- **Planned Stage 5.3:** один nutrition web search на plan cycle (WHO/FAO/официальный Минздрав Узбекистана), cache 30 дней; источник и дата в ответе.
+- **Planned Stage 5.3A/5.4/6:** orchestration и расписание делает только Hermes cron; user-scoped cron identity детерминирована до MCP.
 
 Backend делает:
 
@@ -46,8 +48,24 @@ Backend делает:
 - возвращает отчётные числа и факты (**без прозы и советов**);
 - валидирует категории, суммы, валюты, роли, даты, units;
 - делает backup/status/heartbeat данные.
+- **Planned data/storage only:** product plan items/cycles, read-only utility connector snapshots и recurring obligations; connector не понимает сообщения, не пишет прозу и не выполняет payments.
 
 LLM memory **не** источник финансовой аналитики.
+
+## Planned v3.10 extensions — не current runtime
+
+```text
+Hermes cron job
+  -> trusted cron job id
+  -> private mapping mode 0600
+  -> internal users.id
+  -> identity guard
+  -> user-scoped MCP tool
+```
+
+Unknown cron job блокируется fail closed до downstream tool. Utility access: official API → official export/endpoint → узкий deterministic read-only connector. Credentials остаются в VPS secrets и не видны LLM. Hermes browser с открытыми credentials запрещён. Hermes core, backend router/orchestrator и backend scheduler не добавляются.
+
+Planned tool progression: Stage 5.3 = 21 (расширение существующих contracts), Stage 5.3A = 22, Stage 5.4 = 25, Stage 6 extension = 27. **Текущий runtime = 21.**
 
 ## Запрещённые backend-heavy решения
 

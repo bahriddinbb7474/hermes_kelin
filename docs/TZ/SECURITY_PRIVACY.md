@@ -45,6 +45,32 @@
 - **Repo/VPS runtime:** plugin **1.0.4**; Stage 5.1 identity policy live E2E PASS.
 - **Skill-protect ACTIVE 4/4:** canonical SKILL — только `skills/mariyam/SKILL.md`, SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; отдельной git-copy нет; `tool_progress` off.
 
+## Planned v3.10 security gates — NOT IMPLEMENTED
+
+### Plan approval и cron identity
+
+- `approve_monthly_plan`: Oyijon self-only; admin — только target из `allowed_target_user_ids`, future month и отдельный narrow cross-target allowlist. Права на transactions/update/delete не расширяются.
+- `approve_monthly_plan` действует только до начала планового месяца. После начала месяца approval-cycle закрыт; активный plan корректирует только Oyijon self-only. Admin edit текущего plan в v3.10 не заявлен.
+- До cron automation проверить Hermes v0.18.2 context. Trusted cron job id маппится private file mode 0600 на internal user id. Unknown/corrupt job → fail closed и downstream=0. LLM-supplied `user_id` запрещён как источник identity.
+
+### Utility и recurring obligations identity
+
+- `set_utility_threshold`: Oyijon self-only; admin narrow cross-target только для target из `allowed_target_user_ids` и только для threshold. Portal/payment/settings/transactions запрещены.
+- `upsert_recurring_obligation` и `get_recurring_obligations`: Oyijon self-only; admin narrow cross-target только для target из `allowed_target_user_ids` и отдельного per-tool allowlist; прав на transactions нет.
+
+### Utility cabinet read-only
+
+- До кода проверить official URL/auth, CAPTCHA/2FA, fields, API/export, write/payment surface, terms, session stability и automation feasibility.
+- Приоритет: official API → official export/endpoint → deterministic read-only connector. Hermes browser с открытыми credentials запрещён.
+- Credentials только VPS secrets; никогда LLM, PostgreSQL, git, SKILL, Telegram или logs. Account reference хранится/логируется только masked.
+- Connector возвращает allowlisted structured fields. Payment/top-up, card storage, settings/tariff write запрещены. HTML/API drift → fail closed.
+- Газ/вода и любой платный utility API — только после отдельного разрешения заказчика. После двух sync errors уведомляется только Бахриддин ака.
+
+### Vision и ручное сохранение
+
+- Screenshot/photo values подтверждаются пользователем до ручного сохранения. Deterministic portal sync не требует подтверждения каждого snapshot.
+- Сначала native image input текущего model path; отдельная vision-модель только после фактического FAIL. Hermes core не менять.
+
 ## Приватность
 
 - Не хранить сырые voice-файлы дольше необходимого.

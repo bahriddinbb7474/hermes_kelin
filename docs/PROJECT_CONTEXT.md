@@ -38,7 +38,7 @@
 
 ## Где мы сейчас (2026-07-14)
 
-ТЗ: **v3.9**. Этап 5.1 — **CLOSED / LIVE PASS**. Repo/VPS: tools **21**, plugin **1.0.4**, migration 002 active, skill-protect **4/4**, SKILL SHA `b1231182…`. Test-user «Тест Ойижон» используется только pre-handover; реальная Ойижон не подключена.
+ТЗ: **v3.10**. Этап 5.1 остаётся **CLOSED / LIVE PASS**. Current repo/VPS: tools **21**, plugin **1.0.4**, migration 002 active, skill-protect **4/4**, SKILL SHA `b1231182…`. Stage 5.2–6 finance/utility additions — **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Test-user «Тест Ойижон» используется только pre-handover; реальная Ойижон не подключена.
 
 На VPS выполнено (Этап 1, технически):
 - PostgreSQL поднят и **healthy** (контейнер `hermes_mariyam_postgres`, порт 127.0.0.1:5432, init-миграции применены).
@@ -50,14 +50,15 @@
 - **Первый живой ответ получен**: бот ответил Бахриддин ака в Telegram на узбекской кириллице (gateway реально принимает/обрабатывает сообщения).
 - systemd/автозапуск/reboot проверены: после общего `sudo reboot` Gateway поднялся автоматически (ровно 1 процесс), PostgreSQL healthy, контейнер Time-Agent снова работает, `/opt/time-agent` не трогался (Блок 6И).
 - allowlist блокирует чужой аккаунт **до** LLM/tools/БД (`PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL`); точный текст отказа `Кечирасиз, бу шахсий ёрдамчи.` не обязателен для Hermes v0.18.2 (решение заказчика 2026-07-12, ТЗ §0.5).
-- Очистка тестовых данных production-БД выполнена (Блок 6З): остался только `admin`, fixture-таблицы пусты.
+- На момент Блока 6З после очистки production-БД оставался только `admin`, fixture-таблицы были пусты; позднее для pre-handover E2E добавлен временный test-user.
 
 Статусы и открытые работы:
 - **Этап 1 закрыт по решению заказчика (2026-07-12, ТЗ v3.5):** `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (тихая блокировка принята). **Аудит и merge коммита `d24d01c` (systemd unit) в `main` ВЫПОЛНЕНЫ** — вся feature-ветка merged в `main` через `dd9261e`.
 - **DB guard (`tests/db_guard.py`) находится в `main`** (merged через `dd9261e`; 16 unit-тестов PASS). Destructive suite на production-БД не запускался.
 - **Identity guard 1.0.4** — VPS runtime + Stage 5/5.1 E2E PASS (`TZ/EVIDENCE_IDENTITY_GUARD_2026-07-12.md`, `TZ/EVIDENCE_STAGE_5_E2E_2026-07-12.md`, `EVIDENCE_STAGE_5_1_LIVE_2026-07-13.md`). MCP-prefix, fail-closed barrier, int `telegram_id`, SKILL sentinel `user_id:0`.
 - **Этап 5 (бухгалтерия): ЗАКРЫТ (PASS 2026-07-13)** — E2E 4/4; final test **1/12000**, admin **8/768000**; на момент acceptance runtime tools **19**, затем расширены Stage 5.1 до 21.
-- **Этап 5.1: CLOSED / LIVE PASS** (ТЗ **v3.9**) — quantity/unit, by_item, compare/trend, plan/fact и identity подтверждены live; runtime 21 tools / plugin 1.0.4.
+- **Этап 5.1: CLOSED / LIVE PASS** (решение v3.9, сохранено в **v3.10**) — quantity/unit, by_item, compare/trend, plan/fact и identity подтверждены live; runtime 21 tools / plugin 1.0.4.
+- **Planned v3.10:** Stage 5.2 simple reports; Stage 5.3 product plans; Stage 5.3A approval cycle + cron identity gate; Stage 5.4 utility read-only; Stage 6 recurring obligations. Planned tools 21→22→25→27; current runtime не менялся.
 - **Skill-protect:** active **4/4**, canonical SKILL SHA подтверждён, `tool_progress` off.
 - Мариям = бытовой финансовый аналитик; backend считает факты, Hermes объясняет; memory ≠ источник аналитики.
 - очистка тестовых данных БД — выполнена, закрепить аудитом;
