@@ -57,7 +57,7 @@ hermes-mariyam/
 
 ## Текущее состояние (2026-07-15)
 
-ТЗ: **v3.12**. Stage 5.1 остаётся **CLOSED / LIVE PASS**. Stage 5.2 = **LIVE FAIL / FIX REQUIRED**: controlled Telegram E2E подтвердил суммы, identity, кириллицу, отсутствие traces и cleanup, но обязательная финальная фраза отсутствовала. Repo canonical SKILL SHA остаётся `b3afd9ecfb16a4d4618be898573a84c00ae24a1c3b41e8ae57823912b9ac9d18`; новый SKILL-fix и повторный live test ещё не выполнялись. После rollback VPS использует Stage 5.1 SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; runtime = **21 tools / plugin 1.0.4 / migration 002**. Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Реальная Ойижон не подключена.
+ТЗ: **v3.13**. Stage 5.1 остаётся **CLOSED / LIVE PASS**. Stage 5.2 = **OFFLINE PASS / LIVE PENDING**: canonical SKILL и permanent contracts приведены к решениям заказчика, локальные проверки PASS. Repo canonical SKILL SHA = `f00214f7ebdd280bc71b04b133a40d7e018708bf35f7facea73843ec8cc02693`. После rollback VPS по-прежнему использует Stage 5.1 SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; повторный Telegram E2E и deploy не выполнялись. Runtime = **21 tools / plugin 1.0.4 / migration 002**. Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Реальная Ойижон не подключена.
 
 Этап 1 (VPS + Hermes + Telegram) — **закрыт по решению заказчика (2026-07-12, ТЗ v3.5)**:
 - ✅ PostgreSQL healthy (порт 127.0.0.1:5432, init-миграции применены);
@@ -87,16 +87,16 @@ hermes-mariyam/
 - ✅ Runtime: quantity/unit, by_item, compare/trend, plan/fact; tools/dispatch/discovery **21/21/21**; plugin **1.0.4**; migration 002 active; SKILL SHA `b1231182…`; skill-protect **4/4**.
 - ✅ Controlled E2E на «Тест Ойижон»: identity PASS, 6/7 provider requests, retry=0; cleanup восстановил DB baseline. Evidence: `docs/EVIDENCE_STAGE_5_1_LIVE_2026-07-13.md`.
 
-**Stage 5.2 — LIVE FAIL / FIX REQUIRED (v3.12):**
-- общий отчёт прошёл проверки сумм, identity и языка, но не завершился обязательной дословной фразой;
-- repo SHA остаётся `b3afd9ecfb16a4d4618be898573a84c00ae24a1c3b41e8ae57823912b9ac9d18`; после rollback VPS SHA = `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; повторный live test после будущего SKILL-fix ещё не выполнялся;
-- Evidence: `docs/EVIDENCE_STAGE_5_2_LIVE_FAIL_2026-07-15.md`.
+**Stage 5.2 — OFFLINE PASS / LIVE PENDING (v3.13):**
+- canonical SKILL и permanent tests приведены к утверждённому формату общих и подробных отчётов;
+- repo SHA = `f00214f7ebdd280bc71b04b133a40d7e018708bf35f7facea73843ec8cc02693`; VPS после rollback остаётся на SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; повторный Telegram E2E и deploy не выполнялись;
+- предыдущий live FAIL зафиксирован в `docs/EVIDENCE_STAGE_5_2_LIVE_FAIL_2026-07-15.md`.
 
-**Planned v3.12 — NOT IMPLEMENTED:**
+**Planned v3.13 — NOT IMPLEMENTED:**
 - Stage 5.3/5.3A: product plan, last/weighted average/manual reference prices, migration 003 price snapshot и approval cycle 25/27/28/1; planned count 21→22 после approval tool;
 - Stage 5.4: researched official utility cabinet, deterministic read-only connector, migration 004, planned count 25;
 - Stage 6 extension: recurring obligations, migration 005, Hermes cron, planned final count 27;
-- current runtime остаётся **21**; VPS/profile не менялись.
+- current runtime остаётся **21**; VPS/profile не менялись в рамках offline fix.
 
 Текущий allowlist: **admin + временный «Тест Ойижон»** (второй аккаунт заказчика, role=oyijon). Реальная Ойижон отсутствует (до handover).
 

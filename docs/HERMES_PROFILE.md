@@ -10,7 +10,7 @@
 
 > **Stage 5.1 status (2026-07-15): CLOSED / LIVE PASS.** VPS/profile = tools **21**, plugin **1.0.4**, migration 002 active, SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, skill-protect **4/4**, `tool_progress` off. Controlled E2E и cleanup PASS.
 
-> **ТЗ v3.12:** Stage 5.2 = **LIVE FAIL / FIX REQUIRED**. Controlled E2E выполнен; после rollback profile/runtime остаются на `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, 21 tools, plugin 1.0.4, migration 002. Repo SKILL остаётся `b3afd9ecfb16a4d4618be898573a84c00ae24a1c3b41e8ae57823912b9ac9d18`; новый fix и повторный live test ещё не выполнялись. Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Реальная Ойижон не подключалась.
+> **ТЗ v3.13:** Stage 5.2 = **OFFLINE PASS / LIVE PENDING**. Repo SKILL SHA = `f00214f7ebdd280bc71b04b133a40d7e018708bf35f7facea73843ec8cc02693`; permanent contracts и offline checks PASS. После rollback profile/runtime остаются на Stage 5.1 SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, 21 tools, plugin 1.0.4, migration 002. Deploy и повторный Telegram E2E ещё не выполнялись. Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Реальная Ойижон не подключалась.
 
 **Модель профиля:** `gpt-5.6-luna` через api.n1n.ai (`provider: custom`, `base_url: https://api.n1n.ai/v1`, ключ `N1N_API_KEY` в профильном `.env`, 600). Резерв: `deepseek/deepseek-v4-flash` (DECISIONS.md, 2026-07-12).
 
@@ -45,9 +45,9 @@
 9. Настроить автозапуск Hermes (systemd user-service + `loginctl enable-linger`), проверить подъём после `reboot`.
 10. Прогнать AC Этапа 2: 20 тест-фраз → ответы только узбекская кириллица (0 латинских букв).
 
-### Stage 5.2 fix и planned profile gates — не выполнять сейчас
+### Stage 5.2 live gate и planned profile gates — не выполнять сейчас
 
-- Stage 5.2: canonical SKILL/tests ещё не приведены к решениям v3.12; изменение, установка в profile, restart и повторный Telegram E2E — только отдельной задачей и по отдельному разрешению.
+- Stage 5.2: canonical SKILL/tests приведены к решениям v3.12 offline; установка в profile, restart и повторный Telegram E2E — только отдельной задачей и по отдельному разрешению.
 - Stage 5.3A: до создания cron cycle проверить Hermes v0.18.2 cron identity; trusted job id → private mapping 0600 → internal user id; unknown job fail closed.
 - Stage 5.4: utility credentials не помещать в profile/model-visible env; только VPS connector secrets. Hermes browser с открытыми credentials запрещён.
 - Vision smoke перед handover сначала через native image input текущего model path; отдельная vision-модель только после фактического FAIL.

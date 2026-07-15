@@ -68,7 +68,7 @@ AC (измеримые):
 11. Identity guard на все новые user-scoped tools (`set_monthly_budget`, `get_monthly_budget_status`).
 12. Реальная Ойижон до handover не подключается.
 
-### 5.2. Простые семейные отчёты — LIVE FAIL / FIX REQUIRED
+### 5.2. Простые семейные отчёты — OFFLINE PASS / LIVE PENDING
 
 **Общий отчёт:**
 
@@ -88,7 +88,7 @@ AC (измеримые):
 5. Product plan в Stage 5.2 не показывается.
 6. JSON, tool names, technical fields и traces отсутствуют; суммы берутся только из tools.
 
-Controlled Telegram E2E подтвердил суммы, identity, кириллицу, отсутствие traces и cleanup, но общий ответ не содержал обязательную финальную фразу. После rollback runtime восстановлен; новый repo SKILL не создавался. До отдельного SKILL/test fix и успешного повторного E2E этап не закрыт. Evidence: `../EVIDENCE_STAGE_5_2_LIVE_FAIL_2026-07-15.md`.
+Canonical SKILL и permanent contracts приведены к этим критериям; offline suite PASS, repo SKILL SHA = `f00214f7ebdd280bc71b04b133a40d7e018708bf35f7facea73843ec8cc02693`. После rollback VPS runtime остаётся на Stage 5.1 SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; deploy и повторный Telegram E2E не выполнялись. До успешного повторного E2E этап не закрыт. Предыдущий live FAIL: `../EVIDENCE_STAGE_5_2_LIVE_FAIL_2026-07-15.md`.
 
 ### 5.3. Семейный и продуктовый план — PLANNED / NOT IMPLEMENTED
 

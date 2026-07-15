@@ -2,7 +2,7 @@
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md`
 
-**Статус v3.12:** архитектура не меняется. Stage 5.1 — **CLOSED / LIVE PASS**. Stage 5.2 — **LIVE FAIL / FIX REQUIRED**: repo SKILL SHA `b3afd9ecfb16a4d4618be898573a84c00ae24a1c3b41e8ae57823912b9ac9d18`, после rollback VPS SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; повторный live test после будущего fix ещё не выполнялся. Stage 5.3–6 — **PLANNED / NOT IMPLEMENTED**. Current runtime = 21 tools / plugin 1.0.4 / migration 002; migrations 003/004/005 отсутствуют; реальная Ойижон не подключалась.
+**Статус v3.13:** архитектура не меняется. Stage 5.1 — **CLOSED / LIVE PASS**. Stage 5.2 — **OFFLINE PASS / LIVE PENDING**: repo SKILL SHA `f00214f7ebdd280bc71b04b133a40d7e018708bf35f7facea73843ec8cc02693`, после rollback VPS SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; deploy и повторный Telegram E2E ещё не выполнялись. Stage 5.3–6 — **PLANNED / NOT IMPLEMENTED**. Current runtime = 21 tools / plugin 1.0.4 / migration 002; migrations 003/004/005 отсутствуют; реальная Ойижон не подключалась.
 
 ## Принцип Hermes-first
 

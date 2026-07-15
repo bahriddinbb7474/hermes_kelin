@@ -1,8 +1,8 @@
-# Техническое задание v3.12 — FINAL
+# Техническое задание v3.13 — FINAL
 # Hermes Agent «Мариям» — ИИ келинчак для Ойижон
 
 **Статус:** ФИНАЛЬНЫЙ, единый источник истины (single source of truth)
-**Версия:** 3.12 — Stage 5.2 live FAIL, утверждённый формат product reports и planned reference prices (см. 0.12). Stage 5.1 остаётся CLOSED / LIVE PASS по v3.9; Stage 5.3–6 и migrations 003/004/005 остаются PLANNED / NOT IMPLEMENTED. Имя файла не меняется, документ остаётся единственным источником истины.
+**Версия:** 3.13 — Stage 5.2 SKILL/test fix прошёл offline verification; live deploy/E2E остаётся pending (см. 0.13). Stage 5.1 остаётся CLOSED / LIVE PASS по v3.9; Stage 5.3–6 и migrations 003/004/005 остаются PLANNED / NOT IMPLEMENTED. Имя файла не меняется, документ остаётся единственным источником истины.
 **Проект:** персональный Telegram ИИ-агент для пожилой женщины из Узбекистана
 **Имя агента:** Мариям · **Образ:** ИИ келинчак
 **Основной пользователь:** Ойижон · **Администратор:** Бахриддин ака
@@ -10,7 +10,7 @@
 **Архитектура:** Hermes-first
 **Язык общения с Ойижон:** только узбекский, кириллица
 **Часовой пояс:** Asia/Tashkent (UTC+5)
-**Дата:** 2026-07-14
+**Дата:** 2026-07-15
 
 ---
 
@@ -152,6 +152,19 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
 6. Новый repo SKILL не создавался. Repo canonical SKILL остаётся `b3afd9ecfb16a4d4618be898573a84c00ae24a1c3b41e8ae57823912b9ac9d18` и ещё не соответствует новым решениям. После rollback VPS использует Stage 5.1 SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`.
 7. Runtime остаётся **21 tools / plugin 1.0.4 / migration 002**; migrations 003/004/005 отсутствуют. Evidence: `../EVIDENCE_STAGE_5_2_LIVE_FAIL_2026-07-15.md`.
 8. **Статус: Stage 5.2 = LIVE FAIL / FIX REQUIRED; Stage 5.3 = PLANNED / NOT IMPLEMENTED.** Реальная Ойижон не подключалась; повторный live test после будущего SKILL-fix ещё не выполнялся.
+
+### 0.13. Изменения v3.12 → v3.13 (2026-07-15) — Stage 5.2 SKILL/test fix
+
+Требования и решения заказчика из §0.12 не изменены и не расширены. Зафиксирован их offline implementation:
+
+1. Canonical `skills/mariyam/SKILL.md` приведён к утверждённым правилам общего и подробного отчётов: естественное вступление и варианты простых заголовков разрешены; обязательная финальная фраза закреплена дословно; подробный отчёт содержит summary категории перед фактическими товарами.
+2. Product plan на Stage 5.2 не показывается; missing quantity = `—` или поле не показывается; user-facing `pcs` = `та`, остальные единицы = `кг / г / л / мл / қадоқ`; отрицательный остаток сопровождается простым пояснением.
+3. Permanent contract `tests/test_mariyam_skill_stage52.py` обновлён без закрепления единственной стилистической формы; SHA-protection и deploy reference обновлены. Repo canonical SKILL SHA-256 = `f00214f7ebdd280bc71b04b133a40d7e018708bf35f7facea73843ec8cc02693`.
+4. Offline verification: targeted Stage 5.2 + protection = **28 passed**; Stage 5.1 + identity regressions = **89 passed**, language/medical assertions PASS; полный `pytest -q` = **159 passed, 2 skipped**; `ruff check .`, `python -m compileall backend tests`, `git diff --check` — PASS.
+5. Backend, SQL, identity plugin и Hermes core не менялись. Tool count остаётся **21**; migration 002 остаётся единственной active migration; Stage 5.3 и migrations 003/004/005 не реализованы.
+6. VPS/profile не менялись: runtime остаётся **21 tools / plugin 1.0.4 / migration 002**, runtime SKILL остаётся Stage 5.1 SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`.
+7. Deploy, Telegram/API E2E и платные model calls не выполнялись; реальная Ойижон не подключалась.
+8. **Статус: Stage 5.2 = OFFLINE PASS / LIVE PENDING; Stage 5.3–6 = PLANNED / NOT IMPLEMENTED.** Для live acceptance нужны отдельно разрешённые deploy и повторный Telegram E2E.
 
 Исполнитель реализует проект **строго по разделам 5–21**, сдаёт этапами (раздел 15) и на каждом этапе выполняет acceptance criteria. Что делать запрещено — раздел 20.
 
@@ -1221,9 +1234,9 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 
 > **Статус v3.9: CLOSED / LIVE PASS.** Repo и VPS runtime = **21 tools / plugin 1.0.4**; migration 002 применена; canonical SKILL и skill-protect активны. Controlled E2E подтвердил quantity/unit, analytics, compare/trend, budget plan/fact и identity; cleanup восстановил DB baseline. Evidence: `../EVIDENCE_STAGE_5_1_LIVE_2026-07-13.md`.
 
-### Этап 5.2 — Простые семейные отчёты для Ойижон (v3.12)
+### Этап 5.2 — Простые семейные отчёты для Ойижон (v3.13)
 
-**Статус: LIVE FAIL / FIX REQUIRED.** Controlled Telegram E2E подтвердил суммы, identity, язык, отсутствие traces и cleanup, но обязательная финальная фраза отсутствовала. Repo SKILL остаётся SHA `b3afd9ecfb16a4d4618be898573a84c00ae24a1c3b41e8ae57823912b9ac9d18`; после rollback VPS использует Stage 5.1 SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`. Новый SKILL/test fix и повторный E2E ещё не выполнялись.
+**Статус: OFFLINE PASS / LIVE PENDING.** Canonical SKILL и permanent contracts приведены к требованиям v3.12; repo SKILL SHA = `f00214f7ebdd280bc71b04b133a40d7e018708bf35f7facea73843ec8cc02693`, offline verification PASS. После rollback VPS использует Stage 5.1 SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; deploy и повторный Telegram E2E ещё не выполнялись.
 
 **Язык для Ойижон:** сложные термины заменяются только в user-facing тексте: бюджет → `оила харажатлари режаси`; план → `режа`; факт → `амалда сарфланган / сарфланди`; остаток → `қолган пул`; категория → `харажат гуруҳи`; отклонение → `режадан кўп ёки кам`; тренд → `ойлар бўйича ўзгариш`; аналитика → `ҳисоб-китобни кўриб чиқиш`. Внутренние tool fields/contracts остаются техническими.
 

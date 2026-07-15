@@ -38,7 +38,7 @@ GUARD_INIT = (
 )
 # Canonical Stage-5.2 SKILL bytes (must not drift via self-improvement).
 EXPECTED_SKILL_SHA256 = (
-    "b3afd9ecfb16a4d4618be898573a84c00ae24a1c3b41e8ae57823912b9ac9d18"
+    "f00214f7ebdd280bc71b04b133a40d7e018708bf35f7facea73843ec8cc02693"
 )
 PROFILE_SCOPED_DIR = "hermes_profile_mariyam_oyijon"
 SELF_IMPROVEMENT_MARKERS = (
