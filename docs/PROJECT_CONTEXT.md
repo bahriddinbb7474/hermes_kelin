@@ -36,16 +36,16 @@
 
 Основной и обязательный канал MVP — Telegram. Семейная группа, веб-дашборд, кнопочный UI и CRM в MVP не нужны.
 
-## Где мы сейчас (2026-07-15)
+## Где мы сейчас (2026-07-16)
 
-ТЗ: **v3.14**. Этап 5.1 остаётся **CLOSED / LIVE PASS**. Stage 5.2 = **OFFLINE PASS / LIVE PENDING**: canonical prompt перенесён в `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, full effective Telegram prompt contract PASS без truncation. Repo SOUL SHA = `713021c2cfd6c3abff206b6a79ec7423c06c6920645ce4a6c2d31158a108c98a`; VPS/profile не менялись и остаются на Stage 5.1 SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, plugin **1.0.4**, migration 002, inventory 21. Stage 5.3–6 — **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Повторный Telegram E2E не выполнялся; реальная Ойижон не подключена.
+ТЗ: **v3.15**. Этап 5.1 остаётся **CLOSED / LIVE PASS**. Stage 5.2 = **OFFLINE PASS / LIVE PENDING**: controlled live дал Message 1 PASS и Message 2 format-only FAIL; cleanup/rollback PASS. Narrow category-table fix и full effective Telegram prompt contract PASS без truncation. Repo LF SOUL SHA = `a9b584e14d704f08b4778b7928ca71a0cf095394583f769c5e9571097884b4e4`; VPS/profile после rollback остаются на Stage 5.1 SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, plugin **1.0.4**, migration 002, inventory 21. Stage 5.3–6 — **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Narrow fix не развёрнут; реальная Ойижон не подключена.
 
 На VPS выполнено (Этап 1, технически):
 - PostgreSQL поднят и **healthy** (контейнер `hermes_mariyam_postgres`, порт 127.0.0.1:5432, init-миграции применены).
 - Hermes Agent **v0.18.2** (upstream `3b2ef789`) установлен под `timeagent`.
 - Профиль `mariyam_oyijon` создан; модель **`gpt-5.6-luna` через api.n1n.ai** (утверждена 2026-07-12, резерв `deepseek-v4-flash`; DECISIONS.md); allowlist содержит **только ID администратора** (до тестов) — в ходе частичного живого теста временно добавлен test-user «Тест Ойижон» (второй аккаунт заказчика, role=oyijon), остаётся для следующих этапов.
 - Backend зарегистрирован как **stdio MCP** (`mariyam_backend`): inventory/dispatch/discovery = **21/21/21**, реальные tool-calls работают, `ensure_user` (admin) выполнен идемпотентно.
-- В профиль после rollback установлен Stage 5.1 skill SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; Stage 5.2 repo SOUL SHA `713021c2cfd6c3abff206b6a79ec7423c06c6920645ce4a6c2d31158a108c98a` не является live runtime.
+- В профиль после rollback установлен Stage 5.1 skill SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; Stage 5.2 repo LF SOUL SHA `a9b584e14d704f08b4778b7928ca71a0cf095394583f769c5e9571097884b4e4` не является live runtime.
 - Telegram Gateway установлен как **systemd user-service** (`hermes-gateway-mariyam_oyijon.service`), `active`/`enabled`; `loginctl enable-linger timeagent` выполнен (Блок 6И).
 - **Первый живой ответ получен**: бот ответил Бахриддин ака в Telegram на узбекской кириллице (gateway реально принимает/обрабатывает сообщения).
 - systemd/автозапуск/reboot проверены: после общего `sudo reboot` Gateway поднялся автоматически (ровно 1 процесс), PostgreSQL healthy, контейнер Time-Agent снова работает, `/opt/time-agent` не трогался (Блок 6И).
@@ -58,9 +58,9 @@
 - **Identity guard 1.0.4** — VPS runtime + Stage 5/5.1 E2E PASS (`TZ/EVIDENCE_IDENTITY_GUARD_2026-07-12.md`, `TZ/EVIDENCE_STAGE_5_E2E_2026-07-12.md`, `EVIDENCE_STAGE_5_1_LIVE_2026-07-13.md`). MCP-prefix, fail-closed barrier, int `telegram_id`, SKILL sentinel `user_id:0`.
 - **Этап 5 (бухгалтерия): ЗАКРЫТ (PASS 2026-07-13)** — E2E 4/4; final test **1/12000**, admin **8/768000**; на момент acceptance runtime tools **19**, затем расширены Stage 5.1 до 21.
 - **Этап 5.1: CLOSED / LIVE PASS** (решение v3.9, сохранено в **v3.12**) — quantity/unit, by_item, compare/trend, plan/fact и identity подтверждены live; runtime 21 tools / plugin 1.0.4.
-- **Stage 5.2: OFFLINE PASS / LIVE PENDING** (v3.14) — deterministic SOUL/effective-prompt fix и локальные проверки PASS; VPS deploy и повторный Telegram E2E ещё не выполнялись. Root cause: `EVIDENCE_STAGE_5_2_PROMPT_FIX_2026-07-15.md`.
-- **Planned v3.14:** Stage 5.3 product plans + reference price snapshot; Stage 5.3A approval cycle + cron identity gate; Stage 5.4 utility read-only; Stage 6 recurring obligations. Planned tools 21→22→25→27; current runtime не менялся.
-- **Prompt/skill protect:** repo SOUL assertion = `713021c2cfd6c3abff206b6a79ec7423c06c6920645ce4a6c2d31158a108c98a`; VPS protection после rollback фиксирует legacy runtime SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; `tool_progress` off.
+- **Stage 5.2: OFFLINE PASS / LIVE PENDING** (v3.15) — previous live: Message 1 PASS, Message 2 category-summary format-only FAIL, cleanup/rollback PASS; narrow table fix offline PASS. Evidence: `EVIDENCE_STAGE_5_2_CATEGORY_TABLE_FIX_2026-07-16.md`.
+- **Planned v3.15:** Stage 5.3 product plans + reference price snapshot; Stage 5.3A approval cycle + cron identity gate; Stage 5.4 utility read-only; Stage 6 recurring obligations. Planned tools 21→22→25→27; current runtime не менялся.
+- **Prompt/skill protect:** repo LF SOUL assertion = `a9b584e14d704f08b4778b7928ca71a0cf095394583f769c5e9571097884b4e4`; VPS protection после rollback фиксирует legacy runtime SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; `tool_progress` off.
 - Мариям = бытовой финансовый аналитик; backend считает факты, Hermes объясняет; memory ≠ источник аналитики.
 - очистка тестовых данных БД — выполнена, закрепить аудитом;
 - **Этап 2 (язык): PARTIAL 8/20, НЕ закрыт** — 8 из 20 фраз проверены (8/8 кириллица, `LATIN_LINES: []`), полный AC (20/20, 0 латиницы) не пройден; тест остановлен заказчиком, не из-за FAIL (см. `docs/TZ/EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md`);

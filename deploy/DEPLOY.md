@@ -292,8 +292,10 @@ Stage 5.2 показал второй root cause: Hermes добавляет в s
 Опционально (filesystem belt, не вместо config): `chmod a-w` на profile
 `SOUL.md` после deploy.
 
-Текущий skill-protect на VPS остаётся active. Новый SOUL fix имеет статус
-`OFFLINE PASS / LIVE PENDING`; любое VPS-применение — только по новому разрешению.
+Текущий skill-protect на VPS остаётся active. После controlled live
+Message 1 PASS / Message 2 category-summary format-only FAIL и полного rollback
+узкий SOUL table-format fix имеет статус `OFFLINE PASS / LIVE PENDING`; VPS снова
+на Stage 5.1 baseline. Любое VPS-применение — только по новому разрешению.
 
 ## Выполненный Stage 5.1 live deploy (история выполнения)
 

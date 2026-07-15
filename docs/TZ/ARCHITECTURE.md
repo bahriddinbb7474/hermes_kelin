@@ -2,7 +2,7 @@
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md`
 
-**Статус v3.14:** архитектура Hermes-first не меняется. Stage 5.1 — **CLOSED / LIVE PASS**. Stage 5.2 — **OFFLINE PASS / LIVE PENDING**: repo canonical SOUL SHA `713021c2cfd6c3abff206b6a79ec7423c06c6920645ce4a6c2d31158a108c98a`, после rollback VPS использует legacy SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; новый SOUL не развёрнут, `/new` и повторный Telegram E2E не выполнялись. Stage 5.3–6 — **PLANNED / NOT IMPLEMENTED**. Current runtime = 21 tools / plugin 1.0.4 / migration 002; migrations 003/004/005 отсутствуют; реальная Ойижон не подключалась.
+**Статус v3.15:** архитектура Hermes-first не меняется. Stage 5.1 — **CLOSED / LIVE PASS**. Stage 5.2 — **OFFLINE PASS / LIVE PENDING**: controlled live Message 1 PASS / Message 2 category-summary format-only FAIL / rollback PASS; repo canonical LF SOUL SHA `a9b584e14d704f08b4778b7928ca71a0cf095394583f769c5e9571097884b4e4`; VPS использует legacy SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, narrow fix не развёрнут. Stage 5.3–6 — **PLANNED / NOT IMPLEMENTED**. Current runtime = 21 tools / plugin 1.0.4 / migration 002; migrations 003/004/005 отсутствуют; реальная Ойижон не подключалась.
 
 ## Принцип Hermes-first
 

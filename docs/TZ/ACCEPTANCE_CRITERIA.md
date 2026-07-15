@@ -81,14 +81,14 @@ AC (измеримые):
 
 **Подробный отчёт по одной группе:**
 
-1. Сначала показывает summary выбранной категории: `Харажат гуруҳи | Режа | Сарфлангани | Қолгани`.
-2. Затем показывает фактические товары: `Маҳсулот | Миқдор | Сарфлангани`.
+1. Сначала показывает summary выбранной категории только отдельной Markdown-таблицей `Харажат гуруҳи | Режа | Сарфлангани | Қолгани`, минимум с одной строкой выбранной категории; маркированный/list summary запрещён.
+2. Сразу после summary-таблицы показывает таблицу фактических товаров: `Маҳсулот | Миқдор | Сарфлангани`.
 3. Количество показывается только при наличии данных; missing quantity = `—` или поле не показывается; количество не угадывается.
 4. User-facing units: `кг / г / л / мл / та / қадоқ`; canonical units в tools/БД остаются `kg / g / l / ml / pcs / pack`.
 5. Product plan в Stage 5.2 не показывается.
 6. JSON, tool names, technical fields и traces отсутствуют; суммы берутся только из tools.
 
-Canonical SOUL и permanent effective-prompt contracts приведены к этим критериям; offline suite PASS, repo SOUL SHA = `713021c2cfd6c3abff206b6a79ec7423c06c6920645ce4a6c2d31158a108c98a`. После rollback VPS runtime остаётся на Stage 5.1 SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; deploy, `/new` и повторный Telegram E2E не выполнялись. До успешного повторного E2E этап не закрыт. Root cause/fix: `../EVIDENCE_STAGE_5_2_PROMPT_FIX_2026-07-15.md`.
+Canonical SOUL и permanent effective-prompt contracts приведены к этим критериям; offline suite PASS, repo LF SOUL SHA = `a9b584e14d704f08b4778b7928ca71a0cf095394583f769c5e9571097884b4e4`. Controlled live: Message 1 PASS, Message 2 FAIL только по формату первой summary-таблицы; cleanup/rollback PASS. VPS runtime остаётся на Stage 5.1 SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; narrow fix не развёрнут. До успешного повторного E2E этап не закрыт. Evidence: `../EVIDENCE_STAGE_5_2_CATEGORY_TABLE_FIX_2026-07-16.md`.
 
 ### 5.3. Семейный и продуктовый план — PLANNED / NOT IMPLEMENTED
 

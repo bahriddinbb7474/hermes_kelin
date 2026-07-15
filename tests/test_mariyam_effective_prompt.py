@@ -114,6 +114,11 @@ def test_effective_telegram_prompt_contains_full_untruncated_contract(tmp_path):
     assert markers["pcs_to_ta"] == 1
     assert markers["auto_detail_ban"] == 1
     assert markers["stage53_ban"] == 1
+    assert markers["category_summary_header"] >= 2
+    assert markers["product_table_header"] >= 2
+    assert markers["category_table_only"] == 1
+    assert markers["bullet_summary_ban"] == 1
+    assert markers["summary_before_products"] == 1
     assert not any(result["forbidden"].values())
 
 

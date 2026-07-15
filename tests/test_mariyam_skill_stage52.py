@@ -48,9 +48,29 @@ def test_category_detail_has_summary_before_actual_items():
     section = _section()
     summary = "Харажат гуруҳи | Режа | Сарфлангани | Қолгани"
     items = "Маҳсулот | Миқдор | Сарфлангани"
-    assert section.index(summary) < section.index(items)
-    assert "quantity только из tool result, иначе `—`" in section
+    category_row = next(
+        line for line in section.splitlines() if "`CATEGORY_DETAIL`" in line
+    )
+    assert category_row.index(summary) < category_row.index(items)
+    assert "summary категории выводи только отдельной Markdown-таблицей" in category_row
+    assert "минимум одной строкой выбранной категории" in category_row
+    assert "Маркированный список вместо summary-таблицы запрещён" in category_row
+    assert (
+        "Сразу после summary-таблицы выведи таблицу фактических товаров"
+        in category_row
+    )
+    assert "quantity только из tool result, иначе `—`" in category_row
     assert "только её фактические `by_item`" in section
+
+
+def test_category_detail_has_one_short_two_table_example():
+    section = _section()
+    example = section.split("Короткий правильный пример подробного отчёта:", 1)[1]
+    summary = "Харажат гуруҳи | Режа | Сарфлангани | Қолгани"
+    items = "Маҳсулот | Миқдор | Сарфлангани"
+    assert example.index(summary) < example.index(items)
+    assert "| Озиқ-овқат | 500 000 сўм | 221 000 сўм | 279 000 сўм |" in example
+    assert "| Тухум | 12 та | 36 000 сўм |" in example
 
 
 def test_group_mapping_missing_plan_and_negative_remaining_are_explicit():

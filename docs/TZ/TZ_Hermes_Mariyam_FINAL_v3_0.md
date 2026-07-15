@@ -1,8 +1,8 @@
-# Техническое задание v3.14 — FINAL
+# Техническое задание v3.15 — FINAL
 # Hermes Agent «Мариям» — ИИ келинчак для Ойижон
 
 **Статус:** ФИНАЛЬНЫЙ, единый источник истины (single source of truth)
-**Версия:** 3.14 — deterministic SOUL prompt fix прошёл offline verification; live deploy/E2E остаётся pending (см. 0.14). Stage 5.1 остаётся CLOSED / LIVE PASS по v3.9; Stage 5.3–6 и migrations 003/004/005 остаются PLANNED / NOT IMPLEMENTED. Имя файла не меняется, документ остаётся единственным источником истины.
+**Версия:** 3.15 — узкий CATEGORY_DETAIL table-format fix прошёл offline verification после controlled live FAIL и полного rollback (см. 0.15); повторный live deploy/E2E остаётся pending. Stage 5.1 остаётся CLOSED / LIVE PASS по v3.9; Stage 5.3–6 и migrations 003/004/005 остаются PLANNED / NOT IMPLEMENTED. Имя файла не меняется, документ остаётся единственным источником истины.
 **Проект:** персональный Telegram ИИ-агент для пожилой женщины из Узбекистана
 **Имя агента:** Мариям · **Образ:** ИИ келинчак
 **Основной пользователь:** Ойижон · **Администратор:** Бахриддин ака
@@ -10,7 +10,7 @@
 **Архитектура:** Hermes-first
 **Язык общения с Ойижон:** только узбекский, кириллица
 **Часовой пояс:** Asia/Tashkent (UTC+5)
-**Дата:** 2026-07-15
+**Дата:** 2026-07-16
 
 ---
 
@@ -199,6 +199,35 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
    До первого agent turn persisted prompt ещё не заполнен.
    **Stage 5.2 = OFFLINE PASS / LIVE PENDING.** Evidence:
    `../EVIDENCE_STAGE_5_2_PROMPT_FIX_2026-07-15.md`.
+
+### 0.15. Изменения v3.14 → v3.15 (2026-07-16) — CATEGORY_DETAIL table-format fix
+
+1. Controlled Telegram E2E canonical SOUL подтвердил Message 1 = PASS. Message 2
+   совпал по суммам, товарам, units (`pcs → та`), missing quantity, identity и
+   отсутствию technical traces, но summary категории был маркированным списком
+   вместо обязательной таблицы — **LIVE FAIL только по формату**.
+2. Cleanup и rollback прошли PASS. VPS снова использует Stage 5.1 baseline:
+   21 tools, plugin 1.0.4, migration 002, прежний runtime SKILL; marker fixtures
+   удалены, DB baseline восстановлен.
+3. В единственной decision-table `CATEGORY_DETAIL` узко закреплено: summary только
+   отдельной Markdown-таблицей с точным заголовком
+   `Харажат гуруҳи | Режа | Сарфлангани | Қолгани` и минимум одной строкой;
+   маркированный/list summary запрещён; сразу после summary идёт таблица
+   `Маҳсулот | Миқдор | Сарфлангани`.
+4. Добавлен один короткий правильный пример. `GENERAL_FAMILY_REPORT`, tools,
+   descriptions, backend, SQL, identity plugin, Hermes core и остальные правила
+   SOUL не менялись. Stage 5.3–6 не затронуты.
+5. Permanent contracts теперь проверяют правила непосредственно в строке
+   `CATEGORY_DETAIL` и в реально собранном Telegram effective prompt; единственный
+   tracked prompt-source остаётся `SOUL.md`, truncation отсутствует.
+6. Offline verification: focused = **12 passed**; full `pytest -q` =
+   **160 passed, 2 skipped**; `ruff check .`,
+   `python -m compileall -q backend tests`, `git diff --check` — PASS.
+   Repo canonical LF SOUL SHA-256 =
+   `a9b584e14d704f08b4778b7928ca71a0cf095394583f769c5e9571097884b4e4`.
+7. **Stage 5.2 = OFFLINE PASS / LIVE PENDING.** Commit, VPS deploy,
+   Telegram/API retest и push в этой задаче не выполнялись. Evidence:
+   `../EVIDENCE_STAGE_5_2_CATEGORY_TABLE_FIX_2026-07-16.md`.
 
 Исполнитель реализует проект **строго по разделам 5–21**, сдаёт этапами (раздел 15) и на каждом этапе выполняет acceptance criteria. Что делать запрещено — раздел 20.
 
@@ -1268,9 +1297,9 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 
 > **Статус v3.9: CLOSED / LIVE PASS.** Repo и VPS runtime = **21 tools / plugin 1.0.4**; migration 002 применена; canonical SKILL и skill-protect активны. Controlled E2E подтвердил quantity/unit, analytics, compare/trend, budget plan/fact и identity; cleanup восстановил DB baseline. Evidence: `../EVIDENCE_STAGE_5_1_LIVE_2026-07-13.md`.
 
-### Этап 5.2 — Простые семейные отчёты для Ойижон (v3.14)
+### Этап 5.2 — Простые семейные отчёты для Ойижон (v3.15)
 
-**Статус: OFFLINE PASS / LIVE PENDING.** Единственный canonical prompt — profile `SOUL.md`; repo SHA = `713021c2cfd6c3abff206b6a79ec7423c06c6920645ce4a6c2d31158a108c98a`; effective assembled Telegram prompt contract PASS без truncation. После rollback VPS использует прежний Stage 5.1 SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; новый SOUL не развёрнут, новая session не создавалась, повторный Telegram E2E не выполнялся.
+**Статус: OFFLINE PASS / LIVE PENDING.** Единственный canonical prompt — profile `SOUL.md`; repo LF SHA = `a9b584e14d704f08b4778b7928ca71a0cf095394583f769c5e9571097884b4e4`; effective assembled Telegram prompt contract PASS без truncation. Controlled live: Message 1 PASS, Message 2 FAIL только из-за списка вместо обязательной category-summary таблицы; cleanup/rollback PASS. VPS снова использует Stage 5.1 SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; narrow fix не развёрнут, повторный E2E после fix не выполнялся.
 
 **Язык для Ойижон:** сложные термины заменяются только в user-facing тексте: бюджет → `оила харажатлари режаси`; план → `режа`; факт → `амалда сарфланган / сарфланди`; остаток → `қолган пул`; категория → `харажат гуруҳи`; отклонение → `режадан кўп ёки кам`; тренд → `ойлар бўйича ўзгариш`; аналитика → `ҳисоб-китобни кўриб чиқиш`. Внутренние tool fields/contracts остаются техническими.
 

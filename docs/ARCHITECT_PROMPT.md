@@ -30,9 +30,9 @@
   кириллица и только текстом (TTS отключён, v3.2; голосовой ввод остаётся).
   Точные данные — только через tools. Сомнительные суммы — переспрос.
   Медицина без диагноза + алерт админу. Бюджет 10–15 USD/мес.
-- Current ТЗ: **v3.14**. Stage 5.1 = **CLOSED / LIVE PASS**; Stage 5.2 = **OFFLINE PASS / LIVE PENDING**; Stage 5.3–6 = **PLANNED / NOT IMPLEMENTED**.
-- Repo canonical SOUL SHA = `713021c2cfd6c3abff206b6a79ec7423c06c6920645ce4a6c2d31158a108c98a`; VPS runtime legacy SKILL SHA = `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`.
-- Current runtime: **21 tools / plugin 1.0.4 / migration 002**. Migrations 003/004/005 и counts 22/25/27 — только planned; Stage 5.2 deploy и повторный Telegram E2E ещё не выполнялись.
+- Current ТЗ: **v3.15**. Stage 5.1 = **CLOSED / LIVE PASS**; Stage 5.2 = **OFFLINE PASS / LIVE PENDING**; Stage 5.3–6 = **PLANNED / NOT IMPLEMENTED**.
+- Repo canonical LF SOUL SHA = `a9b584e14d704f08b4778b7928ca71a0cf095394583f769c5e9571097884b4e4`; VPS runtime legacy SKILL SHA = `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`.
+- Previous controlled live: Message 1 PASS, Message 2 category-summary format-only FAIL, cleanup/rollback PASS. Current runtime: **21 tools / plugin 1.0.4 / migration 002**; narrow fix не развёрнут. Migrations 003/004/005 и counts 22/25/27 — только planned.
 - Utility integration только read-only после исследования official cabinet;
   credentials никогда не доступны LLM; payments/settings/cards запрещены.
 - User-scoped cron calls требуют deterministic trusted-job identity; unknown

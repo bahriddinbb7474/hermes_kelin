@@ -17,6 +17,13 @@ FINAL_PHRASE = (
 )
 DECISION_TABLE_MARKER = "GENERAL_FAMILY_REPORT"
 AUTO_DETAIL_BAN = "Товарные строки автоматически не показывай"
+CATEGORY_SUMMARY_HEADER = "Харажат гуруҳи | Режа | Сарфлангани | Қолгани"
+PRODUCT_TABLE_HEADER = "Маҳсулот | Миқдор | Сарфлангани"
+CATEGORY_TABLE_ONLY = "summary категории выводи только отдельной Markdown-таблицей"
+BULLET_SUMMARY_BAN = "Маркированный список вместо summary-таблицы запрещён"
+SUMMARY_BEFORE_PRODUCTS = (
+    "Сразу после summary-таблицы выведи таблицу фактических товаров"
+)
 
 
 def main() -> None:
@@ -44,6 +51,11 @@ def main() -> None:
             "pcs_to_ta": full.count("pcs → та"),
             "auto_detail_ban": full.count(AUTO_DETAIL_BAN),
             "stage53_ban": full.count("Product plan не показывай"),
+            "category_summary_header": full.count(CATEGORY_SUMMARY_HEADER),
+            "product_table_header": full.count(PRODUCT_TABLE_HEADER),
+            "category_table_only": full.count(CATEGORY_TABLE_ONLY),
+            "bullet_summary_ban": full.count(BULLET_SUMMARY_BAN),
+            "summary_before_products": full.count(SUMMARY_BEFORE_PRODUCTS),
         },
         "forbidden": {
             "dona": "дона" in full,
