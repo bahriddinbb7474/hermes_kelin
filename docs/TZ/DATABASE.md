@@ -3,7 +3,7 @@
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (DDL всех таблиц — §13).
 Реализация: `backend/sql/001_init.sql` + идемпотентная migration `002_stage51_quantity_budget.sql`. Migration 002 проверена offline двойным применением на чистой PostgreSQL 16 и применена на production/VPS; schema verification = **3 columns / 1 table / 1 index**. Жёсткий DB guard (`tests/db_guard.py`) блокирует destructive tests против production-БД.
 
-**v3.10 design:** migrations 003/004/005 — **PLANNED / NOT IMPLEMENTED**. SQL-файлов и runtime tables для них нет; current schema остаётся 001+002.
+**v3.12 design:** migrations 003/004/005 — **PLANNED / NOT IMPLEMENTED**. SQL-файлов и runtime tables для них нет; current schema остаётся 001+002.
 
 ## Назначение
 
@@ -23,9 +23,11 @@ PostgreSQL хранит точные данные. Hermes memory хранит т
 - `plan_notes` — планы, custom notes, счётчики, если их нужно хранить как факт.
 - `usage_costs` — оценка стоимости STT/TTS/LLM по провайдерам.
 
-### Planned tables v3.10 — не runtime
+### Planned tables v3.12 — не runtime
 
 - Migration 003: `monthly_budget_items` (user/month/category/item, planned quantity/unit/amount; минимум quantity или amount; unique item per month/category) и `monthly_plan_cycles` (status, household size, source, proposal/approval metadata; unique user/month).
+  Planned `monthly_budget_items` дополнительно содержит `reference_unit_price_uzs NUMERIC(14,4) NULL`, `price_basis TEXT NULL CHECK (price_basis IN ('last','average','manual'))`, `price_as_of TIMESTAMPTZ NULL`.
+  История фактических цен остаётся в `transactions`; отдельную таблицу цен сейчас не создавать. `last` и weighted `average` вычисляются из подходящих transactions одного товара и одной unit. При сохранении плана фиксируется snapshot выбранной цены: новый факт покупки не меняет старый план. `planned_amount_uzs` рассчитывается из подтверждённых quantity × snapshot price либо задаётся вручную.
 - Migration 004: `utility_accounts` (service, provider, masked account reference, admin-defined minimum prepaid balance, sync state) и immutable `utility_snapshots` (reading/consumption/billed/prepaid/debt/tariff/observed/source).
 - Migration 005: `recurring_obligations` (internet/loan/tax/utility/other, expected amount, due date, repeat rule, reminder lead, paid/active state).
 - Не хранить одновременно negative prepaid balance и separate debt без утверждённого provider rule; field normalization утверждается после исследования реального кабинета.

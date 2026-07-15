@@ -1,8 +1,8 @@
-# Техническое задание v3.11 — FINAL
+# Техническое задание v3.12 — FINAL
 # Hermes Agent «Мариям» — ИИ келинчак для Ойижон
 
 **Статус:** ФИНАЛЬНЫЙ, единый источник истины (single source of truth)
-**Версия:** 3.11 — offline-реализация Stage 5.2 через canonical SKILL и постоянные contract-тесты (см. 0.11); live deploy/Telegram E2E не выполнялись. Требования planned-этапов Stage 5.2–6 приняты в v3.10 (см. 0.10). Stage 5.1 остаётся CLOSED / LIVE PASS по v3.9 (см. 0.9). 3.8 — offline milestone; 3.7 — требования аналитики; 3.6 — identity binding; 3.5 — silent denial; 3.4 — test-user; 3.3 — Ойижон до handover не подключать; 3.2 — TTS off; 3.1 — ревизия аудита. Имя файла не меняется, документ остаётся единственным источником истины.
+**Версия:** 3.12 — Stage 5.2 live FAIL, утверждённый формат product reports и planned reference prices (см. 0.12). Stage 5.1 остаётся CLOSED / LIVE PASS по v3.9; Stage 5.3–6 и migrations 003/004/005 остаются PLANNED / NOT IMPLEMENTED. Имя файла не меняется, документ остаётся единственным источником истины.
 **Проект:** персональный Telegram ИИ-агент для пожилой женщины из Узбекистана
 **Имя агента:** Мариям · **Образ:** ИИ келинчак
 **Основной пользователь:** Ойижон · **Администратор:** Бахриддин ака
@@ -141,6 +141,17 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
 6. VPS/profile не менялись: runtime остаётся **21 tools / plugin 1.0.4 / migration 002**, runtime SKILL остаётся Stage 5.1 SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4` до отдельно разрешённого deploy.
 7. Telegram E2E и платные API не выполнялись; реальная Ойижон не подключалась.
 8. **Вердикт Stage 5.2: OFFLINE PASS / LIVE PENDING.** Этап не закрыт без отдельного Telegram E2E. Evidence: `../EVIDENCE_STAGE_5_2_OFFLINE_2026-07-14.md`.
+
+### 0.12. Изменения v3.11 → v3.12 (2026-07-15) — отчёты по продуктам и reference prices
+
+1. Controlled Stage 5.2 Telegram test выполнен на временном test-user. Суммы, identity (`requested user_id=0` → effective test-user), узбекская кириллица, отсутствие technical traces и cleanup — PASS.
+2. Общий ответ не содержал обязательную дословную финальную фразу о просмотре деталей — **LIVE FAIL**. Stage 5.2 требует отдельного SKILL/test fix и повторного E2E.
+3. Заказчиком утверждено естественное оформление общего отчёта: короткое вступление, `Сарфланди / Сарфлангани`, `Қолди / Қолгани`, `Жами`, отрицательный остаток с понятным пояснением. Финальная фраза обязательна без пропуска и перефразирования.
+4. Подробный Stage 5.2 отчёт сначала показывает summary выбранной категории, затем только фактические товары. Product plan на Stage 5.2 не показывается. User-facing units: `кг / г / л / мл / та / қадоқ`; canonical units в tools/БД не меняются.
+5. Stage 5.3 остаётся **PLANNED / NOT IMPLEMENTED**: product plan/actual/remaining, последняя, средневзвешенная и ручная цена, price snapshot в planned migration 003; существующие budget tools расширяются без увеличения inventory выше 21.
+6. Новый repo SKILL не создавался. Repo canonical SKILL остаётся `b3afd9ecfb16a4d4618be898573a84c00ae24a1c3b41e8ae57823912b9ac9d18` и ещё не соответствует новым решениям. После rollback VPS использует Stage 5.1 SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`.
+7. Runtime остаётся **21 tools / plugin 1.0.4 / migration 002**; migrations 003/004/005 отсутствуют. Evidence: `../EVIDENCE_STAGE_5_2_LIVE_FAIL_2026-07-15.md`.
+8. **Статус: Stage 5.2 = LIVE FAIL / FIX REQUIRED; Stage 5.3 = PLANNED / NOT IMPLEMENTED.** Реальная Ойижон не подключалась; повторный live test после будущего SKILL-fix ещё не выполнялся.
 
 Исполнитель реализует проект **строго по разделам 5–21**, сдаёт этапами (раздел 15) и на каждом этапе выполняет acceptance criteria. Что делать запрещено — раздел 20.
 
@@ -409,6 +420,12 @@ Backend только проверяет, что `category_code` есть в эт
 
 Мариям отвечает по запросу: «Бугун қанча харажат бўлди?», «Бу ой қанча кетди?», «Гўштга қанча кетди?», «Охирги ҳафта?», «Пенсиядан қанча қолди?» (баланс). Числа берутся из tools, текст пишет Hermes.
 
+**Stage 5.2 — общий отчёт:** допускает короткое вступление, `Сарфланди / Сарфлангани`, `Қолди / Қолгани`, строку `Жами` и отрицательный остаток с простым пояснением. Завершается дословно: `Ойижон, хоҳласангиз, бирор харажат гуруҳини батафсилроқ кўриб чиқамиз. Маълумотлар тайёр.`
+
+**Stage 5.2 — одна группа:** сначала таблица summary `Харажат гуруҳи | Режа | Сарфлангани | Қолгани`, затем фактические товары `Маҳсулот | Миқдор | Сарфлангани`. Missing quantity = `—` или не показывается; количество не угадывается. Product plan на Stage 5.2 не показывается. User-facing units: `kg→кг`, `g→г`, `l→л`, `ml→мл`, `pcs→та`, `pack→қадоқ`.
+
+**Stage 5.3 — PLANNED / NOT IMPLEMENTED:** product table показывает planned quantity/amount, actual quantity/amount и remaining amount. Actual берётся только из transactions. Последняя цена используется по умолчанию для следующего плана; явный запрос возвращает средневзвешенную цену; Ойижон может выбрать average или manual price. Разные units не смешиваются.
+
 ---
 
 ## 8. Напоминания, планы, утро/вечер
@@ -588,7 +605,7 @@ CREATE TABLE monthly_budget_plans (
     UNIQUE (user_id, month, category_code)
 );
 
--- v3.10 PLANNED / NOT IMPLEMENTED — migration 003
+-- v3.12 PLANNED / NOT IMPLEMENTED — migration 003
 CREATE TABLE monthly_budget_items (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -599,6 +616,9 @@ CREATE TABLE monthly_budget_items (
     planned_quantity NUMERIC(14,3),
     unit TEXT,
     planned_amount_uzs NUMERIC(14,2),
+    reference_unit_price_uzs NUMERIC(14,4) NULL,
+    price_basis TEXT NULL CHECK (price_basis IN ('last','average','manual')),
+    price_as_of TIMESTAMPTZ NULL,
     note TEXT,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now(),
@@ -606,7 +626,13 @@ CREATE TABLE monthly_budget_items (
     CHECK (planned_quantity IS NOT NULL OR planned_amount_uzs IS NOT NULL)
 );
 
--- v3.10 PLANNED / NOT IMPLEMENTED — migration 003
+-- Planned migration 003 хранит snapshot выбранной reference price вместе с месячным планом.
+-- История фактических покупок и цен остаётся в transactions; отдельная таблица цен сейчас не создаётся.
+-- last и weighted average вычисляются только по одному normalized item и одной одинаковой unit
+-- при наличии amount, quantity и unit. Новый факт покупки не меняет старый plan snapshot.
+-- planned_amount_uzs рассчитывается из подтверждённых quantity × reference price либо задаётся вручную.
+
+-- v3.12 PLANNED / NOT IMPLEMENTED — migration 003
 CREATE TABLE monthly_plan_cycles (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -725,7 +751,7 @@ CREATE TABLE usage_costs (
 ### 13.2. Миграции и seed (обязательно, v3.1)
 
 - SQL-файлы нумеруются: `001_init.sql`, `002_*.sql`, … Каждый файл **идемпотентен** (`CREATE TABLE IF NOT EXISTS`, `ON CONFLICT DO NOTHING`).
-- **Текущий runtime:** migration 001 + 002 active. **План v3.10:** migration 003 (`monthly_budget_items`, `monthly_plan_cycles`), 004 (`utility_accounts`, `utility_snapshots`) и 005 (`recurring_obligations`) — **PLANNED / NOT IMPLEMENTED**; файлов и production schema для них ещё нет.
+- **Текущий runtime:** migration 001 + 002 active. **План v3.12:** migration 003 (`monthly_budget_items` с price snapshot, `monthly_plan_cycles`), 004 (`utility_accounts`, `utility_snapshots`) и 005 (`recurring_obligations`) — **PLANNED / NOT IMPLEMENTED**; файлов и production schema для них ещё нет.
 - Для utility snapshots правило отрицательного prepaid balance против отдельного debt утверждается только после исследования реального кабинета; без явного provider rule одновременно хранить оба представления долга запрещено.
 - `docker-entrypoint-initdb.d` применяет скрипты **только при первом создании volume**. Любое изменение схемы после этого применяется вручную: `docker compose exec hermes_mariyam_postgres psql -U hermes -d hermes -f /docker-entrypoint-initdb.d/00N_*.sql`. Эта команда документируется в deploy-доке.
 - **Seed пользователей (v3.4):** обязателен `role=admin` (Бахриддин ака) — до первого реального вызова tools в таблице `users` он должен существовать. Опционально разрешён **временный test-user** для end-to-end тестов: `role=oyijon`, `display_name="Тест Ойижон"`, **только на втором Telegram-аккаунте, контролируемом заказчиком** (не реальная Ойижон). Настоящий ID Ойижон и настоящий seed `role=oyijon` выполняются **только при handover** (§0.4, §21). Создание — через tool `ensure_user` (см. 15.15) при настройке профиля Hermes, либо документированным SQL-скриптом в deploy-доке. Перед handover временный test-user и его данные удаляются. Первый вызов `save_expense` на пустой таблице `users` (без admin) не должен быть возможен «по недосмотру».
@@ -999,12 +1025,13 @@ err: { "ok": false, "error_code": "INVALID_INPUT", ... }  // role не из ('oy
 
 **Stage 5.1 runtime (21, LIVE PASS):** + `set_monthly_budget`, `get_monthly_budget_status` (user-scoped; identity guard обязателен). Оба tools развёрнуты и обнаружены реальным MCP discovery.
 
-### 15.16. Planned contracts v3.10 — NOT IMPLEMENTED
+### 15.16. Planned contracts v3.12 — NOT IMPLEMENTED
 
 **Stage 5.3 (tool count остаётся 21):**
 
-- `set_monthly_budget` получает optional `items[]`; каждый item содержит название, optional planned quantity/unit, optional planned amount и note. Минимум одно из `planned_quantity` или `planned_amount_uzs` обязательно; разные units не смешиваются.
-- `get_monthly_budget_status` получает optional `include_items=true` и возвращает planned/actual quantity и amount по товарам. Неизвестные значения возвращаются `null`, а не нулём.
+- `set_monthly_budget` получает optional `items[]`; каждый item может содержать `item_name_normalized`, `item_name_display`, `planned_quantity`, `unit`, `planned_amount_uzs`, `reference_unit_price_uzs`, `price_basis`, `price_as_of`, `note`. Минимум одно из `planned_quantity` или `planned_amount_uzs` обязательно.
+- `get_monthly_budget_status(include_items=true)` возвращает `planned_quantity`, `planned_unit`, `planned_amount_uzs`, `actual_quantity`, `actual_unit`, `actual_amount_uzs`, `remaining_amount_uzs`, `last_unit_price_uzs`, `average_unit_price_uzs`, `reference_unit_price_uzs`, `price_basis`, `price_as_of`. Unknown = `null`, не 0.
+- Backend считает last и weighted average только по точным transactions одного товара/одной unit, сохраняет snapshot плана и не пишет прозу. Hermes предлагает last по умолчанию, спрашивает подтверждение и принимает `average` или `manual` override. Ценовая логика не хранится в LLM memory.
 
 **Stage 5.3A (+1 → planned 22):**
 
@@ -1194,29 +1221,31 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 
 > **Статус v3.9: CLOSED / LIVE PASS.** Repo и VPS runtime = **21 tools / plugin 1.0.4**; migration 002 применена; canonical SKILL и skill-protect активны. Controlled E2E подтвердил quantity/unit, analytics, compare/trend, budget plan/fact и identity; cleanup восстановил DB baseline. Evidence: `../EVIDENCE_STAGE_5_1_LIVE_2026-07-13.md`.
 
-### Этап 5.2 — Простые семейные отчёты для Ойижон (v3.10 requirements; v3.11 offline status)
+### Этап 5.2 — Простые семейные отчёты для Ойижон (v3.12)
 
-**Статус: OFFLINE PASS / LIVE PENDING.** Canonical `skills/mariyam/SKILL.md`, Stage 5.2 contract-тесты и SHA-защита готовы offline; inventory остаётся 21. VPS/profile не менялись, Telegram E2E не выполнялся, поэтому Stage 5.2 не CLOSED и не LIVE PASS.
+**Статус: LIVE FAIL / FIX REQUIRED.** Controlled Telegram E2E подтвердил суммы, identity, язык, отсутствие traces и cleanup, но обязательная финальная фраза отсутствовала. Repo SKILL остаётся SHA `b3afd9ecfb16a4d4618be898573a84c00ae24a1c3b41e8ae57823912b9ac9d18`; после rollback VPS использует Stage 5.1 SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`. Новый SKILL/test fix и повторный E2E ещё не выполнялись.
 
 **Язык для Ойижон:** сложные термины заменяются только в user-facing тексте: бюджет → `оила харажатлари режаси`; план → `режа`; факт → `амалда сарфланган / сарфланди`; остаток → `қолган пул`; категория → `харажат гуруҳи`; отклонение → `режадан кўп ёки кам`; тренд → `ойлар бўйича ўзгариш`; аналитика → `ҳисоб-китобни кўриб чиқиш`. Внутренние tool fields/contracts остаются техническими.
 
 **AC отчёта в течение месяца:**
 
-1. Первый ответ всегда начинается общей таблицей `Харажат гуруҳи | Режа | Сарфланди | Қолди` (минимум озиқ-овқат, дори-дармон, коммунал при наличии данных).
-2. После таблицы ровно один вопрос: `Ойижон, хоҳласангиз, бирор харажат гуруҳини батафсилроқ кўриб чиқамиз. Маълумотлар тайёр.`
+1. Общий ответ показывает plan / spent / remaining по группам. Допустимы короткое вступление, `Сарфланди / Сарфлангани`, `Қолди / Қолгани`, `Жами`, отрицательный остаток с понятным пояснением.
+2. Общий отчёт обязательно заканчивается дословной фразой: `Ойижон, хоҳласангиз, бирор харажат гуруҳини батафсилроқ кўриб чиқамиз. Маълумотлар тайёр.` Её нельзя пропускать или перефразировать.
 3. Детали без просьбы Ойижон не показываются.
-4. По запросу питания таблица: `Маҳсулот | Режада миқдор/сумма | Олинган миқдор/сумма`.
-5. Неизвестное значение = `айтилмаган`, не ноль; разные units не смешивать; quantity не угадывать; суммы только из tools.
-6. JSON, tool names, `plan/fact`, `usage_percent` Ойижон не показывать.
-7. В конце месяца предложить: `Ойижон, вақтингиз бўлганда, кейинги ой учун оила харажатлари режасини бирга кўриб чиқамиз.`
+4. По запросу одной группы сначала summary: `Харажат гуруҳи | Режа | Сарфлангани | Қолгани`; затем фактические товары: `Маҳсулот | Миқдор | Сарфлангани`.
+5. Stage 5.2 не показывает product plan. Quantity показывается только из данных; missing quantity = `—` или не показывается; quantity не угадывать.
+6. User-facing units: `кг / г / л / мл / та / қадоқ`; canonical units остаются `kg / g / l / ml / pcs / pack`.
+7. JSON, tool names, technical fields и traces Ойижон не показывать; суммы только из tools.
 
-### Этап 5.3 — Семейный и продуктовый план (v3.10)
+### Этап 5.3 — Семейный и продуктовый план (v3.12 planned contract)
 
 **Статус: PLANNED / NOT IMPLEMENTED.** Migration 003 planned; существующие tool contracts расширяются, tool count остаётся **21**.
 
 **Диалог:** Hermes спрашивает последовательно, не анкетой: (1) household size; (2) доступная общая сумма; (3) известные обязательные платежи; (4) основные продукты; (5) явно сообщённые ограничения питания; (6) показывает draft; (7) сохраняет только после подтверждения.
 
-**Продуктовый план:** item name, planned quantity/unit/amount, actual quantity/amount. Для каждого item обязательно минимум одно planned value: quantity или amount. Unknown = null/`айтилмаган`; quantity не угадывать; units не смешивать.
+**Продуктовый план:** сначала summary категории, затем таблица `Маҳсулот | Режа миқдор | Режа сўм | Сарфланган миқдор | Сарфланган сўм | Қолди сўм`. Для каждого item обязательно минимум одно planned value: quantity или amount. Actual quantity берётся только из transactions; quantity не угадывать; units не смешивать; remaining amount считает backend из точных данных.
+
+**Reference prices:** последняя цена = amount / quantity самой поздней подходящей покупки; средняя — только средневзвешенная, сумма покупок / общее количество одного товара в одной unit. Без normalized item, amount, quantity и unit цену не считать. Следующий план использует last по умолчанию; Ойижон может выбрать average или manual. Snapshot сохраняется в planned migration 003 и не меняется от будущих покупок.
 
 **Nutrition guidance AC:**
 
@@ -1227,7 +1256,7 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 5. При медицинских ограничениях рекомендовать согласовать рацион с врачом.
 6. Точные quantities сохранять только после подтверждения семьи.
 
-**Storage/tools AC:** migration 003 создаёт `monthly_budget_items`; `set_monthly_budget` принимает optional `items[]`; `get_monthly_budget_status(include_items=true)` возвращает product plan/actual. Runtime discovery по-прежнему = 21.
+**Storage/tools AC:** planned migration 003 создаёт `monthly_budget_items` с `reference_unit_price_uzs`, `price_basis`, `price_as_of`; `set_monthly_budget` принимает optional `items[]`; `get_monthly_budget_status(include_items=true)` возвращает product plan/actual/remaining и last/average/reference price. Runtime discovery по-прежнему = 21; migration 003 не создана и не применена.
 
 ### Этап 5.3A — Цикл утверждения плана 25/27/28/1 (v3.10)
 

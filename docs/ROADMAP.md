@@ -4,7 +4,7 @@
 
 ## MVP этапы (нумерация = ТЗ §21)
 
-| Этап | Что | Статус (2026-07-14) |
+| Этап | Что | Статус (2026-07-15) |
 |---|---|---|
 | 0 | Подготовка данных: доступы, Telegram ID админа (ID Ойижон — перед передачей), voice samples, категории, бюджет | 🟡 частично выполнен — есть ID админа, bot token, VPS, бюджет, voice-samples; ID Ойижон отложен до handover (v3.4) |
 | 1 | VPS + Hermes + Telegram: установка, профиль, allowlist, автозапуск. Текущий allowlist: **admin + временный test-user «Тест Ойижон»** для e2e-тестов (§0.4); реальная Ойижон не подключается до handover | ✅ **закрыт по решению заказчика (2026-07-12, ТЗ v3.5)**: Gateway/live reply/allowlist/systemd/linger/reboot PASS; feature-ветка merged в `main`, accepted commits синхронизированы с origin. |
@@ -14,8 +14,8 @@
 | 4 | Backend tools (MCP) + БД | ✅ выполнен полностью (2026-07-12): на момент Stage 4 acceptance backend/PostgreSQL и real Hermes имели ровно 19 tools; 4 test markers, systemd verify, real tool-calls и идемпотентный `ensure_user` PASS. Current runtime после Stage 5.1 = 21. |
 | 5 | Бухгалтерия: расходы/доходы/отчёты/баланс/исправление/удаление | ✅ **закрыт (2026-07-13):** на момент acceptance identity guard **1.0.3**, runtime tools **19**; Telegram E2E 4/4 PASS; evidence `EVIDENCE_STAGE_5_E2E_2026-07-12.md`. Текущий runtime после Stage 5.1 указан следующей строкой. |
 | 5.1 | Аналитика расходов + месячный план (quantity/unit, compare/trend, plan/fact, осторожные советы) | ✅ **CLOSED / LIVE PASS** (ТЗ v3.9 §0.9): migration 002 active; tools/dispatch/discovery **21/21/21**; plugin **1.0.4**; canonical SKILL + skill-protect active; controlled E2E и cleanup PASS. |
-| 5.2 | Простые family reports для Ойижон: user-friendly terms, общий отчёт сначала, product details по просьбе | 🟡 **OFFLINE PASS / LIVE PENDING**; canonical SKILL + contract-тесты готовы, inventory 21; VPS/profile и Telegram не менялись |
-| 5.3 | Семейный/product plan, nutrition source/cache, product quantities/amounts | ⬜ **PLANNED / NOT IMPLEMENTED**; migration 003 planned; tool count остаётся 21 |
+| 5.2 | Простые family reports для Ойижон: общий отчёт и фактические product details по просьбе | 🔴 **LIVE FAIL / FIX REQUIRED**; суммы/identity/язык/cleanup PASS, обязательная финальная фраза отсутствовала; SKILL/test fix и повторный E2E впереди |
+| 5.3 | Семейный/product plan, product quantities/amounts, last/weighted average/manual reference price | ⬜ **PLANNED / NOT IMPLEMENTED**; migration 003 + price snapshot planned; tool count остаётся 21 |
 | 5.3A | Approval cycle 25/27/28/1, `approve_monthly_plan`, deterministic cron identity | ⬜ **PLANNED / NOT IMPLEMENTED**; migration 003 cycles; planned count 22 |
 | 5.4 | Official utility cabinets read-only, thresholds/snapshots, daily sync | ⬜ **PLANNED / NOT IMPLEMENTED**; research gate + migration 004; planned count 25 |
 | 6 | Hermes cron: reminders, recurring obligations, утро/вечер, новости, погода, намаз | ⬜ **PLANNED / NOT IMPLEMENTED**; migration 005 + 2 tools; planned final count 27; current runtime 21 |
@@ -27,9 +27,9 @@
 - **Очистка test data production-БД** — на момент Блока 6З оставался только `admin`, fixture tables были пусты, backup сохранён; позднее для pre-handover E2E добавлен временный test-user.
 - **DB guard** — в `main` (`tests/db_guard.py`); destructive suite на production-БД не запускался.
 - **Identity guard на момент Stage 5: 1.0.3** — Stage 5 E2E PASS (см. historical evidence); текущий runtime после Stage 5.1 = 1.0.4.
-- **Этап 5.1** — **CLOSED / LIVE PASS** (решение v3.9, сохранено v3.11): runtime 21/1.0.4; migration 002 и skill-protect active; live E2E/cleanup PASS.
-- **Этап 5.2** — **OFFLINE PASS / LIVE PENDING** (v3.11): repo SKILL SHA `b3afd9ec…`; targeted 110 passed, full suite 159 passed / 2 skipped; runtime/VPS без изменений, Telegram E2E не выполнялся.
-- **Stages 5.3–6 planned only (v3.10):** migrations 003/004/005, utility connector, approval/obligation tools и cron jobs не реализованы; tool count 27 не является runtime.
+- **Этап 5.1** — **CLOSED / LIVE PASS** (решение v3.9, сохранено v3.12): runtime 21/1.0.4; migration 002 и skill-protect active; live E2E/cleanup PASS.
+- **Этап 5.2** — **LIVE FAIL / FIX REQUIRED** (v3.12): repo SKILL SHA `b3afd9ecfb16a4d4618be898573a84c00ae24a1c3b41e8ae57823912b9ac9d18`; VPS после rollback SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; новый SKILL/test fix и повторный live test ещё не выполнялись.
+- **Stages 5.3–6 planned only (v3.12):** migrations 003/004/005, price snapshot, utility connector, approval/obligation tools и cron jobs не реализованы; tool count 27 не является runtime.
 - **Skill-protect:** active 4/4; постоянные SHA/contract tests остаются обязательными.
 - **Тихая блокировка unauthorized решена в ТЗ v3.5** — `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (решение заказчика 2026-07-12, ТЗ §0.5); отдельный gateway-fork не требуется; аудит и merge `d24d01c` в `main` **ВЫПОЛНЕНЫ** (через `dd9261e`).
 

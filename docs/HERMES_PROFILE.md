@@ -8,9 +8,9 @@
 
 **Статус выполнения (2026-07-14):** шаги 1–9 выполнены — Hermes v0.18.2, профиль создан, allowlist = **admin + временный test-user «Тест Ойижон»** (второй аккаунт заказчика, role=oyijon, ТЗ §0.4), canonical skill установлен, stdio MCP `mariyam_backend` зарегистрирован (`hermes tools` = ровно 21), seed admin идемпотентен, Telegram Gateway `active`/`enabled`, reboot/autostart пройден. **Шаг 10 (AC 20 фраз через Telegram) — PARTIAL 8/20, НЕ закрыт** (8/8 кириллица на выборке; см. EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md).
 
-> **Stage 5.1 status (2026-07-14): CLOSED / LIVE PASS.** VPS/profile = tools **21**, plugin **1.0.4**, migration 002 active, SKILL SHA `b1231182…`, skill-protect **4/4**, `tool_progress` off. Controlled E2E и cleanup PASS.
+> **Stage 5.1 status (2026-07-15): CLOSED / LIVE PASS.** VPS/profile = tools **21**, plugin **1.0.4**, migration 002 active, SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, skill-protect **4/4**, `tool_progress` off. Controlled E2E и cleanup PASS.
 
-> **v3.11 offline:** Stage 5.2 = **OFFLINE PASS / LIVE PENDING**. Repo SKILL SHA `b3afd9ec…`; profile/runtime не менялись и остаются на `b1231182…`, 21 tools, plugin 1.0.4, migration 002. Telegram E2E не выполнялся. Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**.
+> **ТЗ v3.12:** Stage 5.2 = **LIVE FAIL / FIX REQUIRED**. Controlled E2E выполнен; после rollback profile/runtime остаются на `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, 21 tools, plugin 1.0.4, migration 002. Repo SKILL остаётся `b3afd9ecfb16a4d4618be898573a84c00ae24a1c3b41e8ae57823912b9ac9d18`; новый fix и повторный live test ещё не выполнялись. Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Реальная Ойижон не подключалась.
 
 **Модель профиля:** `gpt-5.6-luna` через api.n1n.ai (`provider: custom`, `base_url: https://api.n1n.ai/v1`, ключ `N1N_API_KEY` в профильном `.env`, 600). Резерв: `deepseek/deepseek-v4-flash` (DECISIONS.md, 2026-07-12).
 
@@ -45,9 +45,9 @@
 9. Настроить автозапуск Hermes (systemd user-service + `loginctl enable-linger`), проверить подъём после `reboot`.
 10. Прогнать AC Этапа 2: 20 тест-фраз → ответы только узбекская кириллица (0 латинских букв).
 
-### Stage 5.2 offline и planned profile gates — не выполнять сейчас
+### Stage 5.2 fix и planned profile gates — не выполнять сейчас
 
-- Stage 5.2: repo wording и tests готовы; установка SKILL в profile, restart и Telegram E2E — только по отдельному разрешению.
+- Stage 5.2: canonical SKILL/tests ещё не приведены к решениям v3.12; изменение, установка в profile, restart и повторный Telegram E2E — только отдельной задачей и по отдельному разрешению.
 - Stage 5.3A: до создания cron cycle проверить Hermes v0.18.2 cron identity; trusted job id → private mapping 0600 → internal user id; unknown job fail closed.
 - Stage 5.4: utility credentials не помещать в profile/model-visible env; только VPS connector secrets. Hermes browser с открытыми credentials запрещён.
 - Vision smoke перед handover сначала через native image input текущего model path; отдельная vision-модель только после фактического FAIL.

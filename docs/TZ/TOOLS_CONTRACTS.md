@@ -3,7 +3,7 @@
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (полные примеры вход/выход — §15).
 Реализация: `backend/server.py` + `backend/db.py`. **Repo/VPS runtime: 21 tools; dispatch/MCP discovery = 21/21; Stage 5.1 CLOSED / LIVE PASS.** Новые tools: `set_monthly_budget`, `get_monthly_budget_status`.
 
-**v3.10 planned progression:** Stage 5.3 = 21, Stage 5.3A = 22, Stage 5.4 = 25, Stage 6 = 27. Всё сверх текущих 21 — **PLANNED / NOT IMPLEMENTED** и отсутствует в runtime discovery.
+**v3.12 planned progression:** Stage 5.3 = 21, Stage 5.3A = 22, Stage 5.4 = 25, Stage 6 = 27. Всё сверх текущих 21 — **PLANNED / NOT IMPLEMENTED** и отсутствует в runtime discovery.
 
 ## Общие правила
 
@@ -43,12 +43,14 @@
 
 **get_expense_report (out extras):** `by_item` (total_uzs, purchase_count, quantity_by_unit, average_unit_price_uzs if homogeneous), `previous_period` (change_percent=null if prev total=0), `monthly_series`.
 
-## Planned contract extensions v3.10
+## Planned contract extensions v3.12
 
 ### Stage 5.3 — без новых tools, runtime count остаётся 21
 
-- `set_monthly_budget`: optional `items[]` с display/normalized name, planned quantity/unit, planned amount, note; минимум quantity или amount.
-- `get_monthly_budget_status`: optional `include_items=true`; возвращает product planned/actual quantity и amount; unknown = null, не 0; разные units не смешивать.
+- `set_monthly_budget`: optional `items[]`; каждый planned item может содержать `item_name_normalized`, `item_name_display`, `planned_quantity`, `unit`, `planned_amount_uzs`, `reference_unit_price_uzs`, `price_basis`, `price_as_of`, `note`. Минимум одно из `planned_quantity` или `planned_amount_uzs` обязательно.
+- `get_monthly_budget_status(include_items=true)` возвращает по item: `planned_quantity`, `planned_unit`, `planned_amount_uzs`, `actual_quantity`, `actual_unit`, `actual_amount_uzs`, `remaining_amount_uzs`, `last_unit_price_uzs`, `average_unit_price_uzs`, `reference_unit_price_uzs`, `price_basis`, `price_as_of`. Unknown = `null`, не `0`; разные units не смешиваются.
+- Backend считает точные числа, последнюю и средневзвешенную цену из transactions и сохраняет price snapshot плана; backend не пишет прозу. Цена рассчитывается только при наличии normalized item, amount, quantity и unit.
+- Hermes объясняет данные, предлагает last price по умолчанию, спрашивает подтверждение и принимает `average` или `manual` override. Ценовая логика не хранится в LLM memory.
 
 ### Stage 5.3A — +1, planned 22
 

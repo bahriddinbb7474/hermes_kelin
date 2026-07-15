@@ -2,7 +2,7 @@
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md`
 
-**Статус v3.10:** архитектура не меняется. Stage 5.1 — **CLOSED / LIVE PASS**; current repo/VPS runtime = 21 tools / plugin 1.0.4, migration 002 и skill-protect active. Stage 5.2–6 additions ниже — **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют.
+**Статус v3.12:** архитектура не меняется. Stage 5.1 — **CLOSED / LIVE PASS**. Stage 5.2 — **LIVE FAIL / FIX REQUIRED**: repo SKILL SHA `b3afd9ecfb16a4d4618be898573a84c00ae24a1c3b41e8ae57823912b9ac9d18`, после rollback VPS SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; повторный live test после будущего fix ещё не выполнялся. Stage 5.3–6 — **PLANNED / NOT IMPLEMENTED**. Current runtime = 21 tools / plugin 1.0.4 / migration 002; migrations 003/004/005 отсутствуют; реальная Ойижон не подключалась.
 
 ## Принцип Hermes-first
 
@@ -66,6 +66,8 @@ Hermes cron job
 Unknown cron job блокируется fail closed до downstream tool. Utility access: official API → official export/endpoint → узкий deterministic read-only connector. Credentials остаются в VPS secrets и не видны LLM. Hermes browser с открытыми credentials запрещён. Hermes core, backend router/orchestrator и backend scheduler не добавляются.
 
 Planned tool progression: Stage 5.3 = 21 (расширение существующих contracts), Stage 5.3A = 22, Stage 5.4 = 25, Stage 6 extension = 27. **Текущий runtime = 21.**
+
+Planned Stage 5.3 сохраняет reference price snapshot в `monthly_budget_items`: backend считает last/weighted average из transactions и сохраняет выбранный `last / average / manual`; Hermes объясняет и спрашивает подтверждение. Отдельная price table и ценовая логика в LLM memory не создаются.
 
 ## Запрещённые backend-heavy решения
 

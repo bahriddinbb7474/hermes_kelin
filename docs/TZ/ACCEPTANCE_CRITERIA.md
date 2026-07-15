@@ -68,23 +68,36 @@ AC (измеримые):
 11. Identity guard на все новые user-scoped tools (`set_monthly_budget`, `get_monthly_budget_status`).
 12. Реальная Ойижон до handover не подключается.
 
-### 5.2. Простые семейные отчёты — OFFLINE PASS / LIVE PENDING
+### 5.2. Простые семейные отчёты — LIVE FAIL / FIX REQUIRED
 
-1. Первый ответ — общая таблица `Харажат гуруҳи | Режа | Сарфланди | Қолди`, затем ровно один мягкий вопрос о деталях.
-2. Product details только по просьбе; питание раскрывается по товарам. Planned quantity/amount показывается только из точного tool result, иначе `айтилмаган`.
-3. Unknown = `айтилмаган`, не 0; units не смешиваются; quantity не угадывается; суммы только tools.
-4. User-facing текст не содержит JSON, tool names, `plan/fact`, `usage_percent` и сложные финансовые термины.
-5. Canonical SKILL и постоянные Stage 5.2 contract-тесты готовы offline; SHA-защита обновлена; inventory = 21 tools.
-6. Backend, БД, plugin и Hermes core не изменены; migration 002 остаётся active, migrations 003/004/005 отсутствуют.
-7. VPS/profile не менялись, Telegram E2E и платные API не выполнялись, реальная Ойижон не подключалась. До отдельного E2E этап не закрыт.
+**Общий отчёт:**
+
+1. Показывает plan / spent / remaining по группам из точных tool-данных.
+2. Допускает короткое естественное вступление и строку `Жами`.
+3. Допускает `Сарфланди` или `Сарфлангани`, `Қолди` или `Қолгани`.
+4. Отрицательный остаток допустим, если превышение рядом объяснено простыми словами.
+5. После отчёта обязательна точная финальная фраза: `Ойижон, хоҳласангиз, бирор харажат гуруҳини батафсилроқ кўриб чиқамиз. Маълумотлар тайёр.` Её нельзя пропускать или перефразировать.
+6. Товарные детали автоматически не показываются.
+
+**Подробный отчёт по одной группе:**
+
+1. Сначала показывает summary выбранной категории: `Харажат гуруҳи | Режа | Сарфлангани | Қолгани`.
+2. Затем показывает фактические товары: `Маҳсулот | Миқдор | Сарфлангани`.
+3. Количество показывается только при наличии данных; missing quantity = `—` или поле не показывается; количество не угадывается.
+4. User-facing units: `кг / г / л / мл / та / қадоқ`; canonical units в tools/БД остаются `kg / g / l / ml / pcs / pack`.
+5. Product plan в Stage 5.2 не показывается.
+6. JSON, tool names, technical fields и traces отсутствуют; суммы берутся только из tools.
+
+Controlled Telegram E2E подтвердил суммы, identity, кириллицу, отсутствие traces и cleanup, но общий ответ не содержал обязательную финальную фразу. После rollback runtime восстановлен; новый repo SKILL не создавался. До отдельного SKILL/test fix и успешного повторного E2E этап не закрыт. Evidence: `../EVIDENCE_STAGE_5_2_LIVE_FAIL_2026-07-15.md`.
 
 ### 5.3. Семейный и продуктовый план — PLANNED / NOT IMPLEMENTED
 
 1. Семь вопросов/шагов задаются последовательно; save только после подтверждения draft.
-2. Item содержит planned/actual quantity/unit/amount; минимум planned quantity или amount.
+2. Product report содержит summary категории, затем `Режа миқдор | Режа сўм | Сарфланган миқдор | Сарфланган сўм | Қолди сўм`; минимум planned quantity или planned amount.
 3. Один nutrition web search на cycle, cache 30 дней, WHO/FAO/официальный Минздрав Узбекистана, source+date.
 4. Нет diagnosis/treatment diet/universal meat norm; medical restrictions → согласовать с врачом; exact quantities только после family confirmation.
-5. Migration 003 и product contracts реализованы и протестированы только в будущем этапе; tool count после Stage 5.3 остаётся 21.
+5. Последняя цена используется для следующего плана по умолчанию; явный запрос возвращает средневзвешенную цену; разрешён manual override. Без quantity unit price не считается, разные units не смешиваются.
+6. Migration 003, price snapshot и product contracts реализуются и тестируются только в будущем этапе; tool count после Stage 5.3 остаётся 21.
 
 ### 5.3A. Утверждение 25/27/28/1 — PLANNED / NOT IMPLEMENTED
 
