@@ -1,8 +1,8 @@
-# Техническое задание v3.13 — FINAL
+# Техническое задание v3.14 — FINAL
 # Hermes Agent «Мариям» — ИИ келинчак для Ойижон
 
 **Статус:** ФИНАЛЬНЫЙ, единый источник истины (single source of truth)
-**Версия:** 3.13 — Stage 5.2 SKILL/test fix прошёл offline verification; live deploy/E2E остаётся pending (см. 0.13). Stage 5.1 остаётся CLOSED / LIVE PASS по v3.9; Stage 5.3–6 и migrations 003/004/005 остаются PLANNED / NOT IMPLEMENTED. Имя файла не меняется, документ остаётся единственным источником истины.
+**Версия:** 3.14 — deterministic SOUL prompt fix прошёл offline verification; live deploy/E2E остаётся pending (см. 0.14). Stage 5.1 остаётся CLOSED / LIVE PASS по v3.9; Stage 5.3–6 и migrations 003/004/005 остаются PLANNED / NOT IMPLEMENTED. Имя файла не меняется, документ остаётся единственным источником истины.
 **Проект:** персональный Telegram ИИ-агент для пожилой женщины из Узбекистана
 **Имя агента:** Мариям · **Образ:** ИИ келинчак
 **Основной пользователь:** Ойижон · **Администратор:** Бахриддин ака
@@ -165,6 +165,40 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
 6. VPS/profile не менялись: runtime остаётся **21 tools / plugin 1.0.4 / migration 002**, runtime SKILL остаётся Stage 5.1 SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`.
 7. Deploy, Telegram/API E2E и платные model calls не выполнялись; реальная Ойижон не подключалась.
 8. **Статус: Stage 5.2 = OFFLINE PASS / LIVE PENDING; Stage 5.3–6 = PLANNED / NOT IMPLEMENTED.** Для live acceptance нужны отдельно разрешённые deploy и повторный Telegram E2E.
+
+### 0.14. Изменения v3.13 → v3.14 (2026-07-15) — deterministic effective prompt
+
+1. Read-only аудит Hermes v0.18.2 (`3b2ef789`) доказал: `SKILL.md` body не
+   входит в system prompt; доступен только skill index/description и последующий
+   `skill_view`. При `agent.disabled_toolsets: [skills]` отсутствуют и индекс, и
+   путь чтения. `skills.enabled` не является loader key v0.18.2.
+2. Проваленная Telegram session была создана до deploy и сохранила старый
+   `sessions.system_prompt`; restart Gateway не создал новую session/prompt.
+   Фактические calls: `session_search`, затем `get_expense_report`; вызова
+   `get_monthly_budget_status` не было. Всего 3 model requests / `$0.058928`.
+3. Единственный canonical repo-source теперь
+   `deploy/hermes_profile_mariyam_oyijon/SOUL.md`; прежний
+   `skills/mariyam/SKILL.md` удалён. SOUL — гарантированный slot profile identity.
+4. Контракт отчётов сведён к одной decision-table: general family report →
+   `get_monthly_budget_status`; category detail → budget summary + фактические
+   items; automatic items запрещены; `pcs → та`; обязательная финальная фраза;
+   product plan/Stage 5.3 не показываются.
+5. Backend, tool descriptions/contracts, SQL, identity plugin и Hermes core не
+   менялись. Tool count остаётся 21; migration 002 остаётся active; migrations
+   003/004/005 отсутствуют.
+6. Permanent effective-prompt test собирает Telegram prompt через реальный
+   `build_system_prompt_parts()`: полный SOUL присутствует, truncation отсутствует,
+   critical markers присутствуют, conflicting markers отсутствуют.
+7. Offline verification: effective-prompt/Stage 5.1/Stage 5.2/identity/medical/
+   language targeted = **117 passed**; full `pytest -q` = **159 passed, 2 skipped**;
+   `ruff check .`, `python -m compileall -q backend tests`, `git diff --check` — PASS.
+   Repo SOUL SHA-256 = `713021c2cfd6c3abff206b6a79ec7423c06c6920645ce4a6c2d31158a108c98a`.
+8. VPS/profile не менялись; новых Telegram/API calls не было. Будущий live gate:
+   deploy → offline prompt preflight без API → `/new` → первый controlled turn →
+   read-only SHA/marker check новой `sessions.system_prompt` → остальные E2E.
+   До первого agent turn persisted prompt ещё не заполнен.
+   **Stage 5.2 = OFFLINE PASS / LIVE PENDING.** Evidence:
+   `../EVIDENCE_STAGE_5_2_PROMPT_FIX_2026-07-15.md`.
 
 Исполнитель реализует проект **строго по разделам 5–21**, сдаёт этапами (раздел 15) и на каждом этапе выполняет acceptance criteria. Что делать запрещено — раздел 20.
 
@@ -1234,9 +1268,9 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 
 > **Статус v3.9: CLOSED / LIVE PASS.** Repo и VPS runtime = **21 tools / plugin 1.0.4**; migration 002 применена; canonical SKILL и skill-protect активны. Controlled E2E подтвердил quantity/unit, analytics, compare/trend, budget plan/fact и identity; cleanup восстановил DB baseline. Evidence: `../EVIDENCE_STAGE_5_1_LIVE_2026-07-13.md`.
 
-### Этап 5.2 — Простые семейные отчёты для Ойижон (v3.13)
+### Этап 5.2 — Простые семейные отчёты для Ойижон (v3.14)
 
-**Статус: OFFLINE PASS / LIVE PENDING.** Canonical SKILL и permanent contracts приведены к требованиям v3.12; repo SKILL SHA = `f00214f7ebdd280bc71b04b133a40d7e018708bf35f7facea73843ec8cc02693`, offline verification PASS. После rollback VPS использует Stage 5.1 SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; deploy и повторный Telegram E2E ещё не выполнялись.
+**Статус: OFFLINE PASS / LIVE PENDING.** Единственный canonical prompt — profile `SOUL.md`; repo SHA = `713021c2cfd6c3abff206b6a79ec7423c06c6920645ce4a6c2d31158a108c98a`; effective assembled Telegram prompt contract PASS без truncation. После rollback VPS использует прежний Stage 5.1 SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; новый SOUL не развёрнут, новая session не создавалась, повторный Telegram E2E не выполнялся.
 
 **Язык для Ойижон:** сложные термины заменяются только в user-facing тексте: бюджет → `оила харажатлари режаси`; план → `режа`; факт → `амалда сарфланган / сарфланди`; остаток → `қолган пул`; категория → `харажат гуруҳи`; отклонение → `режадан кўп ёки кам`; тренд → `ойлар бўйича ўзгариш`; аналитика → `ҳисоб-китобни кўриб чиқиш`. Внутренние tool fields/contracts остаются техническими.
 
@@ -1333,7 +1367,7 @@ Backup + шифрование; **проверка restore в чистое окр
 - **STT узбекского/чисел/хорезмского** → тест на реальном голосе; переспрос сумм; нормализация числительных в Hermes; fallback на текст.
 - **Стоимость cloud API** → короткие voice, длинное текстом, дешёвая модель для простого, кэш новостей/погоды/намаза, `usage_costs`.
 - **Медицина** → не диагноз; совет близких/медпомощь; двойная детекция алертов; уведомление админа.
-- **Кириллица** → правило skill + пост-валидация/транслитерация + автотест.
+- **Кириллица** → правило canonical SOUL + пост-валидация/транслитерация + автотест.
 - **Смешение версий ТЗ** → этот документ единственный; v1/v2.0/v2.1 в архив; кодеру отдавать только этот файл.
 - **Молчаливый простой бота** → автозапуск, heartbeat, внешний uptime-monitor.
 - **Тихая деградация backend** (утечка соединений/ресурсов, лгущие заглушки) → один пул на процесс, smoke-тест на ≥50 вызовов, честные `NOT_CONFIGURED`, heartbeat через `get_bot_status`.

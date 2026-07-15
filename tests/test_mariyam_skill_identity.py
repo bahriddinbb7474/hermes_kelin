@@ -1,4 +1,4 @@
-"""Permanent regression: SKILL.md §1.1 identity/sentinel contract (Этап 5).
+"""Permanent regression: canonical SOUL.md identity/sentinel contract (Этап 5).
 
 These tests pin the *instruction* surface that keeps the model from refusing
 financial tools when Hermes v0.18.2 does not inject origin.user_id into the LLM
@@ -12,13 +12,13 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-SKILL = REPO / "skills" / "mariyam" / "SKILL.md"
+PROMPT = REPO / "deploy" / "hermes_profile_mariyam_oyijon" / "SOUL.md"
 
 
 @pytest.fixture(scope="module")
 def skill_text() -> str:
-    assert SKILL.is_file(), f"missing {SKILL}"
-    return SKILL.read_text(encoding="utf-8")
+    assert PROMPT.is_file(), f"missing {PROMPT}"
+    return PROMPT.read_text(encoding="utf-8")
 
 
 def test_skill_has_identity_section_1_1(skill_text):

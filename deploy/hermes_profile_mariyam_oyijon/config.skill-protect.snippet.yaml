@@ -1,4 +1,4 @@
-# Skill protect for profile mariyam_oyijon (ТЗ security-critical SKILL.md)
+# Profile guard for mariyam_oyijon (ТЗ security-critical SOUL.md)
 # Merge into: ~/.hermes/profiles/mariyam_oyijon/config.yaml
 # Root cause (Stage 5 E2E, 2026-07-13): post-turn background self-improvement
 # fork (agent/background_review.py + turn_finalizer.py) called skill_manage
@@ -14,9 +14,8 @@
 # - toolset name "skills" → skills_list, skill_view, skill_manage (toolsets.py)
 
 skills:
-  enabled:
-    - mariyam
-  # Disable post-turn skill self-improvement fork (default was 10 turns).
+  # `skills.enabled` is not a Hermes v0.18.2 loader key. Mariyam's canonical
+  # contract is profile/SOUL.md, which Hermes injects directly.
   creation_nudge_interval: 0
   # If skill_manage is ever re-enabled, stage writes for human approval
   # (applies to foreground AND background review fork).
@@ -28,7 +27,7 @@ display:
   tool_progress: false
 
 agent:
-  # Remove skill_manage / skills_list / skill_view tools from the agent.
-  # Skill content still loads from skills.enabled (mariyam remains readable).
+  # Disable the skill-management toolset. SOUL.md remains in the system prompt;
+  # SKILL.md indexing/loading is intentionally not part of this profile.
   disabled_toolsets:
     - skills

@@ -246,30 +246,54 @@ Plugin: `deploy/hermes_plugins/mariyam_identity_guard/`.
 
 Значения mapping, реальные Telegram ID и секреты в git/отчёты не добавлять. Реальную Ойижон до handover не подключать.
 
-## Skill protect (security-critical SKILL.md)
+## Deterministic profile prompt и skill-protect
 
-После Stage 5 E2E self-improvement fork переписал `skills/mariyam/SKILL.md` и отправил
-служебное сообщение в Telegram. Root cause (Hermes v0.18.x):
+После Stage 5 E2E self-improvement fork переписал прежний
+`skills/mariyam/SKILL.md` и отправил служебное сообщение в Telegram. Root cause
+защиты от self-improvement (Hermes v0.18.x):
 
 - `agent/turn_finalizer.py` → `_spawn_background_review(review_skills=True)`
   когда `skills.creation_nudge_interval > 0` и tool `skill_manage` доступен;
 - `agent/background_review.py` вызывает `skill_manage` и шлёт
   `💾 Self-improvement review: …` через `background_review_callback`.
 
-**Минимальный поддерживаемый fix (без Hermes core):**
+Stage 5.2 показал второй root cause: Hermes добавляет в system prompt только
+индекс/description skills, а полный `SKILL.md` доступен лишь после `skill_view`.
+При `agent.disabled_toolsets: [skills]` нет ни индекса, ни пути чтения. Ключ
+`skills.enabled` в Hermes v0.18.2 не загружает body skill и фактически не
+используется loader-ом.
+
+**Поддерживаемый profile-level fix (без Hermes core):**
 
 1. Слить в `~/.hermes/profiles/mariyam_oyijon/config.yaml` файл
    `deploy/hermes_profile_mariyam_oyijon/config.skill-protect.snippet.yaml`
    (ключи: `creation_nudge_interval: 0`, `write_approval: true`,
    `memory_notifications: "off"`, `agent.disabled_toolsets: [skills]`).
-2. Skill остаётся **читаемым** через `skills.enabled: [mariyam]` (prompt).
-3. Restart только `hermes-gateway-mariyam_oyijon.service`.
-4. Verify: sha SKILL = `f00214f7ebdd280bc71b04b133a40d7e018708bf35f7facea73843ec8cc02693`; offline `pytest tests/test_mariyam_skill_protection.py`.
+2. Установить единственный canonical repo-source
+   `deploy/hermes_profile_mariyam_oyijon/SOUL.md` как
+   `~/.hermes/profiles/mariyam_oyijon/SOUL.md`. Не создавать вторую копию в
+   `skills/mariyam/SKILL.md`.
+3. Перезапустить только `hermes-gateway-mariyam_oyijon.service`.
+4. **Offline preflight deployed-профиля (0 API calls):** собрать effective prompt
+   через `build_system_prompt_parts()`, подтвердить полный SOUL, canonical SHA,
+   Stage 5.2 markers и отсутствие truncation. Этот шаг не создаёт и не заполняет
+   `sessions.system_prompt`.
+5. Для test-user выполнить поддерживаемый session reset `/new` **до** acceptance:
+   restart процесса сам по себе не меняет сохранённый prompt.
+6. **Первый controlled E2E turn:** после отдельного разрешения отправить ровно одно
+   платное тестовое сообщение и остановиться до DB/prompt-проверки.
+7. **Stored prompt check после первого turn:** read-only подтвердить, что новая
+   session имеет `started_at` позже deploy, а `sessions.system_prompt` совпадает с
+   offline preflight по SHA/markers. Только после этого продолжать остальные
+   acceptance-сообщения. Полный prompt, Telegram ID и secrets в evidence не писать.
+8. Offline gate:
+   `pytest tests/test_mariyam_effective_prompt.py tests/test_mariyam_skill_protection.py`.
 
-Опционально (filesystem belt, не вместо config): `chmod a-w` на
-`…/skills/mariyam/SKILL.md` после deploy skill.
+Опционально (filesystem belt, не вместо config): `chmod a-w` на profile
+`SOUL.md` после deploy.
 
-**VPS apply выполнен по отдельному разрешению:** skill-protect active 4/4, `tool_progress` off, canonical SKILL SHA подтверждён. Любое повторное применение — только по новому разрешению.
+Текущий skill-protect на VPS остаётся active. Новый SOUL fix имеет статус
+`OFFLINE PASS / LIVE PENDING`; любое VPS-применение — только по новому разрешению.
 
 ## Выполненный Stage 5.1 live deploy (история выполнения)
 

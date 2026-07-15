@@ -15,7 +15,7 @@
 
 ИСТОЧНИК ИСТИНЫ — репозиторий, не этот промпт:
 - docs/TZ/TZ_Hermes_Mariyam_FINAL_v3_0.md — единственное ТЗ. Актуальная версия и
-  changelog — внутри файла (§0.x; сейчас **v3.13**). §20 — запреты, §21 — этапы и приёмка.
+  changelog — внутри файла (§0.x; сейчас **v3.14**). §20 — запреты, §21 — этапы и приёмка.
 - README.md — состояние и карта кода; docs/ и docs/TZ/ — рабочие доки
   (DECISIONS, ROADMAP, контракты tools, БД, cron, профиль, голос, безопасность).
 - Код: ветка `main` (после merge `dd9261e` feature-ветка `feature/hermes-mariyam-mvp`
@@ -30,8 +30,8 @@
   кириллица и только текстом (TTS отключён, v3.2; голосовой ввод остаётся).
   Точные данные — только через tools. Сомнительные суммы — переспрос.
   Медицина без диагноза + алерт админу. Бюджет 10–15 USD/мес.
-- Current ТЗ: **v3.13**. Stage 5.1 = **CLOSED / LIVE PASS**; Stage 5.2 = **OFFLINE PASS / LIVE PENDING**; Stage 5.3–6 = **PLANNED / NOT IMPLEMENTED**.
-- Repo SKILL SHA = `f00214f7ebdd280bc71b04b133a40d7e018708bf35f7facea73843ec8cc02693`; VPS runtime SKILL SHA = `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`.
+- Current ТЗ: **v3.14**. Stage 5.1 = **CLOSED / LIVE PASS**; Stage 5.2 = **OFFLINE PASS / LIVE PENDING**; Stage 5.3–6 = **PLANNED / NOT IMPLEMENTED**.
+- Repo canonical SOUL SHA = `713021c2cfd6c3abff206b6a79ec7423c06c6920645ce4a6c2d31158a108c98a`; VPS runtime legacy SKILL SHA = `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`.
 - Current runtime: **21 tools / plugin 1.0.4 / migration 002**. Migrations 003/004/005 и counts 22/25/27 — только planned; Stage 5.2 deploy и повторный Telegram E2E ещё не выполнялись.
 - Utility integration только read-only после исследования official cabinet;
   credentials никогда не доступны LLM; payments/settings/cards запрещены.

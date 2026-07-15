@@ -43,7 +43,7 @@
 - Mapping **вне git**; `MARIYAM_IDENTITY_MAP_FILE` mode **600**; unit + profile `.env` (Hermes может сбросить unit Environment).
 - **Raw Telegram ID и mapping не логируются** (`_mask`).
 - **Repo/VPS runtime:** plugin **1.0.4**; Stage 5.1 identity policy live E2E PASS.
-- **Skill-protect:** repo canonical SKILL — только `skills/mariyam/SKILL.md`, SHA `f00214f7ebdd280bc71b04b133a40d7e018708bf35f7facea73843ec8cc02693`; VPS runtime/protection остаётся Stage 5.1 SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4` до отдельно разрешённого deploy; отдельной git-copy нет; `tool_progress` off.
+- **Prompt/skill-protect:** единственный repo canonical prompt — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, SHA `713021c2cfd6c3abff206b6a79ec7423c06c6920645ce4a6c2d31158a108c98a`; VPS runtime/protection остаётся на Stage 5.1 SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4` до отдельно разрешённого deploy; дублирующий Mariyam SKILL отсутствует; `tool_progress` off.
 
 ## Planned v3.10 security gates — NOT IMPLEMENTED
 
@@ -83,7 +83,7 @@
 Backup должен включать:
 
 - PostgreSQL dump;
-- Hermes profile `mariyam_oyijon` с memory/skills/cron/sessions;
+- Hermes profile `mariyam_oyijon` с SOUL/memory/skills/cron/sessions;
 - конфиги tools без секретов.
 
 Шифрование обязательно: `rclone crypt` или gpg-архив. Хранение: VPS + Google Drive через rclone.

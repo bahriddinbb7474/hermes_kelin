@@ -1,11 +1,16 @@
 """Permanent contract for Mariyam Stage 5.1 analytics/budget skill."""
 from pathlib import Path
 
-SKILL = Path(__file__).resolve().parents[1] / "skills" / "mariyam" / "SKILL.md"
+PROMPT = (
+    Path(__file__).resolve().parents[1]
+    / "deploy"
+    / "hermes_profile_mariyam_oyijon"
+    / "SOUL.md"
+)
 
 
 def _text() -> str:
-    return SKILL.read_text(encoding="utf-8")
+    return PROMPT.read_text(encoding="utf-8")
 
 
 def test_identity_sentinel_and_ensure_user_policy_preserved():
@@ -52,7 +57,7 @@ def test_required_quantity_normalization_examples_exist():
         ("2 кило гўшт", "quantity=2", "unit=kg"),
         ("500 грамм пишлоқ", "quantity=500", "unit=g"),
         ("3 литр ёғ", "quantity=3", "unit=l"),
-        ("6 дона тухум", "quantity=6", "unit=pcs"),
+        ("6 та тухум", "quantity=6", "unit=pcs"),
         ("10 кило картошка 70 минг", "quantity=10", "unit=kg"),
     )
     for phrase, quantity, unit in expected:
@@ -64,21 +69,20 @@ def test_required_quantity_normalization_examples_exist():
 def test_expense_analytics_tool_contract():
     text = _text()
     assert "`get_expense_report`" in text
-    assert "`compare_previous: true`" in text
-    assert "`trend_months: 3`" in text
-    assert "максимум — 12" in text
-    assert "`purchase_count`" in text
+    assert "`compare_previous=true`" in text
+    assert "`trend_months=3`" in text
+    assert "максимум 12" in text
     assert "`monthly_series`" in text
-    assert "не вычисляй точные финансовые данные по памяти" in text
+    assert "суммы и количества бери только из tool" in text
 
 
 def test_monthly_budget_tools_and_negative_remaining_contract():
     text = _text()
     assert "`set_monthly_budget`" in text
     assert "`get_monthly_budget_status`" in text
-    assert "первый день месяца `YYYY-MM-01`" in text
-    assert "Отрицательный `remaining_uzs` — не ошибка" in text
-    assert "один мягкий уточняющий вопрос" in text
+    assert "`month=YYYY-MM-01`" in text
+    assert "Отрицательный остаток" in text
+    assert "сначала уточнить" in text
 
 
 def test_financial_advice_does_not_guarantee_wholesale_savings():
@@ -92,20 +96,21 @@ def test_financial_advice_does_not_guarantee_wholesale_savings():
 def test_user_facing_units_are_cyrillic_and_technical_traces_forbidden():
     text = _text()
     compact = " ".join(text.split())
-    for unit in ("`кг`", "`г`", "`л`", "`мл`", "`дона`", "`қадоқ`"):
+    for unit in ("кг", "г", "л", "мл", "та", "қадоқ"):
         assert unit in text
+    assert "дона" not in text
     assert "только узбекская кириллица" in text
     assert "Не показывай Ойижон JSON" in compact
     assert "tool names" in text
     assert "технические сообщения/traces" in text
 
 
-def test_four_required_stage51_examples_exist():
+def test_stage51_examples_and_report_decisions_exist_without_conflict():
     text = _text()
     for phrase in (
         "10 кило картошка 70 минг",
-        "Бу ой озиқ-овқатга қанча кетди?",
-        "Ўтган ой билан солиштиринг",
         "Кейинги ой озиқ-овқатга 1,5 миллион режа қўйинг",
+        "GENERAL_FAMILY_REPORT",
+        "COMPARE_OR_TREND",
     ):
         assert phrase in text

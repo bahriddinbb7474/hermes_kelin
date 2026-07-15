@@ -1,153 +1,77 @@
-"""Permanent contract for Mariyam Stage 5.2 simple family reports."""
+"""Permanent text-level contract for Mariyam Stage 5.2 decision table."""
+
 from pathlib import Path
 
-SKILL = Path(__file__).resolve().parents[1] / "skills" / "mariyam" / "SKILL.md"
-STAGE52_HEADING = "## 3.6. Ойижон учун оддий оила харажатлари ҳисоботи"
+
+PROMPT = (
+    Path(__file__).resolve().parents[1]
+    / "deploy"
+    / "hermes_profile_mariyam_oyijon"
+    / "SOUL.md"
+)
+HEADING = "### 3.2. Таблица решений по отчётам — единственный контракт"
+FINAL_PHRASE = (
+    "Ойижон, хоҳласангиз, бирор харажат гуруҳини батафсилроқ кўриб "
+    "чиқамиз. Маълумотлар тайёр."
+)
 
 
-def _stage52() -> str:
-    text = SKILL.read_text(encoding="utf-8")
-    assert STAGE52_HEADING in text
-    return text.split(STAGE52_HEADING, 1)[1].split("\n## 4.", 1)[0]
+def _section() -> str:
+    text = PROMPT.read_text(encoding="utf-8")
+    assert text.count(HEADING) == 1
+    return text.split(HEADING, 1)[1].split("\n### 3.3.", 1)[0]
 
 
-def test_general_report_allows_natural_intro_and_flexible_labels():
-    section = _stage52()
-    assert "естественн" in section.lower()
-    assert "вступлен" in section.lower()
-    assert "Сарфланди" in section
-    assert "Сарфлангани" in section
-    assert "Қолди" in section
-    assert "Қолгани" in section
-    assert "Жами" in section
-
-
-def test_general_report_ends_with_exact_required_phrase():
-    section = _stage52()
-    prompt = (
-        "Ойижон, хоҳласангиз, бирор харажат гуруҳини батафсилроқ кўриб "
-        "чиқамиз. Маълумотлар тайёр."
-    )
-    assert section.count(prompt) == 1
-    assert "заверши общий отчёт" in section.lower()
-
-
-def test_details_are_only_on_request_and_not_automatic():
-    section = _stage52().lower()
-    assert "детали только после просьбы" in section
-    assert "не показывать автоматически" in section
-
-
-def test_user_facing_group_mapping_is_explicit():
-    section = _stage52()
-    for group in ("Озиқ-овқат", "Дори-дармон", "Коммунал", "Уй", "Бошқа"):
-        assert group in section
-    for mapping in (
-        "`food` и `food.*` → `Озиқ-овқат`",
-        "`medicine` → `Дори-дармон`",
-        "`utilities` → `Коммунал`",
-        "`home` → `Уй`",
-        "остальные категории → `Бошқа`",
+def test_report_decision_table_has_all_supported_intents_and_tools():
+    section = _section()
+    for marker in (
+        "GENERAL_FAMILY_REPORT",
+        "CATEGORY_DETAIL",
+        "COMPARE_OR_TREND",
+        "SET_MONTHLY_BUDGET",
     ):
-        assert mapping in section
+        assert section.count(marker) == 1
+    assert "Только `get_monthly_budget_status`" in section
+    assert "`get_expense_report`" in section
+    assert "`set_monthly_budget`" in section
 
 
-def test_details_have_category_summary_then_actual_items_only():
-    section = _stage52()
-    lower = section.lower()
+def test_general_report_has_plan_spent_remaining_and_no_automatic_items():
+    section = _section()
+    assert "Харажат гуруҳи | Режа | Сарфлангани | Қолгани" in section
+    assert "Товарные строки автоматически не показывай" in section
+    assert "только после" in section.lower()
+    assert section.count(FINAL_PHRASE) == 1
+
+
+def test_category_detail_has_summary_before_actual_items():
+    section = _section()
     summary = "Харажат гуруҳи | Режа | Сарфлангани | Қолгани"
     items = "Маҳсулот | Миқдор | Сарфлангани"
-    assert summary in section
-    assert items in section
     assert section.index(summary) < section.index(items)
-    assert "только фактические товары" in lower
-    assert "фактическую сумму" in lower
-    assert "только из `get_expense_report`" in section
-    assert "фактическое количество" in lower
-    assert "только при наличии `quantity`" in section
+    assert "quantity только из tool result, иначе `—`" in section
+    assert "только её фактические `by_item`" in section
 
 
-def test_unknown_values_are_not_guessed_or_replaced_with_zero():
-    section = _stage52()
-    compact = " ".join(section.split())
-    lower = section.lower()
-    assert "missing quantity" in lower
-    assert "`—`" in section
-    assert "не показывать" in lower
-    assert "не `0`" in section
-    assert "quantity не угадывать" in section
-    assert "разные единицы не смешивать" in lower
-    assert "не выводить из суммы или числа покупок" in compact
+def test_group_mapping_missing_plan_and_negative_remaining_are_explicit():
+    section = _section()
+    for group in ("Озиқ-овқат", "Дори-дармон", "Коммунал", "Уй", "Бошқа"):
+        assert group in section
+    assert "План отсутствует —\n`айтилмаган`, не `0`" in section
+    assert "Отрицательный остаток" in section
+    assert "Режадан 50 000 сўм кўп сарфланди." in section
 
 
-def test_all_user_facing_units_are_documented():
-    section = _stage52()
-    for mapping in (
-        "`kg` → `кг`",
-        "`g` → `г`",
-        "`l` → `л`",
-        "`ml` → `мл`",
-        "`pcs` → `та`",
-        "`pack` → `қадоқ`",
-    ):
-        assert mapping in section
+def test_units_are_global_ta_only_and_product_plan_is_forbidden():
+    text = PROMPT.read_text(encoding="utf-8")
+    assert text.count("pcs → та") == 1
+    assert "дона" not in text
+    assert "Product plan не показывай" in _section()
+    assert "не начинай Stage 5.3" in _section()
 
 
-def test_product_plan_storage_is_not_invented():
-    section = _stage52()
-    assert "Stage 5.2 не имеет product-plan storage" in section
-    assert "product plan в Stage 5.2 не показывай" in section
-    assert "migration 003" in section
-    assert "новые tools" in section
-
-
-def test_simple_user_facing_financial_words_are_required():
-    section = _stage52()
-    for word in (
-        "режа",
-        "сарфланди",
-        "қолди",
-        "харажат гуруҳи",
-        "режадан кўп",
-        "режадан кам",
-        "ойлар бўйича ўзгариш",
-    ):
-        assert word in section.lower()
-
-
-def test_technical_financial_text_is_explicitly_hidden_from_oyijon():
-    section = _stage52()
-    assert "Не показывай Ойижон" in section
-    for term in (
-        "JSON",
-        "tool names",
-        "plan/fact",
-        "usage_percent",
-        "analytics",
-        "trend",
-        "category_code",
-        "remaining_uzs",
-        "planned_amount_uzs",
-        "actual_amount_uzs",
-        "purchase_count",
-        "canonical units",
-    ):
-        assert f"`{term}`" in section
-
-
-def test_negative_remaining_is_shown_with_simple_explanation():
-    section = _stage52()
-    assert "отрицательный остаток" in section
-    assert "простым пояснением" in section
-    assert "без сложной формулы" in section
-
-
-def test_month_end_has_only_the_required_soft_statement():
-    section = _stage52()
-    statement = (
-        "Ойижон, вақтингиз бўлганда, кейинги ой учун оила харажатлари "
-        "режасини бирга кўриб чиқамиз."
-    )
-    assert section.count(statement) == 1
-    assert "Не начинай Stage 5.3" in section
-    assert "семь вопросов" in section
+def test_old_conflicting_report_instructions_are_absent():
+    text = PROMPT.read_text(encoding="utf-8")
+    assert "внутри питания — товары" not in text
+    assert "разбивку category/item" not in text
+    assert "get_expense_report` с\n   `user_id: 0`, `period=month`" not in text

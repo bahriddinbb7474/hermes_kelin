@@ -10,7 +10,7 @@
 
 > **Stage 5.1 status (2026-07-15): CLOSED / LIVE PASS.** VPS/profile = tools **21**, plugin **1.0.4**, migration 002 active, SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, skill-protect **4/4**, `tool_progress` off. Controlled E2E и cleanup PASS.
 
-> **ТЗ v3.13:** Stage 5.2 = **OFFLINE PASS / LIVE PENDING**. Repo SKILL SHA = `f00214f7ebdd280bc71b04b133a40d7e018708bf35f7facea73843ec8cc02693`; permanent contracts и offline checks PASS. После rollback profile/runtime остаются на Stage 5.1 SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, 21 tools, plugin 1.0.4, migration 002. Deploy и повторный Telegram E2E ещё не выполнялись. Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Реальная Ойижон не подключалась.
+> **ТЗ v3.14:** Stage 5.2 = **OFFLINE PASS / LIVE PENDING**. Единственный canonical prompt — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, SHA `713021c2cfd6c3abff206b6a79ec7423c06c6920645ce4a6c2d31158a108c98a`; effective assembled prompt contract PASS. После rollback profile/runtime остаются на Stage 5.1 SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, 21 tools, plugin 1.0.4, migration 002. Новый SOUL не развёрнут, `/new` и повторный Telegram E2E не выполнялись. Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Реальная Ойижон не подключалась.
 
 **Модель профиля:** `gpt-5.6-luna` через api.n1n.ai (`provider: custom`, `base_url: https://api.n1n.ai/v1`, ключ `N1N_API_KEY` в профильном `.env`, 600). Резерв: `deepseek/deepseek-v4-flash` (DECISIONS.md, 2026-07-12).
 
@@ -19,13 +19,13 @@
 3. Подключить Telegram Gateway: bot token — только через env/конфиг вне git.
 4. Настроить **allowlist**: начальное состояние — только Telegram ID администратора (Бахриддин ака). Для pre-handover E2E уже добавлен второй аккаунт заказчика как временный test-user «Тест Ойижон» (ТЗ §0.4); перед handover он удаляется. Реальный ID Ойижон — только при handover (ТЗ §19). Любой ID вне allowlist не может вызвать agent session / LLM / tools / БД; допустимы short denial или silent block (`PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL`).
 
-5. Установить skill из `skills/mariyam/SKILL.md` в профиль.
+5. Установить canonical `deploy/hermes_profile_mariyam_oyijon/SOUL.md` как корневой `SOUL.md` профиля. Дублирующий Mariyam SKILL не создавать.
 5a. **Skill protect (активен в runtime; обязателен при любом переустановочном deploy):** слить в `config.yaml` профиля
     `deploy/hermes_profile_mariyam_oyijon/config.skill-protect.snippet.yaml`:
     - `skills.creation_nudge_interval: 0` — выключить post-turn skill self-improvement;
     - `skills.write_approval: true` — skill_manage не пишет сразу (staging);
     - `display.memory_notifications: "off"` — нет служебных «Self-improvement review» в Telegram;
-    - `agent.disabled_toolsets: [skills]` — нет `skill_manage` (skill **читается** через `skills.enabled`).
+    - `agent.disabled_toolsets: [skills]` — нет `skill_manage`; critical prompt загружается через SOUL и от skills не зависит.
     Root cause: Hermes `agent/turn_finalizer.py` → `background_review` → `skill_manage` patch SKILL.md.
     После merge — restart gateway. Проверка: `tests/test_mariyam_skill_protection.py`.
 6. Зарегистрировать backend как **stdio MCP-сервер** (точный синтаксис сверить с документацией установленной версии Hermes):
@@ -47,7 +47,10 @@
 
 ### Stage 5.2 live gate и planned profile gates — не выполнять сейчас
 
-- Stage 5.2: canonical SKILL/tests приведены к решениям v3.12 offline; установка в profile, restart и повторный Telegram E2E — только отдельной задачей и по отдельному разрешению.
+- Stage 5.2: canonical SOUL/effective-prompt contracts PASS offline; установка в
+  profile, restart, offline prompt preflight (0 API calls), `/new`, первый
+  controlled turn, затем stored-prompt check и остальные E2E — только отдельной
+  задачей и по отдельному разрешению.
 - Stage 5.3A: до создания cron cycle проверить Hermes v0.18.2 cron identity; trusted job id → private mapping 0600 → internal user id; unknown job fail closed.
 - Stage 5.4: utility credentials не помещать в profile/model-visible env; только VPS connector secrets. Hermes browser с открытыми credentials запрещён.
 - Vision smoke перед handover сначала через native image input текущего model path; отдельная vision-модель только после фактического FAIL.
@@ -67,7 +70,7 @@
 
 В профиле живут:
 
-- skill/личность Мариям;
+- SOUL/личность Мариям;
 - мягкая память о людях, привычках, предпочтениях;
 - onboarding state;
 - cron-задачи и напоминания;

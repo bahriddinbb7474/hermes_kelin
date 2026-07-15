@@ -2,7 +2,7 @@
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md`
 
-**Статус v3.13:** архитектура не меняется. Stage 5.1 — **CLOSED / LIVE PASS**. Stage 5.2 — **OFFLINE PASS / LIVE PENDING**: repo SKILL SHA `f00214f7ebdd280bc71b04b133a40d7e018708bf35f7facea73843ec8cc02693`, после rollback VPS SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; deploy и повторный Telegram E2E ещё не выполнялись. Stage 5.3–6 — **PLANNED / NOT IMPLEMENTED**. Current runtime = 21 tools / plugin 1.0.4 / migration 002; migrations 003/004/005 отсутствуют; реальная Ойижон не подключалась.
+**Статус v3.14:** архитектура Hermes-first не меняется. Stage 5.1 — **CLOSED / LIVE PASS**. Stage 5.2 — **OFFLINE PASS / LIVE PENDING**: repo canonical SOUL SHA `713021c2cfd6c3abff206b6a79ec7423c06c6920645ce4a6c2d31158a108c98a`, после rollback VPS использует legacy SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; новый SOUL не развёрнут, `/new` и повторный Telegram E2E не выполнялись. Stage 5.3–6 — **PLANNED / NOT IMPLEMENTED**. Current runtime = 21 tools / plugin 1.0.4 / migration 002; migrations 003/004/005 отсутствуют; реальная Ойижон не подключалась.
 
 ## Принцип Hermes-first
 
@@ -16,7 +16,7 @@ Backend — только тонкий слой MCP tools/storage: принима
 Telegram (Ойижон / Бахриддин ака)
   -> Hermes Telegram Gateway + allowlist
   -> Hermes Profile: mariyam_oyijon
-       memory, skill, LLM, STT/TTS, cron
+       memory, canonical SOUL, LLM, STT/TTS, cron
   -> Hermes profile plugin `mariyam_identity_guard`   (repo/VPS 1.0.4, узкий слой)
        tool_execution middleware: current session
        -> persisted Telegram source -> private mapping -> internal users.id

@@ -1,10 +1,10 @@
-"""Permanent regression: SKILL.md self-improvement protection (mariyam_oyijon).
+"""Permanent regression: Mariyam SOUL.md and self-improvement protection.
 
 Root cause (runtime, Hermes v0.18.x, profile mariyam_oyijon only):
   After multi-tool Telegram turns, agent/turn_finalizer.py may spawn
   agent/background_review.py with review_skills=True when
   skills.creation_nudge_interval > 0 and skill_manage is in valid tools.
-  That fork can skill_manage(patch) skills/mariyam/SKILL.md and deliver
+  That fork could skill_manage(patch) the former skills/mariyam/SKILL.md and deliver
   "Self-improvement review: Patched SKILL.md…" via background_review_callback.
 
 Supported profile-scoped fix (no Hermes core / identity guard change):
@@ -13,7 +13,8 @@ Supported profile-scoped fix (no Hermes core / identity guard change):
   - agent.disabled_toolsets: [skills]
   - skills.write_approval: true
   - display.memory_notifications: "off"
-  Skill stays readable via skills.enabled: [mariyam].
+  The canonical contract is profile/SOUL.md; there is no mutable Mariyam skill.
+  `skills.enabled` is not a Hermes v0.18.2 loader key.
 """
 
 from __future__ import annotations
@@ -32,13 +33,14 @@ SNIPPET = (
     / "hermes_profile_mariyam_oyijon"
     / "config.skill-protect.snippet.yaml"
 )
-SKILL = REPO / "skills" / "mariyam" / "SKILL.md"
+SOUL = REPO / "deploy" / "hermes_profile_mariyam_oyijon" / "SOUL.md"
+GITATTRIBUTES = REPO / ".gitattributes"
 GUARD_INIT = (
     REPO / "deploy" / "hermes_plugins" / "mariyam_identity_guard" / "__init__.py"
 )
-# Canonical Stage-5.2 SKILL bytes (must not drift via self-improvement).
-EXPECTED_SKILL_SHA256 = (
-    "f00214f7ebdd280bc71b04b133a40d7e018708bf35f7facea73843ec8cc02693"
+# Canonical Git/deploy bytes after CRLF -> LF normalization.
+EXPECTED_SOUL_SHA256 = (
+    "713021c2cfd6c3abff206b6a79ec7423c06c6920645ce4a6c2d31158a108c98a"
 )
 PROFILE_SCOPED_DIR = "hermes_profile_mariyam_oyijon"
 SELF_IMPROVEMENT_MARKERS = (
@@ -67,8 +69,9 @@ def _notify_actions(notification_mode: str, actions_if_on: list[str]) -> list[st
     return list(actions_if_on)
 
 
-def _skill_sha256() -> str:
-    return hashlib.sha256(SKILL.read_bytes()).hexdigest()
+def _soul_sha256() -> str:
+    normalized = SOUL.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(normalized).hexdigest()
 
 
 def _load_guard_module():
@@ -119,11 +122,11 @@ def test_snippet_disables_skills_toolset(protect_cfg):
     assert "skills" in protect_cfg["agent"]["disabled_toolsets"]
 
 
-def test_snippet_keeps_mariyam_skill_enabled_for_read(protect_cfg):
-    assert "mariyam" in protect_cfg["skills"]["enabled"]
+def test_snippet_does_not_use_unsupported_skills_enabled(protect_cfg):
+    assert "enabled" not in protect_cfg["skills"]
 
 
-# --- self-improvement cannot change SKILL under protect policy ---
+# --- self-improvement cannot change canonical SOUL under protect policy ---
 
 
 def test_nudge_zero_blocks_background_skill_review(protect_cfg):
@@ -138,10 +141,10 @@ def test_disabled_skills_toolset_blocks_review_even_with_legacy_nudge(protect_cf
     assert _should_review_skills(10, 10, has_skill_manage) is False
 
 
-def test_self_improvement_policy_preserves_skill_sha(protect_cfg):
-    """With protect gates, simulated self-improvement path does not rewrite SKILL."""
-    before = _skill_sha256()
-    assert before == EXPECTED_SKILL_SHA256
+def test_self_improvement_policy_preserves_soul_sha(protect_cfg):
+    """With protect gates, the self-improvement path cannot rewrite SOUL."""
+    before = _soul_sha256()
+    assert before == EXPECTED_SOUL_SHA256
 
     nudge = int(protect_cfg["skills"]["creation_nudge_interval"])
     has_sm = "skills" not in protect_cfg["agent"]["disabled_toolsets"]
@@ -149,16 +152,21 @@ def test_self_improvement_policy_preserves_skill_sha(protect_cfg):
     assert would_review is False
 
     # No write path taken → bytes unchanged.
-    after = _skill_sha256()
-    assert after == before == EXPECTED_SKILL_SHA256
+    after = _soul_sha256()
+    assert after == before == EXPECTED_SOUL_SHA256
 
 
-def test_skill_sha256_canonical_stage5():
-    assert _skill_sha256() == EXPECTED_SKILL_SHA256
+def test_soul_sha256_is_canonical():
+    assert _soul_sha256() == EXPECTED_SOUL_SHA256
 
 
-def test_skill_remains_readable_for_agent():
-    text = SKILL.read_text(encoding="utf-8")
+def test_canonical_soul_checkout_is_forced_to_lf():
+    attributes = GITATTRIBUTES.read_text(encoding="utf-8").splitlines()
+    assert "deploy/hermes_profile_mariyam_oyijon/SOUL.md text eol=lf" in attributes
+
+
+def test_soul_remains_readable_for_agent():
+    text = SOUL.read_text(encoding="utf-8")
     assert text.strip()
     assert "user_id" in text
     # §1.1 identity sentinel must stay loadable.
