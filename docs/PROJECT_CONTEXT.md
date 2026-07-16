@@ -38,7 +38,7 @@
 
 ## Где мы сейчас (2026-07-16)
 
-ТЗ: **v3.16**. Этапы 5.1 и 5.2 = **CLOSED / LIVE PASS**. Message 1 и Message 2 подтверждены live; правило завершения исправлено по типу отчёта и проверено offline без нового платного теста. Active canonical SOUL LF SHA = `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`; active Mariyam `SKILL.md` отсутствует; plugin **1.0.4**, migration 002, inventory 21. Stage 5.3–6 — **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Реальная Ойижон не подключена.
+ТЗ: **v3.17**. Этапы 5.1 и 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **OFFLINE PASS / LIVE PENDING**. Repo canonical SOUL LF SHA = `856fd7f37cd476e5eeae933c2c6cf82ec5fb0ed89c0410d30a74480188cd6c30`; repo содержит migration 003 и inventory/dispatch/discovery **21/21/21**. VPS остаётся на plugin **1.0.4**, migration 002 и предыдущем deployed SOUL; production и Telegram не менялись. Stage 5.3A–6 — **PLANNED / NOT IMPLEMENTED**; migrations 004/005 отсутствуют. Реальная Ойижон не подключена.
 
 На VPS выполнено (Этап 1, технически):
 - PostgreSQL поднят и **healthy** (контейнер `hermes_mariyam_postgres`, порт 127.0.0.1:5432, init-миграции применены).
@@ -59,8 +59,9 @@
 - **Этап 5 (бухгалтерия): ЗАКРЫТ (PASS 2026-07-13)** — E2E 4/4; final test **1/12000**, admin **8/768000**; на момент acceptance runtime tools **19**, затем расширены Stage 5.1 до 21.
 - **Этап 5.1: CLOSED / LIVE PASS** (решение v3.9, сохранено в **v3.12**) — quantity/unit, by_item, compare/trend, plan/fact и identity подтверждены live; runtime 21 tools / plugin 1.0.4.
 - **Stage 5.2: CLOSED / LIVE PASS** (v3.16) — Message 1 и Message 2 подтверждены live; report-type completion contract и category-table contract PASS; новый платный тест не выполнялся. Evidence: `EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`.
-- **Planned v3.16:** Stage 5.3 product plans + reference price snapshot; Stage 5.3A approval cycle + cron identity gate; Stage 5.4 utility read-only; Stage 6 recurring obligations. Planned tools 21→22→25→27; current runtime = 21.
-- **Prompt/skill protect:** canonical LF SOUL assertion = `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`; active Mariyam `SKILL.md` отсутствует; skill-protect и `tool_progress` off.
+- **Stage 5.3: OFFLINE PASS / LIVE PENDING** (v3.17) — product plans, actuals из transactions, last/weighted average/manual price snapshot, migration 003 и трёхколоночный product report реализованы локально; VPS deploy/E2E pending.
+- **Planned:** Stage 5.3A approval cycle + cron identity gate; Stage 5.4 utility read-only; Stage 6 recurring obligations. Planned tools 21→22→25→27; current repo/VPS inventory = 21.
+- **Prompt/skill protect:** repo canonical LF SOUL assertion = `856fd7f37cd476e5eeae933c2c6cf82ec5fb0ed89c0410d30a74480188cd6c30`; active VPS Mariyam `SKILL.md` отсутствует; skill-protect и `tool_progress` off.
 - Мариям = бытовой финансовый аналитик; backend считает факты, Hermes объясняет; memory ≠ источник аналитики.
 - очистка тестовых данных БД — выполнена, закрепить аудитом;
 - **Этап 2 (язык): PARTIAL 8/20, НЕ закрыт** — 8 из 20 фраз проверены (8/8 кириллица, `LATIN_LINES: []`), полный AC (20/20, 0 латиницы) не пройден; тест остановлен заказчиком, не из-за FAIL (см. `docs/TZ/EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md`);

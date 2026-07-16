@@ -2,7 +2,7 @@
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md`
 
-**Статус v3.15:** архитектура Hermes-first не меняется. Stage 5.1 — **CLOSED / LIVE PASS**. Stage 5.2 — **OFFLINE PASS / LIVE PENDING**: controlled live Message 1 PASS / Message 2 category-summary format-only FAIL / rollback PASS; repo canonical LF SOUL SHA `a9b584e14d704f08b4778b7928ca71a0cf095394583f769c5e9571097884b4e4`; VPS использует legacy SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, narrow fix не развёрнут. Stage 5.3–6 — **PLANNED / NOT IMPLEMENTED**. Current runtime = 21 tools / plugin 1.0.4 / migration 002; migrations 003/004/005 отсутствуют; реальная Ойижон не подключалась.
+**Статус v3.17:** архитектура Hermes-first не меняется. Stage 5.1 и Stage 5.2 — **CLOSED / LIVE PASS**. Stage 5.3 — **OFFLINE PASS / LIVE PENDING**: repo canonical LF SOUL SHA `856fd7f37cd476e5eeae933c2c6cf82ec5fb0ed89c0410d30a74480188cd6c30`, migration 003 и расширенные два tools готовы; inventory = 21. VPS остаётся на 21 tools / plugin 1.0.4 / migration 002 и предыдущем deployed SOUL. Stage 5.3A–6 — **PLANNED / NOT IMPLEMENTED**; migrations 004/005 отсутствуют; реальная Ойижон не подключалась.
 
 ## Принцип Hermes-first
 
@@ -38,7 +38,7 @@ Hermes делает:
 - формулировку всех ответов, отчётов и **осторожных финансовых советов** (не выдумывать цены/экономию);
 - cron: утро, вечер, новости, 19:30, onboarding, heartbeat;
 - веб-поиск для новостей и фактических вопросов.
-- **Planned Stage 5.3:** один nutrition web search на plan cycle (WHO/FAO/официальный Минздрав Узбекистана), cache 30 дней; источник и дата в ответе.
+- **Stage 5.3:** один nutrition web search на plan cycle (WHO/FAO/официальный Минздрав Узбекистана), cache 30 дней; источник и дата в ответе; save только после подтверждения draft.
 - **Planned Stage 5.3A/5.4/6:** orchestration и расписание делает только Hermes cron; user-scoped cron identity детерминирована до MCP.
 
 Backend делает:
@@ -48,7 +48,7 @@ Backend делает:
 - возвращает отчётные числа и факты (**без прозы и советов**);
 - валидирует категории, суммы, валюты, роли, даты, units;
 - делает backup/status/heartbeat данные.
-- **Planned data/storage only:** product plan items/cycles, read-only utility connector snapshots и recurring obligations; connector не понимает сообщения, не пишет прозу и не выполняет payments.
+- **Stage 5.3 data/storage:** product plan items, actuals из transactions и immutable price snapshot; cycles пока только подготовленная schema. Planned data/storage: utility connector snapshots и recurring obligations; connector не понимает сообщения, не пишет прозу и не выполняет payments.
 
 LLM memory **не** источник финансовой аналитики.
 
@@ -67,7 +67,7 @@ Unknown cron job блокируется fail closed до downstream tool. Utilit
 
 Planned tool progression: Stage 5.3 = 21 (расширение существующих contracts), Stage 5.3A = 22, Stage 5.4 = 25, Stage 6 extension = 27. **Текущий runtime = 21.**
 
-Planned Stage 5.3 сохраняет reference price snapshot в `monthly_budget_items`: backend считает last/weighted average из transactions и сохраняет выбранный `last / average / manual`; Hermes объясняет и спрашивает подтверждение. Отдельная price table и ценовая логика в LLM memory не создаются.
+Stage 5.3 сохраняет reference price snapshot в `monthly_budget_items`: backend считает last/weighted average из transactions и сохраняет выбранный `last / average / manual`; Hermes объясняет и спрашивает подтверждение. Отдельная price table и ценовая логика в LLM memory не создаются.
 
 ## Запрещённые backend-heavy решения
 

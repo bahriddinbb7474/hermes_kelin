@@ -17,6 +17,7 @@ SERVICE_TYPES = ("stt", "tts", "llm")
 ROLES = ("oyijon", "admin")
 # Stage 5.1 — physical quantity units (ТЗ v3.7)
 CANONICAL_UNITS = ("kg", "g", "l", "ml", "pcs", "pack")
+PRICE_BASES = ("last", "average", "manual")
 
 
 def _one_of(field: str, value, allowed: tuple[str, ...], *, allow_none: bool = False):
@@ -471,42 +472,364 @@ def _json_number(value: Decimal | int):
     return int(value) if value == value.to_integral_value() else float(value)
 
 
+def _optional_decimal(value, field: str, *, positive: bool) -> Decimal | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
+        raise ValueError(f"INVALID_INPUT: {field} must be a number")
+    result = Decimal(str(value))
+    if not result.is_finite() or (result <= 0 if positive else result < 0):
+        relation = "> 0" if positive else ">= 0"
+        raise ValueError(f"INVALID_INPUT: {field} must be finite and {relation}")
+    return result
+
+
+def _normalize_plan_items(items) -> list[dict]:
+    """Validate product-plan input without inventing quantities or prices."""
+    if not isinstance(items, list):
+        raise ValueError("INVALID_INPUT: items must be an array")
+
+    normalized = []
+    seen = set()
+    for raw in items:
+        if not isinstance(raw, dict):
+            raise ValueError("INVALID_INPUT: every plan item must be an object")
+
+        item_name = raw.get("item_name_normalized")
+        display_name = raw.get("item_name_display")
+        if not isinstance(item_name, str) or not item_name.strip():
+            raise ValueError("INVALID_INPUT: item_name_normalized is required")
+        if not isinstance(display_name, str) or not display_name.strip():
+            raise ValueError("INVALID_INPUT: item_name_display is required")
+        item_name = item_name.strip().casefold()
+        display_name = display_name.strip()
+        if item_name in seen:
+            raise ValueError("INVALID_INPUT: duplicate item_name_normalized")
+        seen.add(item_name)
+
+        quantity = _optional_decimal(
+            raw.get("planned_quantity"), "planned_quantity", positive=True
+        )
+        amount = _optional_decimal(
+            raw.get("planned_amount_uzs"), "planned_amount_uzs", positive=False
+        )
+        if quantity is None and amount is None:
+            raise ValueError(
+                "INVALID_INPUT: planned_quantity or planned_amount_uzs is required"
+            )
+
+        unit = raw.get("unit")
+        if unit is not None:
+            if not isinstance(unit, str):
+                raise ValueError("INVALID_INPUT: unit must be a string")
+            unit = unit.strip().lower()
+            _one_of("unit", unit, CANONICAL_UNITS)
+            if quantity is None:
+                raise ValueError("INVALID_INPUT: unit requires planned_quantity")
+
+        reference_price = _optional_decimal(
+            raw.get("reference_unit_price_uzs"),
+            "reference_unit_price_uzs",
+            positive=False,
+        )
+        price_basis = raw.get("price_basis")
+        if price_basis is not None:
+            if not isinstance(price_basis, str):
+                raise ValueError("INVALID_INPUT: price_basis must be a string")
+            price_basis = price_basis.strip().lower()
+            _one_of("price_basis", price_basis, PRICE_BASES)
+        if (reference_price is not None or price_basis is not None) and unit is None:
+            raise ValueError("INVALID_INPUT: reference price requires quantity and unit")
+        if price_basis == "manual" and reference_price is None:
+            raise ValueError("INVALID_INPUT: manual price requires reference_unit_price_uzs")
+
+        price_as_of = raw.get("price_as_of")
+        if price_as_of is not None:
+            if not isinstance(price_as_of, str):
+                raise ValueError("INVALID_INPUT: price_as_of must be UTC ISO 8601")
+            try:
+                price_as_of = parse_dt(price_as_of)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("INVALID_INPUT: price_as_of must be UTC ISO 8601") from exc
+
+        normalized.append(
+            {
+                "item_name_normalized": item_name,
+                "item_name_display": display_name,
+                "planned_quantity": quantity,
+                "unit": unit,
+                "planned_amount_uzs": amount,
+                "reference_unit_price_uzs": reference_price,
+                "price_basis": price_basis,
+                "price_as_of": price_as_of,
+                "note": raw.get("note"),
+            }
+        )
+    return normalized
+
+
+async def _transaction_prices(conn, user_id, item_name: str, unit: str):
+    """Return last and weighted-average UZS prices for one exact canonical unit."""
+    last = await conn.fetchrow(
+        """SELECT amount / quantity AS unit_price, occurred_at
+           FROM transactions
+           WHERE user_id=$1 AND type='expense' AND currency='UZS'
+             AND item_name_normalized=$2 AND unit=$3
+             AND quantity IS NOT NULL
+           ORDER BY occurred_at DESC, id DESC
+           LIMIT 1""",
+        user_id,
+        item_name,
+        unit,
+    )
+    average = await conn.fetchrow(
+        """SELECT SUM(amount) / SUM(quantity) AS unit_price,
+                  MAX(occurred_at) AS price_as_of
+           FROM transactions
+           WHERE user_id=$1 AND type='expense' AND currency='UZS'
+             AND item_name_normalized=$2 AND unit=$3
+             AND quantity IS NOT NULL""",
+        user_id,
+        item_name,
+        unit,
+    )
+    return {
+        "last_price": None if last is None else Decimal(last["unit_price"]),
+        "last_as_of": None if last is None else last["occurred_at"],
+        "average_price": (
+            None
+            if average is None or average["unit_price"] is None
+            else Decimal(average["unit_price"])
+        ),
+        "average_as_of": None if average is None else average["price_as_of"],
+    }
+
+
+async def _resolve_plan_item_price(conn, user_id, item: dict) -> dict:
+    """Freeze the selected factual/manual price into a new item-plan snapshot."""
+    resolved = dict(item)
+    unit = item["unit"]
+    if unit is None:
+        resolved["reference_unit_price_uzs"] = None
+        resolved["price_basis"] = None
+        resolved["price_as_of"] = None
+        return resolved
+
+    basis = item["price_basis"] or "last"
+    price = None
+    price_as_of = None
+    if basis == "manual":
+        price = item["reference_unit_price_uzs"]
+        price_as_of = item["price_as_of"] or datetime.now(timezone.utc)
+    else:
+        prices = await _transaction_prices(
+            conn, user_id, item["item_name_normalized"], unit
+        )
+        if basis == "last":
+            price = prices["last_price"]
+            price_as_of = prices["last_as_of"]
+        else:
+            price = prices["average_price"]
+            price_as_of = prices["average_as_of"]
+
+    if price is None:
+        resolved["reference_unit_price_uzs"] = None
+        resolved["price_basis"] = None
+        resolved["price_as_of"] = None
+    else:
+        resolved["reference_unit_price_uzs"] = price
+        resolved["price_basis"] = basis
+        resolved["price_as_of"] = price_as_of
+        if resolved["planned_amount_uzs"] is None:
+            resolved["planned_amount_uzs"] = resolved["planned_quantity"] * price
+    return resolved
+
+
 async def set_monthly_budget(
-    pool, user_id, month, category_code, planned_amount_uzs, note=None
+    pool, user_id, month, category_code, planned_amount_uzs, note=None, items=None
 ):
     month_date = _budget_month(month)
     amount = _budget_amount(planned_amount_uzs)
-    if not await valid_category(pool, category_code):
-        raise ValueError("BAD_CATEGORY:" + str(category_code))
-    row = await pool.fetchrow(
-        """WITH ins AS (
-               INSERT INTO monthly_budget_plans
-                   (user_id, month, category_code, planned_amount_uzs, note)
-               VALUES ($1,$2,$3,$4,$5)
-               ON CONFLICT (user_id, month, category_code) DO NOTHING
-               RETURNING id
-           ), upd AS (
-               UPDATE monthly_budget_plans
-               SET planned_amount_uzs=$4, note=$5, updated_at=now()
-               WHERE user_id=$1 AND month=$2 AND category_code=$3
-                 AND NOT EXISTS (SELECT 1 FROM ins)
-               RETURNING id
-           )
-           SELECT id, true AS created FROM ins
-           UNION ALL
-           SELECT id, false AS created FROM upd
-           LIMIT 1""",
-        user_id, month_date, category_code, amount, note,
-    )
+    normalized_items = None if items is None else _normalize_plan_items(items)
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            if not await valid_category(conn, category_code):
+                raise ValueError("BAD_CATEGORY:" + str(category_code))
+            row = await conn.fetchrow(
+                """WITH ins AS (
+                       INSERT INTO monthly_budget_plans
+                           (user_id, month, category_code, planned_amount_uzs, note)
+                       VALUES ($1,$2,$3,$4,$5)
+                       ON CONFLICT (user_id, month, category_code) DO NOTHING
+                       RETURNING id
+                   ), upd AS (
+                       UPDATE monthly_budget_plans
+                       SET planned_amount_uzs=$4, note=$5, updated_at=now()
+                       WHERE user_id=$1 AND month=$2 AND category_code=$3
+                         AND NOT EXISTS (SELECT 1 FROM ins)
+                       RETURNING id
+                   )
+                   SELECT id, true AS created FROM ins
+                   UNION ALL
+                   SELECT id, false AS created FROM upd
+                   LIMIT 1""",
+                user_id,
+                month_date,
+                category_code,
+                amount,
+                note,
+            )
+            if normalized_items is not None:
+                resolved_items = [
+                    await _resolve_plan_item_price(conn, user_id, item)
+                    for item in normalized_items
+                ]
+                await conn.execute(
+                    """DELETE FROM monthly_budget_items
+                       WHERE user_id=$1 AND month=$2 AND category_code=$3""",
+                    user_id,
+                    month_date,
+                    category_code,
+                )
+                for item in resolved_items:
+                    await conn.execute(
+                        """INSERT INTO monthly_budget_items
+                           (user_id, month, category_code, item_name_normalized,
+                            item_name_display, planned_quantity, unit,
+                            planned_amount_uzs, reference_unit_price_uzs,
+                            price_basis, price_as_of, note)
+                           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)""",
+                        user_id,
+                        month_date,
+                        category_code,
+                        item["item_name_normalized"],
+                        item["item_name_display"],
+                        item["planned_quantity"],
+                        item["unit"],
+                        item["planned_amount_uzs"],
+                        item["reference_unit_price_uzs"],
+                        item["price_basis"],
+                        item["price_as_of"],
+                        item["note"],
+                    )
     if not row:
         raise RuntimeError("monthly budget upsert returned no row")
     return {"plan_id": row["id"], "created": row["created"]}
 
 
-async def get_monthly_budget_status(pool, user_id, month):
+def _iso_utc(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+async def _get_monthly_budget_items(
+    pool, user_id, month_date: date, start_utc: datetime, end_utc: datetime
+):
+    plan_rows = await pool.fetch(
+        """SELECT item_name_normalized, item_name_display, category_code,
+                  planned_quantity, unit, planned_amount_uzs,
+                  reference_unit_price_uzs, price_basis, price_as_of
+           FROM monthly_budget_items
+           WHERE user_id=$1 AND month=$2
+           ORDER BY category_code, item_name_normalized""",
+        user_id,
+        month_date,
+    )
+    result = []
+    for plan in plan_rows:
+        actual_rows = await pool.fetch(
+            """SELECT amount, quantity, unit
+               FROM transactions
+               WHERE user_id=$1 AND type='expense' AND currency='UZS'
+                 AND item_name_normalized=$2
+                 AND occurred_at >= $3 AND occurred_at < $4
+                 AND (
+                     category_code=$5
+                     OR ($5='food' AND category_code LIKE 'food.%')
+                 )""",
+            user_id,
+            plan["item_name_normalized"],
+            start_utc,
+            end_utc,
+            plan["category_code"],
+        )
+        actual_amount = sum((Decimal(row["amount"]) for row in actual_rows), Decimal(0))
+        actual_quantity = None
+        actual_unit = None
+        if actual_rows and all(
+            row["quantity"] is not None and row["unit"] is not None
+            for row in actual_rows
+        ):
+            units = {row["unit"] for row in actual_rows}
+            if len(units) == 1:
+                actual_unit = units.pop()
+                actual_quantity = sum(
+                    (Decimal(row["quantity"]) for row in actual_rows), Decimal(0)
+                )
+
+        unit = plan["unit"]
+        prices = None
+        if unit is not None:
+            prices = await _transaction_prices(
+                pool, user_id, plan["item_name_normalized"], unit
+            )
+        planned_amount = plan["planned_amount_uzs"]
+        result.append(
+            {
+                "item_name_normalized": plan["item_name_normalized"],
+                "item_name_display": plan["item_name_display"],
+                "planned_quantity": (
+                    None
+                    if plan["planned_quantity"] is None
+                    else _json_number(plan["planned_quantity"])
+                ),
+                "planned_unit": unit,
+                "planned_amount_uzs": (
+                    None if planned_amount is None else _json_number(planned_amount)
+                ),
+                "actual_quantity": (
+                    None
+                    if actual_quantity is None
+                    else _json_number(actual_quantity)
+                ),
+                "actual_unit": actual_unit,
+                "actual_amount_uzs": _json_number(actual_amount),
+                "remaining_amount_uzs": (
+                    None
+                    if planned_amount is None
+                    else _json_number(Decimal(planned_amount) - actual_amount)
+                ),
+                "last_unit_price_uzs": (
+                    None
+                    if prices is None or prices["last_price"] is None
+                    else _json_number(prices["last_price"])
+                ),
+                "average_unit_price_uzs": (
+                    None
+                    if prices is None or prices["average_price"] is None
+                    else _json_number(prices["average_price"])
+                ),
+                "reference_unit_price_uzs": (
+                    None
+                    if plan["reference_unit_price_uzs"] is None
+                    else _json_number(plan["reference_unit_price_uzs"])
+                ),
+                "price_basis": plan["price_basis"],
+                "price_as_of": _iso_utc(plan["price_as_of"]),
+            }
+        )
+    return result
+
+
+async def get_monthly_budget_status(pool, user_id, month, include_items=False):
+    if not isinstance(include_items, bool):
+        raise ValueError("INVALID_INPUT: include_items must be boolean")
     month_date = _budget_month(month)
     start_t = datetime(month_date.year, month_date.month, 1, tzinfo=TASHKENT)
     end_t = _shift_month(start_t, 1)
+    start_utc = start_t.astimezone(timezone.utc)
+    end_utc = end_t.astimezone(timezone.utc)
     rows = await pool.fetch(
         """WITH planned AS (
                SELECT category_code, planned_amount_uzs AS planned_uzs
@@ -527,8 +850,8 @@ async def get_monthly_budget_status(pool, user_id, month):
            ORDER BY COALESCE(p.category_code, a.category_code) NULLS LAST""",
         user_id,
         month_date,
-        start_t.astimezone(timezone.utc),
-        end_t.astimezone(timezone.utc),
+        start_utc,
+        end_utc,
     )
     planned_total = Decimal(0)
     actual_total = Decimal(0)
@@ -546,13 +869,18 @@ async def get_monthly_budget_status(pool, user_id, month):
             "difference_uzs": _json_number(planned - actual),
             "usage_percent": usage,
         })
-    return {
+    result = {
         "month": month_date.isoformat(),
         "planned_total_uzs": _json_number(planned_total),
         "actual_total_uzs": _json_number(actual_total),
         "remaining_uzs": _json_number(planned_total - actual_total),
         "by_category": by_category,
     }
+    if include_items:
+        result["items"] = await _get_monthly_budget_items(
+            pool, user_id, month_date, start_utc, end_utc
+        )
+    return result
 
 
 async def save_quran_progress(pool, user_id, surah, juz, page, note):

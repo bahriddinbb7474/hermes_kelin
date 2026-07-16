@@ -109,12 +109,12 @@ def test_group_mapping_missing_plan_and_negative_remaining_are_explicit():
     assert "Режадан 50 000 сўм кўп сарфланди." in section
 
 
-def test_units_are_global_ta_only_and_product_plan_is_forbidden():
+def test_units_are_global_ta_only_and_stage52_detail_stays_actual_only():
     text = PROMPT.read_text(encoding="utf-8")
     assert text.count("pcs → та") == 1
     assert "дона" not in text
     assert "Product plan не показывай" in _section()
-    assert "не начинай Stage 5.3" in _section()
+    assert "Stage 5.3 — продуктовый месячный план" in text
 
 
 def test_old_conflicting_report_instructions_are_absent():

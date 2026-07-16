@@ -24,7 +24,7 @@ hermes-mariyam/
 │   └── ROADMAP.md         # дорожная карта
 ├── backend/               # тонкий MCP backend (FastMCP + PostgreSQL)
 │   ├── server.py, db.py, config.py, __init__.py, __main__.py
-│   ├── sql/001_init.sql
+│   ├── sql/001_init.sql, 002_stage51_quantity_budget.sql, 003_stage53_product_plans.sql
 │   ├── requirements.txt, Dockerfile, .env.example
 ├── deploy/                # deploy docs + systemd template
 │   ├── DEPLOY.md
@@ -56,7 +56,7 @@ hermes-mariyam/
 
 ## Текущее состояние (2026-07-16)
 
-ТЗ: **v3.16**. Stage 5.1 и Stage 5.2 = **CLOSED / LIVE PASS**. Message 1 и Message 2 подтверждены live; исправление завершения отчётов теперь зависит только от report type, а не от строки `Жами`, и проверено offline без нового платного теста. Active canonical SOUL LF SHA = `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`; active Mariyam `SKILL.md` отсутствует. Runtime = **21 tools / plugin 1.0.4 / migration 002**. Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Реальная Ойижон не подключена.
+ТЗ: **v3.17**. Stage 5.1 и Stage 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **OFFLINE PASS / LIVE PENDING**. Repo содержит migration 003, product plans, price snapshots и canonical SOUL LF SHA `856fd7f37cd476e5eeae933c2c6cf82ec5fb0ed89c0410d30a74480188cd6c30`; inventory/dispatch/discovery = **21/21/21**, plugin не менялся. VPS остаётся на **21 tools / plugin 1.0.4 / migration 002** и предыдущем deployed SOUL до отдельного deploy. Stage 5.3A–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 004/005 отсутствуют. Реальная Ойижон не подключена.
 
 Этап 1 (VPS + Hermes + Telegram) — **закрыт по решению заказчика (2026-07-12, ТЗ v3.5)**:
 - ✅ PostgreSQL healthy (порт 127.0.0.1:5432, init-миграции применены);
@@ -93,11 +93,16 @@ hermes-mariyam/
 - identity AC: exact Telegram session → private mapping → `requested=0` → effective test-user; wrapper-маркеры stored prompt и Telegram profile names не являются AC;
 - evidence: `docs/EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`.
 
-**Planned v3.16 — NOT IMPLEMENTED:**
-- Stage 5.3/5.3A: product plan, last/weighted average/manual reference prices, migration 003 price snapshot и approval cycle 25/27/28/1; planned count 21→22 после approval tool;
+**Stage 5.3 — OFFLINE PASS / LIVE PENDING (v3.17):**
+- product plan, last/weighted average/manual reference prices и immutable snapshot реализованы локально в migration 003 и двух существующих tools;
+- detailed product report: `Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма`; отдельной product-колонки остатка нет;
+- full offline gates PASS; VPS deploy, production migration и Telegram E2E не выполнялись.
+
+**Planned after Stage 5.3 — NOT IMPLEMENTED:**
+- Stage 5.3A: approval cycle 25/27/28/1 и `approve_monthly_plan`; schema cycles подготовлена в migration 003, planned count 22;
 - Stage 5.4: researched official utility cabinet, deterministic read-only connector, migration 004, planned count 25;
 - Stage 6 extension: recurring obligations, migration 005, Hermes cron, planned final count 27;
-- current runtime остаётся **21**; Stage 5.3–6 не реализованы.
+- current VPS runtime остаётся **21**; Stage 5.3A–6 не реализованы.
 
 Текущий allowlist: **admin + временный «Тест Ойижон»** (второй аккаунт заказчика, role=oyijon). Реальная Ойижон отсутствует (до handover).
 

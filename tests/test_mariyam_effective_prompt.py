@@ -113,7 +113,7 @@ def test_effective_telegram_prompt_contains_full_untruncated_contract(tmp_path):
     assert markers["final_phrase"] == 1
     assert markers["pcs_to_ta"] == 1
     assert markers["auto_detail_ban"] == 1
-    assert markers["stage53_ban"] == 1
+    assert markers["stage52_product_plan_ban"] == 1
     assert markers["category_summary_header"] >= 2
     assert markers["product_table_header"] >= 2
     assert markers["category_table_only"] == 1
@@ -122,6 +122,11 @@ def test_effective_telegram_prompt_contains_full_untruncated_contract(tmp_path):
     assert markers["completion_not_total_driven"] == 1
     assert markers["category_completion"] == 1
     assert markers["category_no_general_phrase"] == 1
+    assert markers["stage53_heading"] == 1
+    assert markers["stage53_product_header"] == 1
+    assert markers["stage53_one_question"] == 1
+    assert markers["stage53_draft_confirmation"] == 1
+    assert markers["stage53_nutrition_limit"] == 1
     assert not any(result["forbidden"].values())
 
 

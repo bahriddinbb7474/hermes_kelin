@@ -15,8 +15,8 @@
 | 5 | Бухгалтерия: расходы/доходы/отчёты/баланс/исправление/удаление | ✅ **закрыт (2026-07-13):** на момент acceptance identity guard **1.0.3**, runtime tools **19**; Telegram E2E 4/4 PASS; evidence `EVIDENCE_STAGE_5_E2E_2026-07-12.md`. Текущий runtime после Stage 5.1 указан следующей строкой. |
 | 5.1 | Аналитика расходов + месячный план (quantity/unit, compare/trend, plan/fact, осторожные советы) | ✅ **CLOSED / LIVE PASS** (ТЗ v3.9 §0.9): migration 002 active; tools/dispatch/discovery **21/21/21**; plugin **1.0.4**; canonical SKILL + skill-protect active; controlled E2E и cleanup PASS. |
 | 5.2 | Простые family reports для Ойижон: общий отчёт и фактические product details по просьбе | ✅ **CLOSED / LIVE PASS (v3.16)**; Message 1/2 подтверждены live; final phrase зависит от report type, не от `Жами`; новый платный тест не выполнялся |
-| 5.3 | Семейный/product plan, product quantities/amounts, last/weighted average/manual reference price | ⬜ **PLANNED / NOT IMPLEMENTED**; migration 003 + price snapshot planned; tool count остаётся 21 |
-| 5.3A | Approval cycle 25/27/28/1, `approve_monthly_plan`, deterministic cron identity | ⬜ **PLANNED / NOT IMPLEMENTED**; migration 003 cycles; planned count 22 |
+| 5.3 | Семейный/product plan, product quantities/amounts, last/weighted average/manual reference price | ✅ **OFFLINE PASS / LIVE PENDING (v3.17)**; repo migration 003 + price snapshot + expanded 21 tools + canonical SOUL; VPS остаётся на migration 002 до deploy |
+| 5.3A | Approval cycle 25/27/28/1, `approve_monthly_plan`, deterministic cron identity | ⬜ **PLANNED / NOT IMPLEMENTED**; cycles schema подготовлена в migration 003, runtime/status/cron не реализованы; planned count 22 |
 | 5.4 | Official utility cabinets read-only, thresholds/snapshots, daily sync | ⬜ **PLANNED / NOT IMPLEMENTED**; research gate + migration 004; planned count 25 |
 | 6 | Hermes cron: reminders, recurring obligations, утро/вечер, новости, погода, намаз | ⬜ **PLANNED / NOT IMPLEMENTED**; migration 005 + 2 tools; planned final count 27; current runtime 21 |
 | 7 | Admin reports + safety: отчёт 19:30, alerts, recall 100% | ⬜ не начат — backend-tools готовы, нужен Hermes |
@@ -29,7 +29,8 @@
 - **Identity guard на момент Stage 5: 1.0.3** — Stage 5 E2E PASS (см. historical evidence); текущий runtime после Stage 5.1 = 1.0.4.
 - **Этап 5.1** — **CLOSED / LIVE PASS** (решение v3.9, сохранено v3.12): runtime 21/1.0.4; migration 002 и skill-protect active; live E2E/cleanup PASS.
 - **Этап 5.2** — **CLOSED / LIVE PASS** (v3.16): canonical SOUL LF SHA `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`; active Mariyam `SKILL.md` отсутствует; evidence `EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`.
-- **Stages 5.3–6 planned only (v3.16):** migrations 003/004/005, price snapshot, utility connector, approval/obligation tools и cron jobs не реализованы; tool count 27 не является runtime.
+- **Stage 5.3 = OFFLINE PASS / LIVE PENDING (v3.17):** repo migration 003, price snapshot, два расширенных tools и финальный трёхколоночный product report реализованы; inventory/dispatch/discovery = 21/21/21; VPS пока migration 002.
+- **Stages 5.3A–6 planned only:** approval runtime/cron, migrations 004/005, utility connector и obligation tools не реализованы; tool count 27 не является runtime.
 - **Skill-protect:** active 4/4; постоянные SHA/contract tests остаются обязательными.
 - **Тихая блокировка unauthorized решена в ТЗ v3.5** — `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (решение заказчика 2026-07-12, ТЗ §0.5); отдельный gateway-fork не требуется; аудит и merge `d24d01c` в `main` **ВЫПОЛНЕНЫ** (через `dd9261e`).
 

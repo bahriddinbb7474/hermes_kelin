@@ -1,8 +1,8 @@
-# Техническое задание v3.16 — FINAL
+# Техническое задание v3.17 — FINAL
 # Hermes Agent «Мариям» — ИИ келинчак для Ойижон
 
 **Статус:** ФИНАЛЬНЫЙ, единый источник истины (single source of truth)
-**Версия:** 3.16 — Stage 5.2 CLOSED / LIVE PASS: Message 1 и Message 2 подтверждены live; правило завершения зависит только от типа отчёта, не от строки `Жами`; canonical SOUL развёрнут и проверен offline без нового платного теста (см. 0.16). Stage 5.1 остаётся CLOSED / LIVE PASS по v3.9; Stage 5.3–6 и migrations 003/004/005 остаются PLANNED / NOT IMPLEMENTED. Имя файла не меняется, документ остаётся единственным источником истины.
+**Версия:** 3.17 — Stage 5.3 реализован локально и имеет статус **OFFLINE PASS / LIVE PENDING**: repo содержит идемпотентную migration 003, product plans, price snapshots, расширенные 21 tools и canonical SOUL; VPS по-прежнему использует migration 002 и предыдущий deployed SOUL. Stage 5.1 и Stage 5.2 остаются CLOSED / LIVE PASS; Stage 5.3A–6 остаются PLANNED / NOT IMPLEMENTED. Имя файла не меняется, документ остаётся единственным источником истины.
 **Проект:** персональный Telegram ИИ-агент для пожилой женщины из Узбекистана
 **Имя агента:** Мариям · **Образ:** ИИ келинчак
 **Основной пользователь:** Ойижон · **Администратор:** Бахриддин ака
@@ -252,6 +252,35 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
 7. **Stage 5.2 = CLOSED / LIVE PASS.** Stage 5.3–6 = **PLANNED / NOT
    IMPLEMENTED**. Реальная Ойижон не подключена. Evidence:
    `../EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`.
+
+### 0.17. Изменения v3.16 → v3.17 (2026-07-16) — Stage 5.3 offline implementation
+
+1. Добавлена идемпотентная repo migration `003_stage53_product_plans.sql`:
+   `monthly_budget_items` и подготовленная schema-часть `monthly_plan_cycles`.
+   Stage 5.3A runtime, `approve_monthly_plan` и cron-цикл не реализованы.
+2. `set_monthly_budget` принимает optional `items[]` и атомарно заменяет товары
+   одной пары user/month/category; category-only вызов остаётся совместимым.
+   `get_monthly_budget_status(include_items=true)` возвращает точные planned,
+   actual, remaining и price facts. Inventory/dispatch/discovery = **21/21/21**.
+3. Actual quantity/amount берутся только из `transactions`; несовместимые units
+   не смешиваются, unknown остаётся `null`, подтверждённый нулевой расход — `0`.
+4. Backend считает last и weighted average (`SUM(amount)/SUM(quantity)`),
+   поддерживает manual price и сохраняет неизменяемый price snapshot плана.
+   Отдельная таблица истории цен не создана.
+5. Canonical SOUL закрепляет один вопрос за сообщение, save только после явного
+   подтверждения полного draft, один nutrition web search на cycle с cache 30 дней
+   и medical safety. Repo canonical LF SOUL SHA-256:
+   `856fd7f37cd476e5eeae933c2c6cf82ec5fb0ed89c0410d30a74480188cd6c30`.
+6. Финальный подробный product report: category summary, затем ровно три колонки
+   `Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма`. Отдельной product-
+   колонки остатка нет; unknown = `—` или `айтилмаган`; значения не угадываются.
+7. Permanent Stage 5.3, SOUL/effective-prompt и regression tests добавлены.
+   Disposable PostgreSQL 16 double-apply migration PASS; `pytest -q` =
+   **185 passed**; ruff, compileall и `git diff --check` — PASS.
+8. **Статус Stage 5.3: OFFLINE PASS / LIVE PENDING.** Repo содержит migration 003,
+   но VPS остаётся на migration 002 до отдельного deploy. VPS/Telegram/provider API
+   не менялись; реальная Ойижон не подключалась. Stage 5.3A–6 остаются
+   **PLANNED / NOT IMPLEMENTED**.
 
 Исполнитель реализует проект **строго по разделам 5–21**, сдаёт этапами (раздел 15) и на каждом этапе выполняет acceptance criteria. Что делать запрещено — раздел 20.
 
@@ -524,7 +553,7 @@ Backend только проверяет, что `category_code` есть в эт
 
 **Stage 5.2 — одна группа:** сначала таблица summary `Харажат гуруҳи | Режа | Сарфлангани | Қолгани`, затем фактические товары `Маҳсулот | Миқдор | Сарфлангани`. Строка `Жами` допустима. После таблиц ответ завершается без финальной фразы общего отчёта и без вопросов. Missing quantity = `—` или не показывается; количество не угадывается. Product plan на Stage 5.2 не показывается. User-facing units: `kg→кг`, `g→г`, `l→л`, `ml→мл`, `pcs→та`, `pack→қадоқ`.
 
-**Stage 5.3 — PLANNED / NOT IMPLEMENTED:** product table показывает planned quantity/amount, actual quantity/amount и remaining amount. Actual берётся только из transactions. Последняя цена используется по умолчанию для следующего плана; явный запрос возвращает средневзвешенную цену; Ойижон может выбрать average или manual price. Разные units не смешиваются.
+**Stage 5.3 — OFFLINE PASS / LIVE PENDING:** product table после category summary имеет три колонки: `Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма`. Actual берётся только из transactions. Последняя цена используется по умолчанию для следующего плана; Ойижон может выбрать weighted average или manual price. Разные units не смешиваются; отдельная product-колонка остатка не показывается.
 
 ---
 
@@ -705,7 +734,7 @@ CREATE TABLE monthly_budget_plans (
     UNIQUE (user_id, month, category_code)
 );
 
--- v3.12 PLANNED / NOT IMPLEMENTED — migration 003
+-- v3.17 REPO IMPLEMENTED / VPS NOT APPLIED — migration 003
 CREATE TABLE monthly_budget_items (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -726,13 +755,13 @@ CREATE TABLE monthly_budget_items (
     CHECK (planned_quantity IS NOT NULL OR planned_amount_uzs IS NOT NULL)
 );
 
--- Planned migration 003 хранит snapshot выбранной reference price вместе с месячным планом.
+-- Migration 003 хранит snapshot выбранной reference price вместе с месячным планом.
 -- История фактических покупок и цен остаётся в transactions; отдельная таблица цен сейчас не создаётся.
 -- last и weighted average вычисляются только по одному normalized item и одной одинаковой unit
 -- при наличии amount, quantity и unit. Новый факт покупки не меняет старый plan snapshot.
 -- planned_amount_uzs рассчитывается из подтверждённых quantity × reference price либо задаётся вручную.
 
--- v3.12 PLANNED / NOT IMPLEMENTED — migration 003
+-- v3.17 REPO SCHEMA PREPARED / STAGE 5.3A RUNTIME NOT IMPLEMENTED — migration 003
 CREATE TABLE monthly_plan_cycles (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -851,7 +880,7 @@ CREATE TABLE usage_costs (
 ### 13.2. Миграции и seed (обязательно, v3.1)
 
 - SQL-файлы нумеруются: `001_init.sql`, `002_*.sql`, … Каждый файл **идемпотентен** (`CREATE TABLE IF NOT EXISTS`, `ON CONFLICT DO NOTHING`).
-- **Текущий runtime:** migration 001 + 002 active. **План v3.12:** migration 003 (`monthly_budget_items` с price snapshot, `monthly_plan_cycles`), 004 (`utility_accounts`, `utility_snapshots`) и 005 (`recurring_obligations`) — **PLANNED / NOT IMPLEMENTED**; файлов и production schema для них ещё нет.
+- **Repo v3.17:** migrations 001+002+003; migration 003 содержит `monthly_budget_items` с price snapshot и подготовленную schema-часть `monthly_plan_cycles`. **VPS runtime:** только 001+002 active; migration 003 не применена. Migrations 004 (`utility_accounts`, `utility_snapshots`) и 005 (`recurring_obligations`) остаются **PLANNED / NOT IMPLEMENTED**.
 - Для utility snapshots правило отрицательного prepaid balance против отдельного debt утверждается только после исследования реального кабинета; без явного provider rule одновременно хранить оба представления долга запрещено.
 - `docker-entrypoint-initdb.d` применяет скрипты **только при первом создании volume**. Любое изменение схемы после этого применяется вручную: `docker compose exec hermes_mariyam_postgres psql -U hermes -d hermes -f /docker-entrypoint-initdb.d/00N_*.sql`. Эта команда документируется в deploy-доке.
 - **Seed пользователей (v3.4):** обязателен `role=admin` (Бахриддин ака) — до первого реального вызова tools в таблице `users` он должен существовать. Опционально разрешён **временный test-user** для end-to-end тестов: `role=oyijon`, `display_name="Тест Ойижон"`, **только на втором Telegram-аккаунте, контролируемом заказчиком** (не реальная Ойижон). Настоящий ID Ойижон и настоящий seed `role=oyijon` выполняются **только при handover** (§0.4, §21). Создание — через tool `ensure_user` (см. 15.15) при настройке профиля Hermes, либо документированным SQL-скриптом в deploy-доке. Перед handover временный test-user и его данные удаляются. Первый вызов `save_expense` на пустой таблице `users` (без admin) не должен быть возможен «по недосмотру».
@@ -1125,7 +1154,7 @@ err: { "ok": false, "error_code": "INVALID_INPUT", ... }  // role не из ('oy
 
 **Stage 5.1 runtime (21, LIVE PASS):** + `set_monthly_budget`, `get_monthly_budget_status` (user-scoped; identity guard обязателен). Оба tools развёрнуты и обнаружены реальным MCP discovery.
 
-### 15.16. Planned contracts v3.12 — NOT IMPLEMENTED
+### 15.16. Stage 5.3 implemented contracts и planned extensions
 
 **Stage 5.3 (tool count остаётся 21):**
 
@@ -1151,7 +1180,7 @@ err: { "ok": false, "error_code": "INVALID_INPUT", ... }  // role не из ('oy
 - `get_recurring_obligations` — получить active/due обязательства пользователя.
 - Identity для обоих tools: Oyijon — self-only. Admin cross-target разрешён только для target из `allowed_target_user_ids` через отдельный narrow allowlist; разрешение не даёт прав на transactions.
 
-Все planned tools user-scoped и до реализации возвращать/объявлять их в runtime discovery запрещено. Текущий runtime остаётся **21**.
+Все новые planned tools Stage 5.3A–6 user-scoped и до реализации возвращать/объявлять их в runtime discovery запрещено. Stage 5.3 расширяет только два существующих tools; repo inventory остаётся **21**.
 
 ---
 
@@ -1338,15 +1367,15 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 7. JSON, tool names, technical fields и traces Ойижон не показывать; суммы только из tools.
 8. Wrapper-маркеры stored prompt и Telegram profile names не являются AC. Identity AC: exact Telegram session → private mapping → `requested=0` → effective test-user.
 
-### Этап 5.3 — Семейный и продуктовый план (v3.12 planned contract)
+### Этап 5.3 — Семейный и продуктовый план (v3.17)
 
-**Статус: PLANNED / NOT IMPLEMENTED.** Migration 003 planned; существующие tool contracts расширяются, tool count остаётся **21**.
+**Статус: OFFLINE PASS / LIVE PENDING.** Repo migration 003 и расширенные tool contracts реализованы; tool count остаётся **21**. VPS по-прежнему использует migration 002 до отдельного deploy.
 
-**Диалог:** Hermes спрашивает последовательно, не анкетой: (1) household size; (2) доступная общая сумма; (3) известные обязательные платежи; (4) основные продукты; (5) явно сообщённые ограничения питания; (6) показывает draft; (7) сохраняет только после подтверждения.
+**Диалог:** Hermes спрашивает последовательно, по одному вопросу в сообщении: (1) месяц; (2) household size; (3) группа расходов; (4) продукты дома; (5) нужные продукты и подтверждённые количества; (6) бюджет и last/average/manual price; (7) полный draft. `set_monthly_budget` вызывается только после явного подтверждения; после исправления draft показывается и подтверждается снова.
 
-**Продуктовый план:** сначала summary категории, затем таблица `Маҳсулот | Режа миқдор | Режа сўм | Сарфланган миқдор | Сарфланган сўм | Қолди сўм`. Для каждого item обязательно минимум одно planned value: quantity или amount. Actual quantity берётся только из transactions; quantity не угадывать; units не смешивать; remaining amount считает backend из точных данных.
+**Продуктовый план:** сначала summary категории `Харажат гуруҳи | Режа | Сарфлангани | Қолгани`, затем таблица `Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма`. Старый пятиколоночный planned-формат заменён; отдельной product-колонки остатка нет. Для item обязательно минимум одно planned value: quantity или amount. Actual quantity/amount берутся только из transactions; quantity и price не угадывать; units не смешивать; unknown = `—` или `айтилмаган`.
 
-**Reference prices:** последняя цена = amount / quantity самой поздней подходящей покупки; средняя — только средневзвешенная, сумма покупок / общее количество одного товара в одной unit. Без normalized item, amount, quantity и unit цену не считать. Следующий план использует last по умолчанию; Ойижон может выбрать average или manual. Snapshot сохраняется в planned migration 003 и не меняется от будущих покупок.
+**Reference prices:** последняя цена = amount / quantity самой поздней подходящей покупки; средняя — только средневзвешенная, сумма покупок / общее количество одного товара в одной unit. Без normalized item, amount, quantity и unit цену не считать. Следующий план использует last по умолчанию; Ойижон может выбрать average или manual. Snapshot сохраняется repo migration 003 и не меняется от будущих покупок.
 
 **Nutrition guidance AC:**
 
@@ -1357,7 +1386,7 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 5. При медицинских ограничениях рекомендовать согласовать рацион с врачом.
 6. Точные quantities сохранять только после подтверждения семьи.
 
-**Storage/tools AC:** planned migration 003 создаёт `monthly_budget_items` с `reference_unit_price_uzs`, `price_basis`, `price_as_of`; `set_monthly_budget` принимает optional `items[]`; `get_monthly_budget_status(include_items=true)` возвращает product plan/actual/remaining и last/average/reference price. Runtime discovery по-прежнему = 21; migration 003 не создана и не применена.
+**Storage/tools AC:** repo migration 003 создаёт `monthly_budget_items` с `reference_unit_price_uzs`, `price_basis`, `price_as_of` и подготовленную schema-часть `monthly_plan_cycles`; `set_monthly_budget` принимает optional `items[]`; `get_monthly_budget_status(include_items=true)` возвращает product plan/actual/remaining и last/average/reference price. Inventory/dispatch/discovery = 21/21/21. Migration 003 не применена на VPS.
 
 ### Этап 5.3A — Цикл утверждения плана 25/27/28/1 (v3.10)
 

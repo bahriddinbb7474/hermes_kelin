@@ -139,12 +139,15 @@ async def t_set_monthly_budget(pool, a):
         a["category_code"],
         a["planned_amount_uzs"],
         a.get("note"),
+        a.get("items"),
     )
     return ok(**r)
 
 
 async def t_get_monthly_budget_status(pool, a):
-    r = await db.get_monthly_budget_status(pool, a["user_id"], a["month"])
+    r = await db.get_monthly_budget_status(
+        pool, a["user_id"], a["month"], a.get("include_items", False)
+    )
     return ok(**r)
 
 
@@ -275,6 +278,27 @@ P = {
     "trend_months": {"type": "integer", "minimum": 1, "maximum": 12},
     "month": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-01$"},
     "planned_amount_uzs": {"type": "number", "minimum": 0},
+    "budget_items": {"type": "array", "items": {
+        "type": "object",
+        "properties": {
+            "item_name_normalized": {"type": "string", "minLength": 1},
+            "item_name_display": {"type": "string", "minLength": 1},
+            "planned_quantity": {"type": "number", "exclusiveMinimum": 0},
+            "unit": {"type": "string", "enum": list(db.CANONICAL_UNITS)},
+            "planned_amount_uzs": {"type": "number", "minimum": 0},
+            "reference_unit_price_uzs": {"type": "number", "minimum": 0},
+            "price_basis": {"type": "string", "enum": list(db.PRICE_BASES)},
+            "price_as_of": {"type": "string"},
+            "note": {"type": "string"},
+        },
+        "required": ["item_name_normalized", "item_name_display"],
+        "anyOf": [
+            {"required": ["planned_quantity"]},
+            {"required": ["planned_amount_uzs"]},
+        ],
+        "additionalProperties": False,
+    }},
+    "include_items": {"type": "boolean", "default": False},
     "surah": {"type": "string"},
     "juz": {"type": "integer"},
     "page": {"type": "integer"},
@@ -310,8 +334,8 @@ TOOLS = [
     ("delete_last_expense", "Удалить последний расход", schema(pick("user_id"), ["user_id"])),
     ("get_expense_report", "Отчёт по расходам (+ by_item / compare_previous / monthly_series)", schema(pick("user_id", "period", "from", "to", "category_code", "compare_previous", "trend_months"), ["user_id"])),
     ("get_balance_summary", "Доход/расход/остаток за период", schema(pick("user_id", "period"), ["user_id"])),
-    ("set_monthly_budget", "Создать или обновить месячный план по категории", schema(pick("user_id", "month", "category_code", "planned_amount_uzs", "note"), ["user_id", "month", "category_code", "planned_amount_uzs"])),
-    ("get_monthly_budget_status", "Факты plan/fact за календарный месяц", schema(pick("user_id", "month"), ["user_id", "month"])),
+    ("set_monthly_budget", "Создать/обновить план категории и после подтверждения атомарно заменить optional product items с price snapshot", schema({**pick("user_id", "month", "category_code", "planned_amount_uzs", "note"), "items": P["budget_items"]}, ["user_id", "month", "category_code", "planned_amount_uzs"])),
+    ("get_monthly_budget_status", "Точные plan/fact за месяц; include_items=true добавляет product plan, actual и reference prices", schema(pick("user_id", "month", "include_items"), ["user_id", "month"])),
     ("save_quran_progress", "Сохранить прогресс Корана", schema(pick("user_id", "surah", "juz", "page", "note"), ["user_id"])),
     ("get_quran_progress", "Последний прогресс Корана", schema(pick("user_id"), ["user_id"])),
     ("save_health_note", "Заметка о самочувствии (без диагноза)", schema(pick("user_id", "note", "severity", "source_text"), ["user_id", "note"])),

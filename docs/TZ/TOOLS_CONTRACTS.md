@@ -1,9 +1,9 @@
 # Tools Contracts
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (полные примеры вход/выход — §15).
-Реализация: `backend/server.py` + `backend/db.py`. **Repo/VPS runtime: 21 tools; dispatch/MCP discovery = 21/21; Stage 5.1 CLOSED / LIVE PASS.** Новые tools: `set_monthly_budget`, `get_monthly_budget_status`.
+Реализация: `backend/server.py` + `backend/db.py`. **Repo/VPS inventory: 21 tools; repo dispatch/MCP discovery = 21/21.** Stage 5.3 расширяет существующие `set_monthly_budget` и `get_monthly_budget_status`; новых tools нет. VPS deployment Stage 5.3 pending.
 
-**v3.12 planned progression:** Stage 5.3 = 21, Stage 5.3A = 22, Stage 5.4 = 25, Stage 6 = 27. Всё сверх текущих 21 — **PLANNED / NOT IMPLEMENTED** и отсутствует в runtime discovery.
+**v3.17 progression:** Stage 5.3 repo = 21, Stage 5.3A = planned 22, Stage 5.4 = planned 25, Stage 6 = planned 27. Всё сверх текущих 21 — **PLANNED / NOT IMPLEMENTED** и отсутствует в runtime discovery.
 
 ## Общие правила
 
@@ -43,12 +43,14 @@
 
 **get_expense_report (out extras):** `by_item` (total_uzs, purchase_count, quantity_by_unit, average_unit_price_uzs if homogeneous), `previous_period` (change_percent=null if prev total=0), `monthly_series`.
 
-## Planned contract extensions v3.12
+## Stage 5.3 implemented contract extensions
 
 ### Stage 5.3 — без новых tools, runtime count остаётся 21
 
 - `set_monthly_budget`: optional `items[]`; каждый planned item может содержать `item_name_normalized`, `item_name_display`, `planned_quantity`, `unit`, `planned_amount_uzs`, `reference_unit_price_uzs`, `price_basis`, `price_as_of`, `note`. Минимум одно из `planned_quantity` или `planned_amount_uzs` обязательно.
+- Если `items` отсутствует, product rows не меняются; если передан — category plan и полная замена product rows выполняются атомарно. Default price basis = last; average только явно, manual требует явную reference price.
 - `get_monthly_budget_status(include_items=true)` возвращает по item: `planned_quantity`, `planned_unit`, `planned_amount_uzs`, `actual_quantity`, `actual_unit`, `actual_amount_uzs`, `remaining_amount_uzs`, `last_unit_price_uzs`, `average_unit_price_uzs`, `reference_unit_price_uzs`, `price_basis`, `price_as_of`. Unknown = `null`, не `0`; разные units не смешиваются.
+- Default `include_items=false`, поэтому Stage 5.2 contract не меняется.
 - Backend считает точные числа, последнюю и средневзвешенную цену из transactions и сохраняет price snapshot плана; backend не пишет прозу. Цена рассчитывается только при наличии normalized item, amount, quantity и unit.
 - Hermes объясняет данные, предлагает last price по умолчанию, спрашивает подтверждение и принимает `average` или `manual` override. Ценовая логика не хранится в LLM memory.
 
@@ -69,7 +71,7 @@
 - Upsert также меняет amount/date, отмечает paid и disables; paid не создаёт expense автоматически.
 - Оба tools: Oyijon self-only; admin narrow cross-target только для target из `allowed_target_user_ids` через отдельный per-tool allowlist; права на transactions не выдаются.
 
-Все planned tools user-scoped. Unknown/untrusted Telegram или cron identity → fail closed до MCP.
+Все будущие tools Stage 5.3A–6 user-scoped. Unknown/untrusted Telegram или cron identity → fail closed до MCP.
 
 ## Обязательные поля (required) по tools
 

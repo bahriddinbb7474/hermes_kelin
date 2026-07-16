@@ -27,6 +27,17 @@ SUMMARY_BEFORE_PRODUCTS = (
 COMPLETION_NOT_TOTAL_DRIVEN = "Наличие `Жами` никогда не определяет"
 CATEGORY_COMPLETION = "После таблиц завершить ответ"
 CATEGORY_NO_GENERAL_PHRASE = "Финальную фразу общего отчёта не писать"
+STAGE53_HEADING = "Stage 5.3 — продуктовый месячный план"
+STAGE53_PRODUCT_HEADER = (
+    "Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма"
+)
+ONE_QUESTION = "бир хабарда фақат битта савол"
+DRAFT_CONFIRMATION = "не вызывай `set_monthly_budget`"
+NUTRITION_LIMIT = "максимум один web search на plan cycle"
+OLD_FIVE_COLUMN = (
+    "Маҳсулот | Режа миқдор | Режа сўм | "
+    "Сарфланган миқдор | Сарфланган сўм | Қолди сўм"
+)
 
 
 def main() -> None:
@@ -53,7 +64,7 @@ def main() -> None:
             "final_phrase": full.count(FINAL_PHRASE),
             "pcs_to_ta": full.count("pcs → та"),
             "auto_detail_ban": full.count(AUTO_DETAIL_BAN),
-            "stage53_ban": full.count("Product plan не показывай"),
+            "stage52_product_plan_ban": full.count("Product plan не показывай"),
             "category_summary_header": full.count(CATEGORY_SUMMARY_HEADER),
             "product_table_header": full.count(PRODUCT_TABLE_HEADER),
             "category_table_only": full.count(CATEGORY_TABLE_ONLY),
@@ -62,11 +73,17 @@ def main() -> None:
             "completion_not_total_driven": full.count(COMPLETION_NOT_TOTAL_DRIVEN),
             "category_completion": full.count(CATEGORY_COMPLETION),
             "category_no_general_phrase": full.count(CATEGORY_NO_GENERAL_PHRASE),
+            "stage53_heading": full.count(STAGE53_HEADING),
+            "stage53_product_header": full.count(STAGE53_PRODUCT_HEADER),
+            "stage53_one_question": full.count(ONE_QUESTION),
+            "stage53_draft_confirmation": full.count(DRAFT_CONFIRMATION),
+            "stage53_nutrition_limit": full.count(NUTRITION_LIMIT),
         },
         "forbidden": {
             "dona": "дона" in full,
             "old_auto_items": "внутри питания — товары" in full,
             "old_category_item_example": "разбивку category/item" in full,
+            "old_stage53_five_column": OLD_FIVE_COLUMN in full,
         },
     }
     print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
