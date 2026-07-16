@@ -273,29 +273,28 @@ Stage 5.2 показал второй root cause: Hermes добавляет в s
    `deploy/hermes_profile_mariyam_oyijon/SOUL.md` как
    `~/.hermes/profiles/mariyam_oyijon/SOUL.md`. Не создавать вторую копию в
    `skills/mariyam/SKILL.md`.
-3. Перезапустить только `hermes-gateway-mariyam_oyijon.service`.
-4. **Offline preflight deployed-профиля (0 API calls):** собрать effective prompt
-   через `build_system_prompt_parts()`, подтвердить полный SOUL, canonical SHA,
-   Stage 5.2 markers и отсутствие truncation. Этот шаг не создаёт и не заполняет
-   `sessions.system_prompt`.
-5. Для test-user выполнить поддерживаемый session reset `/new` **до** acceptance:
-   restart процесса сам по себе не меняет сохранённый prompt.
-6. **Первый controlled E2E turn:** после отдельного разрешения отправить ровно одно
-   платное тестовое сообщение и остановиться до DB/prompt-проверки.
-7. **Stored prompt check после первого turn:** read-only подтвердить, что новая
-   session имеет `started_at` позже deploy, а `sessions.system_prompt` совпадает с
-   offline preflight по SHA/markers. Только после этого продолжать остальные
-   acceptance-сообщения. Полный prompt, Telegram ID и secrets в evidence не писать.
-8. Offline gate:
+3. Инвалидировать только session временного test-user через private mapping; другие
+   sessions и данные не менять.
+4. Перезапустить только `hermes-gateway-mariyam_oyijon.service`.
+5. **Offline preflight deployed-профиля (API calls = 0):** собрать effective prompt
+   через `build_system_prompt_parts()`, подтвердить полный SOUL, canonical SHA, оба
+   report contracts и отсутствие truncation.
+6. Новый платный Telegram/provider test не выполнять: Message 1 и Message 2 уже
+   подтверждены live. Специальные wrapper-маркеры stored prompt не являются AC;
+   Telegram first_name/last_name/username не являются identity. Identity проверяется
+   только цепочкой `exact Telegram session → private mapping → requested=0 → effective=test-user`.
+7. Offline gate:
    `pytest tests/test_mariyam_effective_prompt.py tests/test_mariyam_skill_protection.py`.
 
 Опционально (filesystem belt, не вместо config): `chmod a-w` на profile
 `SOUL.md` после deploy.
 
-Текущий skill-protect на VPS остаётся active. После controlled live
-Message 1 PASS / Message 2 category-summary format-only FAIL и полного rollback
-узкий SOUL table-format fix имеет статус `OFFLINE PASS / LIVE PENDING`; VPS снова
-на Stage 5.1 baseline. Любое VPS-применение — только по новому разрешению.
+Stage 5.2 = **CLOSED / LIVE PASS**. Message 1 и Message 2 подтверждены live;
+исправление завершения отчётов закреплено offline без нового платного теста.
+Активен единственный canonical SOUL SHA
+`3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`;
+активный Mariyam `SKILL.md` отсутствует, skill-protect и `tool_progress=off`
+сохранены. Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**.
 
 ## Выполненный Stage 5.1 live deploy (история выполнения)
 

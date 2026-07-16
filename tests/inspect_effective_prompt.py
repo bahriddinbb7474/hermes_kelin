@@ -24,6 +24,9 @@ BULLET_SUMMARY_BAN = "Маркированный список вместо summa
 SUMMARY_BEFORE_PRODUCTS = (
     "Сразу после summary-таблицы выведи таблицу фактических товаров"
 )
+COMPLETION_NOT_TOTAL_DRIVEN = "Наличие `Жами` никогда не определяет"
+CATEGORY_COMPLETION = "После таблиц завершить ответ"
+CATEGORY_NO_GENERAL_PHRASE = "Финальную фразу общего отчёта не писать"
 
 
 def main() -> None:
@@ -56,6 +59,9 @@ def main() -> None:
             "category_table_only": full.count(CATEGORY_TABLE_ONLY),
             "bullet_summary_ban": full.count(BULLET_SUMMARY_BAN),
             "summary_before_products": full.count(SUMMARY_BEFORE_PRODUCTS),
+            "completion_not_total_driven": full.count(COMPLETION_NOT_TOTAL_DRIVEN),
+            "category_completion": full.count(CATEGORY_COMPLETION),
+            "category_no_general_phrase": full.count(CATEGORY_NO_GENERAL_PHRASE),
         },
         "forbidden": {
             "dona": "дона" in full,

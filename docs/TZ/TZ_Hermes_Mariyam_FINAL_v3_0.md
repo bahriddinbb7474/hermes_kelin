@@ -1,8 +1,8 @@
-# Техническое задание v3.15 — FINAL
+# Техническое задание v3.16 — FINAL
 # Hermes Agent «Мариям» — ИИ келинчак для Ойижон
 
 **Статус:** ФИНАЛЬНЫЙ, единый источник истины (single source of truth)
-**Версия:** 3.15 — узкий CATEGORY_DETAIL table-format fix прошёл offline verification после controlled live FAIL и полного rollback (см. 0.15); повторный live deploy/E2E остаётся pending. Stage 5.1 остаётся CLOSED / LIVE PASS по v3.9; Stage 5.3–6 и migrations 003/004/005 остаются PLANNED / NOT IMPLEMENTED. Имя файла не меняется, документ остаётся единственным источником истины.
+**Версия:** 3.16 — Stage 5.2 CLOSED / LIVE PASS: Message 1 и Message 2 подтверждены live; правило завершения зависит только от типа отчёта, не от строки `Жами`; canonical SOUL развёрнут и проверен offline без нового платного теста (см. 0.16). Stage 5.1 остаётся CLOSED / LIVE PASS по v3.9; Stage 5.3–6 и migrations 003/004/005 остаются PLANNED / NOT IMPLEMENTED. Имя файла не меняется, документ остаётся единственным источником истины.
 **Проект:** персональный Telegram ИИ-агент для пожилой женщины из Узбекистана
 **Имя агента:** Мариям · **Образ:** ИИ келинчак
 **Основной пользователь:** Ойижон · **Администратор:** Бахриддин ака
@@ -228,6 +228,30 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
 7. **Stage 5.2 = OFFLINE PASS / LIVE PENDING.** Commit, VPS deploy,
    Telegram/API retest и push в этой задаче не выполнялись. Evidence:
    `../EVIDENCE_STAGE_5_2_CATEGORY_TABLE_FIX_2026-07-16.md`.
+
+### 0.16. Изменения v3.15 → v3.16 (2026-07-16) — Stage 5.2 closure
+
+1. Исправлена логическая ошибка завершения: наличие `Жами` никогда не определяет,
+   нужна ли финальная фраза; правило зависит только от report type.
+2. `GENERAL_FAMILY_REPORT` допускает `Жами` и обязательно завершается дословной
+   финальной фразой. `CATEGORY_DETAIL` допускает `Жами`, выводит summary-таблицу,
+   затем product-таблицу и завершается без финальной фразы общего отчёта и без
+   вопросов.
+3. Wrapper-маркеры stored prompt не являются AC. Telegram
+   `first_name/last_name/username` не являются identity. Identity AC:
+   `exact Telegram session → private mapping → requested=0 → effective=test-user`.
+4. Message 1 и Message 2 уже подтверждены live; новый платный Telegram/provider
+   test не выполнялся.
+5. Единственный active canonical prompt — SOUL LF SHA
+   `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`;
+   active Mariyam `SKILL.md` отсутствует; skill-protect и `tool_progress=off`
+   сохранены.
+6. Backend, SQL, identity plugin, Hermes core и migrations не менялись. Runtime
+   остаётся 21 tools / plugin 1.0.4 / migration 002; migrations 003/004/005
+   отсутствуют.
+7. **Stage 5.2 = CLOSED / LIVE PASS.** Stage 5.3–6 = **PLANNED / NOT
+   IMPLEMENTED**. Реальная Ойижон не подключена. Evidence:
+   `../EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`.
 
 Исполнитель реализует проект **строго по разделам 5–21**, сдаёт этапами (раздел 15) и на каждом этапе выполняет acceptance criteria. Что делать запрещено — раздел 20.
 
@@ -496,9 +520,9 @@ Backend только проверяет, что `category_code` есть в эт
 
 Мариям отвечает по запросу: «Бугун қанча харажат бўлди?», «Бу ой қанча кетди?», «Гўштга қанча кетди?», «Охирги ҳафта?», «Пенсиядан қанча қолди?» (баланс). Числа берутся из tools, текст пишет Hermes.
 
-**Stage 5.2 — общий отчёт:** допускает короткое вступление, `Сарфланди / Сарфлангани`, `Қолди / Қолгани`, строку `Жами` и отрицательный остаток с простым пояснением. Завершается дословно: `Ойижон, хоҳласангиз, бирор харажат гуруҳини батафсилроқ кўриб чиқамиз. Маълумотлар тайёр.`
+**Stage 5.2 — общий отчёт:** допускает короткое вступление, `Сарфланди / Сарфлангани`, `Қолди / Қолгани`, строку `Жами` и отрицательный остаток с простым пояснением. По типу `GENERAL_FAMILY_REPORT` обязательно завершается дословно: `Ойижон, хоҳласангиз, бирор харажат гуруҳини батафсилроқ кўриб чиқамиз. Маълумотлар тайёр.` Наличие `Жами` правило завершения не меняет.
 
-**Stage 5.2 — одна группа:** сначала таблица summary `Харажат гуруҳи | Режа | Сарфлангани | Қолгани`, затем фактические товары `Маҳсулот | Миқдор | Сарфлангани`. Missing quantity = `—` или не показывается; количество не угадывается. Product plan на Stage 5.2 не показывается. User-facing units: `kg→кг`, `g→г`, `l→л`, `ml→мл`, `pcs→та`, `pack→қадоқ`.
+**Stage 5.2 — одна группа:** сначала таблица summary `Харажат гуруҳи | Режа | Сарфлангани | Қолгани`, затем фактические товары `Маҳсулот | Миқдор | Сарфлангани`. Строка `Жами` допустима. После таблиц ответ завершается без финальной фразы общего отчёта и без вопросов. Missing quantity = `—` или не показывается; количество не угадывается. Product plan на Stage 5.2 не показывается. User-facing units: `kg→кг`, `g→г`, `l→л`, `ml→мл`, `pcs→та`, `pack→қадоқ`.
 
 **Stage 5.3 — PLANNED / NOT IMPLEMENTED:** product table показывает planned quantity/amount, actual quantity/amount и remaining amount. Actual берётся только из transactions. Последняя цена используется по умолчанию для следующего плана; явный запрос возвращает средневзвешенную цену; Ойижон может выбрать average или manual price. Разные units не смешиваются.
 
@@ -1297,21 +1321,22 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 
 > **Статус v3.9: CLOSED / LIVE PASS.** Repo и VPS runtime = **21 tools / plugin 1.0.4**; migration 002 применена; canonical SKILL и skill-protect активны. Controlled E2E подтвердил quantity/unit, analytics, compare/trend, budget plan/fact и identity; cleanup восстановил DB baseline. Evidence: `../EVIDENCE_STAGE_5_1_LIVE_2026-07-13.md`.
 
-### Этап 5.2 — Простые семейные отчёты для Ойижон (v3.15)
+### Этап 5.2 — Простые семейные отчёты для Ойижон (v3.16)
 
-**Статус: OFFLINE PASS / LIVE PENDING.** Единственный canonical prompt — profile `SOUL.md`; repo LF SHA = `a9b584e14d704f08b4778b7928ca71a0cf095394583f769c5e9571097884b4e4`; effective assembled Telegram prompt contract PASS без truncation. Controlled live: Message 1 PASS, Message 2 FAIL только из-за списка вместо обязательной category-summary таблицы; cleanup/rollback PASS. VPS снова использует Stage 5.1 SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; narrow fix не развёрнут, повторный E2E после fix не выполнялся.
+**Статус: CLOSED / LIVE PASS.** Единственный canonical prompt — profile `SOUL.md`; LF SHA = `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`; active Mariyam `SKILL.md` отсутствует. Effective assembled Telegram prompt contract PASS без truncation. Message 1 и Message 2 подтверждены live; новый платный test не выполнялся. Evidence: `../EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`.
 
 **Язык для Ойижон:** сложные термины заменяются только в user-facing тексте: бюджет → `оила харажатлари режаси`; план → `режа`; факт → `амалда сарфланган / сарфланди`; остаток → `қолган пул`; категория → `харажат гуруҳи`; отклонение → `режадан кўп ёки кам`; тренд → `ойлар бўйича ўзгариш`; аналитика → `ҳисоб-китобни кўриб чиқиш`. Внутренние tool fields/contracts остаются техническими.
 
 **AC отчёта в течение месяца:**
 
 1. Общий ответ показывает plan / spent / remaining по группам. Допустимы короткое вступление, `Сарфланди / Сарфлангани`, `Қолди / Қолгани`, `Жами`, отрицательный остаток с понятным пояснением.
-2. Общий отчёт обязательно заканчивается дословной фразой: `Ойижон, хоҳласангиз, бирор харажат гуруҳини батафсилроқ кўриб чиқамиз. Маълумотлар тайёр.` Её нельзя пропускать или перефразировать.
+2. По типу `GENERAL_FAMILY_REPORT` общий отчёт обязательно заканчивается дословной фразой: `Ойижон, хоҳласангиз, бирор харажат гуруҳини батафсилроқ кўриб чиқамиз. Маълумотлар тайёр.` Её нельзя пропускать или перефразировать. Наличие `Жами` правило не меняет.
 3. Детали без просьбы Ойижон не показываются.
-4. По запросу одной группы сначала summary: `Харажат гуруҳи | Режа | Сарфлангани | Қолгани`; затем фактические товары: `Маҳсулот | Миқдор | Сарфлангани`.
+4. По запросу одной группы сначала summary: `Харажат гуруҳи | Режа | Сарфлангани | Қолгани`; затем фактические товары: `Маҳсулот | Миқдор | Сарфлангани`. `Жами` допустима; после таблиц ответ завершается без финальной фразы общего отчёта и без вопросов.
 5. Stage 5.2 не показывает product plan. Quantity показывается только из данных; missing quantity = `—` или не показывается; quantity не угадывать.
 6. User-facing units: `кг / г / л / мл / та / қадоқ`; canonical units остаются `kg / g / l / ml / pcs / pack`.
 7. JSON, tool names, technical fields и traces Ойижон не показывать; суммы только из tools.
+8. Wrapper-маркеры stored prompt и Telegram profile names не являются AC. Identity AC: exact Telegram session → private mapping → `requested=0` → effective test-user.
 
 ### Этап 5.3 — Семейный и продуктовый план (v3.12 planned contract)
 

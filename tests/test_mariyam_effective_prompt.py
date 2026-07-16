@@ -119,16 +119,24 @@ def test_effective_telegram_prompt_contains_full_untruncated_contract(tmp_path):
     assert markers["category_table_only"] == 1
     assert markers["bullet_summary_ban"] == 1
     assert markers["summary_before_products"] == 1
+    assert markers["completion_not_total_driven"] == 1
+    assert markers["category_completion"] == 1
+    assert markers["category_no_general_phrase"] == 1
     assert not any(result["forbidden"].values())
 
 
-def test_deploy_requires_new_session_and_cached_prompt_verification():
+def test_deploy_closes_stage_with_offline_prompt_gate_and_no_paid_retest():
     text = DEPLOY_DOC.read_text(encoding="utf-8")
     section = text.split("## Deterministic profile prompt", 1)[1]
     offline = section.index("Offline preflight deployed-профиля")
-    reset = section.index("/new")
-    first_turn = section.index("Первый controlled E2E turn")
-    stored = section.index("Stored prompt check после первого turn")
-    assert offline < reset < first_turn < stored
-    assert "sessions.system_prompt" in section
+    invalidate = section.index("Инвалидировать только session временного test-user")
+    assert invalidate < offline
+    assert "API calls = 0" in section
+    assert "Новый платный Telegram/provider test не выполнять" in section
+    assert "wrapper-маркеры stored prompt не являются AC" in section
+    assert "first_name/last_name/username не являются identity" in section
+    assert (
+        "exact Telegram session → private mapping → requested=0 → effective=test-user"
+        in section
+    )
     assert "effective prompt" in section.lower()

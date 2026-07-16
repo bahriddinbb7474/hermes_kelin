@@ -56,13 +56,13 @@ hermes-mariyam/
 
 ## Текущее состояние (2026-07-16)
 
-ТЗ: **v3.15**. Stage 5.1 остаётся **CLOSED / LIVE PASS**. Stage 5.2 = **OFFLINE PASS / LIVE PENDING**: controlled live дал Message 1 PASS и Message 2 FAIL только из-за списка вместо обязательной category-summary таблицы; cleanup/rollback PASS. Узкий table-format fix и effective prompt проверены offline без truncation; repo LF SOUL SHA = `a9b584e14d704f08b4778b7928ca71a0cf095394583f769c5e9571097884b4e4`. VPS после rollback использует Stage 5.1 SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; narrow fix ещё не развёрнут. Runtime = **21 tools / plugin 1.0.4 / migration 002**. Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Реальная Ойижон не подключена.
+ТЗ: **v3.16**. Stage 5.1 и Stage 5.2 = **CLOSED / LIVE PASS**. Message 1 и Message 2 подтверждены live; исправление завершения отчётов теперь зависит только от report type, а не от строки `Жами`, и проверено offline без нового платного теста. Active canonical SOUL LF SHA = `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`; active Mariyam `SKILL.md` отсутствует. Runtime = **21 tools / plugin 1.0.4 / migration 002**. Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Реальная Ойижон не подключена.
 
 Этап 1 (VPS + Hermes + Telegram) — **закрыт по решению заказчика (2026-07-12, ТЗ v3.5)**:
 - ✅ PostgreSQL healthy (порт 127.0.0.1:5432, init-миграции применены);
 - ✅ Hermes Agent v0.18.2 установлен (профиль `mariyam_oyijon` создан; модель `gpt-5.6-luna` через api.n1n.ai — утверждена 2026-07-12, язык 100%/числа 100%; в allowlist сейчас admin + временный test-user «Тест Ойижон», допустимый для e2e-тестов — ТЗ §0.4);
 - ✅ На момент Stage 4 acceptance MCP stdio `mariyam_backend` показывал ровно **19 tools**; реальные tool-calls работали, `ensure_user` был идемпотентен. Текущий runtime после Stage 5.1 = 21 tools;
-- ✅ runtime Stage 5.1 skill установлен; новый canonical SOUL v3.15 пока только offline;
+- ✅ canonical SOUL v3.16 установлен; active Mariyam `SKILL.md` отсутствует;
 - ✅ Telegram Gateway установлен как **systemd user-service** (`hermes-gateway-mariyam_oyijon.service`; user-unit, `Restart=always`, без секретов); `loginctl enable-linger timeagent` выполнен; unit `active`/`enabled` (Блок 6И);
 - ✅ **Живой ответ получен**: бот ответил Бахриддин ака в Telegram на узбекской кириллице (gateway реально принимает и обрабатывает сообщения);
 - ✅ Негативный allowlist-тест выполнен: аккаунт вне allowlist блокируется адаптером **до** LLM/tools/БД — `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (решение заказчика 2026-07-12, ТЗ §0.5; точный текст отказа `Кечирасиз, бу шахсий ёрдамчи.` не обязателен для Hermes v0.18.2);
@@ -86,19 +86,18 @@ hermes-mariyam/
 - ✅ Runtime: quantity/unit, by_item, compare/trend, plan/fact; tools/dispatch/discovery **21/21/21**; plugin **1.0.4**; migration 002 active; SKILL SHA `b1231182…`; skill-protect **4/4**.
 - ✅ Controlled E2E на «Тест Ойижон»: identity PASS, 6/7 provider requests, retry=0; cleanup восстановил DB baseline. Evidence: `docs/EVIDENCE_STAGE_5_1_LIVE_2026-07-13.md`.
 
-**Stage 5.2 — OFFLINE PASS / LIVE PENDING (v3.15):**
-- единственный canonical prompt — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`;
-- full effective Telegram prompt contract PASS; repo LF SHA = `a9b584e14d704f08b4778b7928ca71a0cf095394583f769c5e9571097884b4e4`;
-- предыдущий live: Message 1 PASS, Message 2 format-only FAIL, cleanup/rollback PASS;
-- VPS = Stage 5.1 rollback baseline; будущий gate: deploy → offline prompt preflight (0 API calls) →
-  `/new` → первый controlled turn → stored-prompt check → остальные E2E;
-- narrow fix evidence: `docs/EVIDENCE_STAGE_5_2_CATEGORY_TABLE_FIX_2026-07-16.md`.
+**Stage 5.2 — CLOSED / LIVE PASS (v3.16):**
+- единственный canonical prompt — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, LF SHA `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`;
+- Message 1 и Message 2 подтверждены live; новый платный Telegram/provider test не выполнялся;
+- `GENERAL_FAMILY_REPORT` завершается обязательной дословной фразой; `CATEGORY_DETAIL` после двух таблиц завершается без этой фразы и без вопросов; наличие `Жами` правило не меняет;
+- identity AC: exact Telegram session → private mapping → `requested=0` → effective test-user; wrapper-маркеры stored prompt и Telegram profile names не являются AC;
+- evidence: `docs/EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`.
 
-**Planned v3.15 — NOT IMPLEMENTED:**
+**Planned v3.16 — NOT IMPLEMENTED:**
 - Stage 5.3/5.3A: product plan, last/weighted average/manual reference prices, migration 003 price snapshot и approval cycle 25/27/28/1; planned count 21→22 после approval tool;
 - Stage 5.4: researched official utility cabinet, deterministic read-only connector, migration 004, planned count 25;
 - Stage 6 extension: recurring obligations, migration 005, Hermes cron, planned final count 27;
-- current runtime остаётся **21**; VPS/profile не менялись в рамках offline fix.
+- current runtime остаётся **21**; Stage 5.3–6 не реализованы.
 
 Текущий allowlist: **admin + временный «Тест Ойижон»** (второй аккаунт заказчика, role=oyijon). Реальная Ойижон отсутствует (до handover).
 

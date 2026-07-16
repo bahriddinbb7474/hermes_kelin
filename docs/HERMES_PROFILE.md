@@ -10,7 +10,7 @@
 
 > **Stage 5.1 status (2026-07-15): CLOSED / LIVE PASS.** VPS/profile = tools **21**, plugin **1.0.4**, migration 002 active, SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, skill-protect **4/4**, `tool_progress` off. Controlled E2E и cleanup PASS.
 
-> **ТЗ v3.15:** Stage 5.2 = **OFFLINE PASS / LIVE PENDING**. Единственный canonical prompt — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, LF SHA `a9b584e14d704f08b4778b7928ca71a0cf095394583f769c5e9571097884b4e4`; effective assembled prompt contract PASS. Предыдущий controlled live: Message 1 PASS, Message 2 FAIL только по category-summary format; cleanup/rollback PASS. Profile/runtime снова на Stage 5.1 SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, 21 tools, plugin 1.0.4, migration 002. Narrow fix не развёрнут и после него E2E не выполнялся. Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Реальная Ойижон не подключалась.
+> **ТЗ v3.16:** Stage 5.2 = **CLOSED / LIVE PASS**. Единственный canonical prompt — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, LF SHA `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`; active Mariyam `SKILL.md` отсутствует. Message 1 и Message 2 подтверждены live; report-type completion fix проверен offline без нового платного теста. Runtime = 21 tools, plugin 1.0.4, migration 002. Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 003/004/005 отсутствуют. Реальная Ойижон не подключалась.
 
 **Модель профиля:** `gpt-5.6-luna` через api.n1n.ai (`provider: custom`, `base_url: https://api.n1n.ai/v1`, ключ `N1N_API_KEY` в профильном `.env`, 600). Резерв: `deepseek/deepseek-v4-flash` (DECISIONS.md, 2026-07-12).
 
@@ -45,12 +45,14 @@
 9. Настроить автозапуск Hermes (systemd user-service + `loginctl enable-linger`), проверить подъём после `reboot`.
 10. Прогнать AC Этапа 2: 20 тест-фраз → ответы только узбекская кириллица (0 латинских букв).
 
-### Stage 5.2 live gate и planned profile gates — не выполнять сейчас
+### Stage 5.2 closure и planned profile gates
 
-- Stage 5.2: canonical SOUL/effective-prompt contracts PASS offline; установка в
-  profile, restart, offline prompt preflight (0 API calls), `/new`, первый
-  controlled turn, затем stored-prompt check и остальные E2E — только отдельной
-  задачей и по отдельному разрешению.
+- Stage 5.2 закрыт: Message 1/2 подтверждены live, canonical SOUL установлен,
+  test-user session точечно инвалидирована, full effective prompt проверен offline
+  при API calls = 0. Новый платный Telegram/provider test не выполнять.
+- Wrapper-маркеры stored prompt и Telegram `first_name/last_name/username` не
+  являются AC. Identity AC: exact Telegram session → private mapping →
+  `requested=0` → effective test-user.
 - Stage 5.3A: до создания cron cycle проверить Hermes v0.18.2 cron identity; trusted job id → private mapping 0600 → internal user id; unknown job fail closed.
 - Stage 5.4: utility credentials не помещать в profile/model-visible env; только VPS connector secrets. Hermes browser с открытыми credentials запрещён.
 - Vision smoke перед handover сначала через native image input текущего model path; отдельная vision-модель только после фактического FAIL.

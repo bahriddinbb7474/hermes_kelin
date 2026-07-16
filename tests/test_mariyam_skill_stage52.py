@@ -22,6 +22,10 @@ def _section() -> str:
     return text.split(HEADING, 1)[1].split("\n### 3.3.", 1)[0]
 
 
+def _decision_row(marker: str) -> str:
+    return next(line for line in _section().splitlines() if f"`{marker}`" in line)
+
+
 def test_report_decision_table_has_all_supported_intents_and_tools():
     section = _section()
     for marker in (
@@ -42,6 +46,29 @@ def test_general_report_has_plan_spent_remaining_and_no_automatic_items():
     assert "Товарные строки автоматически не показывай" in section
     assert "только после" in section.lower()
     assert section.count(FINAL_PHRASE) == 1
+
+
+def test_report_completion_depends_on_report_type_not_total_row():
+    section = _section()
+    general_row = _decision_row("GENERAL_FAMILY_REPORT")
+    category_row = _decision_row("CATEGORY_DETAIL")
+
+    assert "можно `Жами`" in general_row
+    assert "завершить дословной фразой ниже" in general_row
+    assert "можно `Жами`" in category_row
+    assert "После таблиц завершить ответ" in category_row
+    assert "Финальную фразу общего отчёта не писать" in category_row
+    assert "вопросов не задавать" in category_row
+    assert "Наличие `Жами` никогда не определяет" in section
+
+
+def test_general_final_phrase_is_not_a_category_detail_suffix():
+    section = _section()
+    category_row = _decision_row("CATEGORY_DETAIL")
+
+    assert section.count(FINAL_PHRASE) == 1
+    assert FINAL_PHRASE not in category_row
+    assert "Общий отчёт всегда заверши дословно" in section
 
 
 def test_category_detail_has_summary_before_actual_items():

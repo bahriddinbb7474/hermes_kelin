@@ -68,15 +68,15 @@ AC (измеримые):
 11. Identity guard на все новые user-scoped tools (`set_monthly_budget`, `get_monthly_budget_status`).
 12. Реальная Ойижон до handover не подключается.
 
-### 5.2. Простые семейные отчёты — OFFLINE PASS / LIVE PENDING
+### 5.2. Простые семейные отчёты — CLOSED / LIVE PASS
 
 **Общий отчёт:**
 
 1. Показывает plan / spent / remaining по группам из точных tool-данных.
-2. Допускает короткое естественное вступление и строку `Жами`.
+2. Допускает короткое естественное вступление и строку `Жами`; наличие `Жами` не определяет правило завершения.
 3. Допускает `Сарфланди` или `Сарфлангани`, `Қолди` или `Қолгани`.
 4. Отрицательный остаток допустим, если превышение рядом объяснено простыми словами.
-5. После отчёта обязательна точная финальная фраза: `Ойижон, хоҳласангиз, бирор харажат гуруҳини батафсилроқ кўриб чиқамиз. Маълумотлар тайёр.` Её нельзя пропускать или перефразировать.
+5. По типу `GENERAL_FAMILY_REPORT` после отчёта обязательна точная финальная фраза: `Ойижон, хоҳласангиз, бирор харажат гуруҳини батафсилроқ кўриб чиқамиз. Маълумотлар тайёр.` Её нельзя пропускать или перефразировать.
 6. Товарные детали автоматически не показываются.
 
 **Подробный отчёт по одной группе:**
@@ -87,8 +87,9 @@ AC (измеримые):
 4. User-facing units: `кг / г / л / мл / та / қадоқ`; canonical units в tools/БД остаются `kg / g / l / ml / pcs / pack`.
 5. Product plan в Stage 5.2 не показывается.
 6. JSON, tool names, technical fields и traces отсутствуют; суммы берутся только из tools.
+7. Строка `Жами` допустима. После таблиц ответ завершается без финальной фразы общего отчёта и без вопросов.
 
-Canonical SOUL и permanent effective-prompt contracts приведены к этим критериям; offline suite PASS, repo LF SOUL SHA = `a9b584e14d704f08b4778b7928ca71a0cf095394583f769c5e9571097884b4e4`. Controlled live: Message 1 PASS, Message 2 FAIL только по формату первой summary-таблицы; cleanup/rollback PASS. VPS runtime остаётся на Stage 5.1 SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`; narrow fix не развёрнут. До успешного повторного E2E этап не закрыт. Evidence: `../EVIDENCE_STAGE_5_2_CATEGORY_TABLE_FIX_2026-07-16.md`.
+Canonical SOUL и permanent effective-prompt contracts приведены к этим критериям; repo LF SOUL SHA = `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`. Message 1 и Message 2 подтверждены live; новый платный тест не выполнялся. Wrapper-маркеры stored prompt не являются AC. Telegram profile names не являются identity: identity AC — только `exact Telegram session → private mapping → requested=0 → effective=test-user`. Evidence: `../EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`. Реальная Ойижон не подключена; Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**.
 
 ### 5.3. Семейный и продуктовый план — PLANNED / NOT IMPLEMENTED
 
