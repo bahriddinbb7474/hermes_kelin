@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS monthly_budget_items (
 
     CONSTRAINT monthly_budget_items_user_month_category_item_key
         UNIQUE (user_id, month, category_code, item_name_normalized),
+    CONSTRAINT monthly_budget_items_parent_plan_fk
+        FOREIGN KEY (user_id, month, category_code)
+        REFERENCES monthly_budget_plans (user_id, month, category_code)
+        ON DELETE CASCADE,
     CONSTRAINT monthly_budget_items_month_first_day
         CHECK (date_trunc('month', month)::date = month),
     CONSTRAINT monthly_budget_items_name_normalized_nonempty
@@ -46,7 +50,17 @@ CREATE TABLE IF NOT EXISTS monthly_budget_items (
     CONSTRAINT monthly_budget_items_price_basis_valid
         CHECK (price_basis IS NULL OR price_basis IN ('last', 'average', 'manual')),
     CONSTRAINT monthly_budget_items_price_with_unit
-        CHECK (reference_unit_price_uzs IS NULL OR unit IS NOT NULL)
+        CHECK (reference_unit_price_uzs IS NULL OR unit IS NOT NULL),
+    CONSTRAINT monthly_budget_items_price_snapshot_coherent
+        CHECK (
+            (reference_unit_price_uzs IS NULL
+             AND price_basis IS NULL
+             AND price_as_of IS NULL)
+            OR
+            (reference_unit_price_uzs IS NOT NULL
+             AND price_basis IS NOT NULL
+             AND price_as_of IS NOT NULL)
+        )
 );
 
 CREATE INDEX IF NOT EXISTS idx_mbi_user_month

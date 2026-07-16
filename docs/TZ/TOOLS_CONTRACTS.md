@@ -48,10 +48,10 @@
 ### Stage 5.3 — без новых tools, runtime count остаётся 21
 
 - `set_monthly_budget`: optional `items[]`; каждый planned item может содержать `item_name_normalized`, `item_name_display`, `planned_quantity`, `unit`, `planned_amount_uzs`, `reference_unit_price_uzs`, `price_basis`, `price_as_of`, `note`. Минимум одно из `planned_quantity` или `planned_amount_uzs` обязательно.
-- Если `items` отсутствует, product rows не меняются; если передан — category plan и полная замена product rows выполняются атомарно. Default price basis = last; average только явно, manual требует явную reference price.
+- Если `items` отсутствует, product rows не меняются; если передан — category plan и полная замена product rows выполняются атомарно. Default price basis = last; average только явно, manual требует явную reference price. Переданный factual snapshot last/average проверяется против transactions; при snapshot суммы `planned_amount_uzs` и quantity × price обязаны совпадать.
 - `get_monthly_budget_status(include_items=true)` возвращает по item: `planned_quantity`, `planned_unit`, `planned_amount_uzs`, `actual_quantity`, `actual_unit`, `actual_amount_uzs`, `remaining_amount_uzs`, `last_unit_price_uzs`, `average_unit_price_uzs`, `reference_unit_price_uzs`, `price_basis`, `price_as_of`. Unknown = `null`, не `0`; разные units не смешиваются.
 - Default `include_items=false`, поэтому Stage 5.2 contract не меняется.
-- Backend считает точные числа, последнюю и средневзвешенную цену из transactions и сохраняет price snapshot плана; backend не пишет прозу. Цена рассчитывается только при наличии normalized item, amount, quantity и unit.
+- Backend casefold-нормализует item name, считает точные числа, последнюю и средневзвешенную цену из transactions и сохраняет price snapshot плана; backend не пишет прозу. Цена рассчитывается только при наличии normalized item, amount, quantity и unit. При category plan `food` фактические расходы дочерних `food.*` сворачиваются в родительскую строку, если для конкретной дочерней категории нет более точного плана.
 - Hermes объясняет данные, предлагает last price по умолчанию, спрашивает подтверждение и принимает `average` или `manual` override. Ценовая логика не хранится в LLM memory.
 
 ### Stage 5.3A — +1, planned 22

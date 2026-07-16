@@ -89,7 +89,7 @@ AC (измеримые):
 6. JSON, tool names, technical fields и traces отсутствуют; суммы берутся только из tools.
 7. Строка `Жами` допустима. После таблиц ответ завершается без финальной фразы общего отчёта и без вопросов.
 
-Stage 5.2 live evidence зафиксировано для SOUL SHA `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`; Stage 5.3 repo SOUL SHA = `856fd7f37cd476e5eeae933c2c6cf82ec5fb0ed89c0410d30a74480188cd6c30`. Message 1 и Message 2 подтверждены live; новый платный тест не выполнялся. Wrapper-маркеры stored prompt не являются AC. Telegram profile names не являются identity: identity AC — только `exact Telegram session → private mapping → requested=0 → effective=test-user`. Evidence: `../EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`. Реальная Ойижон не подключена.
+Stage 5.2 live evidence зафиксировано для SOUL SHA `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`; Stage 5.3 repo SOUL SHA = `5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`. Message 1 и Message 2 подтверждены live; новый платный тест не выполнялся. Wrapper-маркеры stored prompt не являются AC. Telegram profile names не являются identity: identity AC — только `exact Telegram session → private mapping → requested=0 → effective=test-user`. Evidence: `../EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`. Реальная Ойижон не подключена.
 
 ### 5.3. Семейный и продуктовый план — OFFLINE PASS / LIVE PENDING
 

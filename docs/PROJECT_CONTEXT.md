@@ -38,7 +38,7 @@
 
 ## Где мы сейчас (2026-07-16)
 
-ТЗ: **v3.17**. Этапы 5.1 и 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **OFFLINE PASS / LIVE PENDING**. Repo canonical SOUL LF SHA = `856fd7f37cd476e5eeae933c2c6cf82ec5fb0ed89c0410d30a74480188cd6c30`; repo содержит migration 003 и inventory/dispatch/discovery **21/21/21**. VPS остаётся на plugin **1.0.4**, migration 002 и предыдущем deployed SOUL; production и Telegram не менялись. Stage 5.3A–6 — **PLANNED / NOT IMPLEMENTED**; migrations 004/005 отсутствуют. Реальная Ойижон не подключена.
+ТЗ: **v3.17**. Этапы 5.1 и 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **OFFLINE PASS / LIVE PENDING**. Repo canonical SOUL LF SHA = `5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`; repo содержит migration 003 и inventory/dispatch/discovery **21/21/21**. VPS остаётся на plugin **1.0.4**, migration 002 и предыдущем deployed SOUL; production и Telegram не менялись. Stage 5.3A–6 — **PLANNED / NOT IMPLEMENTED**; migrations 004/005 отсутствуют. Реальная Ойижон не подключена.
 
 На VPS выполнено (Этап 1, технически):
 - PostgreSQL поднят и **healthy** (контейнер `hermes_mariyam_postgres`, порт 127.0.0.1:5432, init-миграции применены).
@@ -61,7 +61,7 @@
 - **Stage 5.2: CLOSED / LIVE PASS** (v3.16) — Message 1 и Message 2 подтверждены live; report-type completion contract и category-table contract PASS; новый платный тест не выполнялся. Evidence: `EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`.
 - **Stage 5.3: OFFLINE PASS / LIVE PENDING** (v3.17) — product plans, actuals из transactions, last/weighted average/manual price snapshot, migration 003 и трёхколоночный product report реализованы локально; VPS deploy/E2E pending.
 - **Planned:** Stage 5.3A approval cycle + cron identity gate; Stage 5.4 utility read-only; Stage 6 recurring obligations. Planned tools 21→22→25→27; current repo/VPS inventory = 21.
-- **Prompt/skill protect:** repo canonical LF SOUL assertion = `856fd7f37cd476e5eeae933c2c6cf82ec5fb0ed89c0410d30a74480188cd6c30`; active VPS Mariyam `SKILL.md` отсутствует; skill-protect и `tool_progress` off.
+- **Prompt/skill protect:** repo canonical LF SOUL assertion = `5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`; active VPS Mariyam `SKILL.md` отсутствует; skill-protect и `tool_progress` off.
 - Мариям = бытовой финансовый аналитик; backend считает факты, Hermes объясняет; memory ≠ источник аналитики.
 - очистка тестовых данных БД — выполнена, закрепить аудитом;
 - **Этап 2 (язык): PARTIAL 8/20, НЕ закрыт** — 8 из 20 фраз проверены (8/8 кириллица, `LATIN_LINES: []`), полный AC (20/20, 0 латиницы) не пройден; тест остановлен заказчиком, не из-за FAIL (см. `docs/TZ/EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md`);

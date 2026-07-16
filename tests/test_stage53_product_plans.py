@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
+import asyncpg
 import pytest
 import pytest_asyncio
 
@@ -35,14 +36,11 @@ def _db_available() -> bool:
     env = os.environ.get("APP_ENV")
     if env != "test" or not url:
         return False
-    try:
-        validate_destructive_test_target(
-            database_url=url,
-            app_env=env,
-            allow_remote=os.environ.get("ALLOW_DESTRUCTIVE_TESTS") == "1",
-        )
-    except Exception:
-        return False
+    validate_destructive_test_target(
+        database_url=url,
+        app_env=env,
+        allow_remote=os.environ.get("ALLOW_DESTRUCTIVE_TESTS") == "1",
+    )
     return True
 
 
@@ -63,6 +61,9 @@ async def stage53_pool():
         async with pool.acquire() as conn:
             await conn.execute(SQL_001.read_text(encoding="utf-8"))
             await conn.execute(SQL_002.read_text(encoding="utf-8"))
+            await conn.execute(
+                "DROP TABLE IF EXISTS monthly_budget_items, monthly_plan_cycles"
+            )
             await conn.execute(SQL_003.read_text(encoding="utf-8"))
             await conn.execute(SQL_003.read_text(encoding="utf-8"))
             await conn.execute(
@@ -161,6 +162,8 @@ def test_stage53_migration_declares_both_tables_and_guards():
     assert "date_trunc('month', month)::date = month" in text
     assert "('kg', 'g', 'l', 'ml', 'pcs', 'pack')" in text
     assert "('last', 'average', 'manual')" in text
+    assert "REFERENCES monthly_budget_plans (user_id, month, category_code)" in text
+    assert "monthly_budget_items_price_snapshot_coherent" in text
     assert "DROP TABLE" not in text.upper()
     assert "ALTER TABLE transactions" not in text
 
@@ -169,6 +172,10 @@ def test_stage53_migration_declares_both_tables_and_guards():
 @pytest.mark.asyncio
 async def test_migration_003_first_and_second_apply_schema_and_old_transactions(stage53_pool):
     pool = stage53_pool
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "DROP TABLE IF EXISTS monthly_budget_items, monthly_plan_cycles"
+        )
     user_id = await _seed_user(pool)
     tx_id = await _insert_expense(
         pool,
@@ -205,6 +212,69 @@ async def test_migration_003_first_and_second_apply_schema_and_old_transactions(
     }
     assert "idx_mbi_user_month" in indexes
     assert "idx_mpc_user_month" in indexes
+
+
+@requires_db
+@pytest.mark.asyncio
+async def test_migration_003_enforces_parent_plan_and_snapshot_coherence(stage53_pool):
+    pool = stage53_pool
+    user_id = await _seed_user(pool)
+    with pytest.raises(asyncpg.ForeignKeyViolationError):
+        await pool.execute(
+            """INSERT INTO monthly_budget_items
+               (user_id, month, category_code, item_name_normalized,
+                item_name_display, planned_amount_uzs)
+               VALUES ($1, '2026-08-01', 'food', 'нон', 'Нон', 100000)""",
+            user_id,
+        )
+    await db.set_monthly_budget(pool, user_id, "2026-08-01", "food", 100000)
+    with pytest.raises(asyncpg.CheckViolationError):
+        await pool.execute(
+            """INSERT INTO monthly_budget_items
+               (user_id, month, category_code, item_name_normalized,
+                item_name_display, planned_quantity, unit,
+                reference_unit_price_uzs)
+               VALUES ($1, '2026-08-01', 'food', 'нон', 'Нон', 10, 'kg', 8000)""",
+            user_id,
+        )
+
+
+@requires_db
+@pytest.mark.asyncio
+async def test_monthly_plan_cycles_constraints_are_enforced(stage53_pool):
+    pool = stage53_pool
+    user_id = await _seed_user(pool)
+    await pool.execute(
+        """INSERT INTO monthly_plan_cycles
+           (user_id, month, status, source, household_size)
+           VALUES ($1, '2026-08-01', 'draft', 'manually_created', 3)""",
+        user_id,
+    )
+    with pytest.raises(asyncpg.UniqueViolationError):
+        await pool.execute(
+            """INSERT INTO monthly_plan_cycles
+               (user_id, month, status, source)
+               VALUES ($1, '2026-08-01', 'waiting_oyijon', 'manually_created')""",
+            user_id,
+        )
+    invalid_rows = (
+        (date(2026, 9, 2), "draft", "manually_created", 3),
+        (date(2026, 9, 1), "unknown", "manually_created", 3),
+        (date(2026, 9, 1), "draft", "cron", 3),
+        (date(2026, 9, 1), "draft", "manually_created", 0),
+    )
+    for month, status, source, household_size in invalid_rows:
+        with pytest.raises(asyncpg.CheckViolationError):
+            await pool.execute(
+                """INSERT INTO monthly_plan_cycles
+                   (user_id, month, status, source, household_size)
+                   VALUES ($1, $2, $3, $4, $5)""",
+                user_id,
+                month,
+                status,
+                source,
+                household_size,
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -339,7 +409,7 @@ async def test_failed_item_insert_rolls_back_plan_and_previous_items(stage53_poo
         100000,
         items=[_item("нон", amount=100000)],
     )
-    with pytest.raises(Exception):
+    with pytest.raises(asyncpg.NumericValueOutOfRangeError):
         await db.set_monthly_budget(
             pool,
             user_id,
@@ -436,6 +506,95 @@ async def test_last_weighted_average_manual_snapshot_and_derived_amount(stage53_
     assert carrot["reference_unit_price_uzs"] == 7000
     assert carrot["price_basis"] == "manual"
     assert carrot["planned_amount_uzs"] == 70000
+
+
+@requires_db
+@pytest.mark.asyncio
+async def test_resolved_price_rejects_inconsistent_amount_and_ambiguous_input(stage53_pool):
+    pool = stage53_pool
+    user_id = await _seed_user(pool)
+    occurred_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    await _insert_expense(
+        pool,
+        user_id,
+        amount=80000,
+        category="food.vegetables",
+        item="картошка",
+        quantity=10,
+        unit="kg",
+        occurred_at=occurred_at,
+    )
+    base = (pool, user_id, "2026-08-01", "food", 100000)
+    with pytest.raises(ValueError, match="planned_amount_uzs must equal"):
+        await db.set_monthly_budget(
+            *base,
+            items=[
+                _item(
+                    "картошка",
+                    quantity=10,
+                    unit="kg",
+                    amount=1,
+                    basis="last",
+                )
+            ],
+        )
+    with pytest.raises(ValueError, match="price_basis is required"):
+        await db.set_monthly_budget(
+            *base,
+            items=[_item("картошка", quantity=10, unit="kg", price=8000)],
+        )
+    with pytest.raises(ValueError, match="price_as_of requires reference"):
+        await db.set_monthly_budget(
+            *base,
+            items=[
+                _item(
+                    "картошка",
+                    quantity=10,
+                    unit="kg",
+                    basis="last",
+                    price_as_of=occurred_at.isoformat(),
+                )
+            ],
+        )
+
+
+@requires_db
+@pytest.mark.asyncio
+async def test_expense_and_plan_item_normalization_match_case_insensitively(stage53_pool):
+    pool = stage53_pool
+    user_id = await _seed_user(pool)
+    await db.save_expense(
+        pool,
+        user_id,
+        [
+            {
+                "item_name": "Картошка",
+                "item_name_normalized": "Картошка",
+                "amount_uzs": 80000,
+                "category_code": "food.vegetables",
+                "quantity": 10,
+                "unit": "kg",
+            }
+        ],
+        "2026-07-10T00:00:00Z",
+        "text",
+    )
+    await db.set_monthly_budget(
+        pool,
+        user_id,
+        "2026-07-01",
+        "food",
+        160000,
+        items=[_item("Картошка", quantity=20, unit="kg", basis="last")],
+    )
+    status = await db.get_monthly_budget_status(
+        pool, user_id, "2026-07-01", include_items=True
+    )
+    item = status["items"][0]
+    assert item["item_name_normalized"] == "картошка"
+    assert item["reference_unit_price_uzs"] == 8000
+    assert item["actual_amount_uzs"] == 80000
+    assert item["actual_quantity"] == 10
 
 
 @requires_db
@@ -539,6 +698,9 @@ async def test_actuals_parent_food_exact_amount_homogeneous_quantity_and_categor
     assert potato["actual_quantity"] == 15
     assert potato["actual_unit"] == "kg"
     assert potato["remaining_amount_uzs"] == 40000
+    by_category = {row["category_code"]: row for row in status["by_category"]}
+    assert by_category["food"]["actual_uzs"] == 120000
+    assert "food.vegetables" not in by_category
 
 
 @requires_db
@@ -647,6 +809,19 @@ async def test_stage53_extends_two_schemas_without_new_tools():
         "price_as_of",
         "note",
     }
+    assert item_schema["required"] == [
+        "item_name_normalized",
+        "item_name_display",
+    ]
+    assert item_schema["anyOf"] == [
+        {"required": ["planned_quantity"]},
+        {"required": ["planned_amount_uzs"]},
+    ]
+    assert item_schema["additionalProperties"] is False
+    assert item_schema["properties"]["unit"]["enum"] == list(db.CANONICAL_UNITS)
+    assert item_schema["properties"]["price_basis"]["enum"] == list(db.PRICE_BASES)
+    assert item_schema["properties"]["planned_quantity"]["exclusiveMinimum"] == 0
+    assert item_schema["properties"]["planned_amount_uzs"]["minimum"] == 0
     assert schemas["get_monthly_budget_status"]["required"] == ["user_id", "month"]
     include = schemas["get_monthly_budget_status"]["properties"]["include_items"]
     assert include == {"type": "boolean", "default": False}

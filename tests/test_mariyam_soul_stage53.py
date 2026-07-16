@@ -54,19 +54,22 @@ def test_dialog_is_strictly_sequential_and_draft_first():
     assert "снова получи подтверждение" in section
 
 
-def test_stage53_dialog_has_required_seven_step_sequence():
+def test_stage53_dialog_has_required_sequential_fields():
     section = _stage53()
     required = (
         "На какой месяц",
         "На сколько членов семьи",
         "Какая группа расходов",
         "Какие продукты уже есть дома",
-        "Какие продукты нужны",
-        "последнюю, средневзвешенную или вручную названную цену",
+        "Какие продукты нужны семье",
+        "Для одного продукта за сообщение уточняй только его количество",
+        "Сначала уточни бюджет",
         "полный draft",
     )
     positions = [section.index(marker) for marker in required]
     assert positions == sorted(positions)
+    assert "Только после ответа отдельным сообщением уточни способ цены" in section
+    assert "последнюю, средневзвешенную или вручную названную" in section
 
 
 def test_nutrition_search_and_medical_limits_are_explicit():

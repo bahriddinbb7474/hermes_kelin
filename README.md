@@ -56,7 +56,7 @@ hermes-mariyam/
 
 ## Текущее состояние (2026-07-16)
 
-ТЗ: **v3.17**. Stage 5.1 и Stage 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **OFFLINE PASS / LIVE PENDING**. Repo содержит migration 003, product plans, price snapshots и canonical SOUL LF SHA `856fd7f37cd476e5eeae933c2c6cf82ec5fb0ed89c0410d30a74480188cd6c30`; inventory/dispatch/discovery = **21/21/21**, plugin не менялся. VPS остаётся на **21 tools / plugin 1.0.4 / migration 002** и предыдущем deployed SOUL до отдельного deploy. Stage 5.3A–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 004/005 отсутствуют. Реальная Ойижон не подключена.
+ТЗ: **v3.17**. Stage 5.1 и Stage 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **OFFLINE PASS / LIVE PENDING**. Repo содержит migration 003, product plans, price snapshots и canonical SOUL LF SHA `5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`; inventory/dispatch/discovery = **21/21/21**, plugin не менялся. VPS остаётся на **21 tools / plugin 1.0.4 / migration 002** и предыдущем deployed SOUL до отдельного deploy. Stage 5.3A–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 004/005 отсутствуют. Реальная Ойижон не подключена.
 
 Этап 1 (VPS + Hermes + Telegram) — **закрыт по решению заказчика (2026-07-12, ТЗ v3.5)**:
 - ✅ PostgreSQL healthy (порт 127.0.0.1:5432, init-миграции применены);

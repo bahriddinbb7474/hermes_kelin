@@ -3,7 +3,7 @@
 Backend validates and stores already-parsed data; returns exact facts/numbers.
 """
 from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from math import isfinite
 
 from .config import TASHKENT, parse_dt
@@ -102,7 +102,7 @@ async def save_expense(pool, user_id, items, occurred_at, source_type, source_te
                 if item_norm is not None and not isinstance(item_norm, str):
                     raise ValueError("INVALID_INPUT: item_name_normalized must be a string")
                 if isinstance(item_norm, str):
-                    item_norm = item_norm.strip() or None
+                    item_norm = item_norm.strip().casefold() or None
                 tid = await conn.fetchval(
                     """INSERT INTO transactions
                        (user_id, type, amount, currency, category_code, item_name,
@@ -551,6 +551,10 @@ def _normalize_plan_items(items) -> list[dict]:
                 price_as_of = parse_dt(price_as_of)
             except (TypeError, ValueError) as exc:
                 raise ValueError("INVALID_INPUT: price_as_of must be UTC ISO 8601") from exc
+        if reference_price is not None and price_basis is None:
+            raise ValueError("INVALID_INPUT: price_basis is required with reference price")
+        if price_as_of is not None and reference_price is None:
+            raise ValueError("INVALID_INPUT: price_as_of requires reference_unit_price_uzs")
 
         normalized.append(
             {
@@ -631,6 +635,16 @@ async def _resolve_plan_item_price(conn, user_id, item: dict) -> dict:
         else:
             price = prices["average_price"]
             price_as_of = prices["average_as_of"]
+        supplied_price = item["reference_unit_price_uzs"]
+        supplied_as_of = item["price_as_of"]
+        if supplied_price is not None and supplied_price != price:
+            raise ValueError(
+                "INVALID_INPUT: supplied reference price does not match transaction facts"
+            )
+        if supplied_as_of is not None and supplied_as_of != price_as_of:
+            raise ValueError(
+                "INVALID_INPUT: supplied price_as_of does not match transaction facts"
+            )
 
     if price is None:
         resolved["reference_unit_price_uzs"] = None
@@ -640,8 +654,15 @@ async def _resolve_plan_item_price(conn, user_id, item: dict) -> dict:
         resolved["reference_unit_price_uzs"] = price
         resolved["price_basis"] = basis
         resolved["price_as_of"] = price_as_of
+        derived_amount = (resolved["planned_quantity"] * price).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
         if resolved["planned_amount_uzs"] is None:
-            resolved["planned_amount_uzs"] = resolved["planned_quantity"] * price
+            resolved["planned_amount_uzs"] = derived_amount
+        elif resolved["planned_amount_uzs"] != derived_amount:
+            raise ValueError(
+                "INVALID_INPUT: planned_amount_uzs must equal quantity × reference price"
+            )
     return resolved
 
 
@@ -836,11 +857,23 @@ async def get_monthly_budget_status(pool, user_id, month, include_items=False):
                FROM monthly_budget_plans
                WHERE user_id=$1 AND month=$2
            ), actual AS (
-               SELECT category_code, SUM(amount)::numeric AS actual_uzs
-               FROM transactions
-               WHERE user_id=$1 AND type='expense' AND currency='UZS'
-                 AND occurred_at >= $3 AND occurred_at < $4
-               GROUP BY category_code
+               SELECT CASE
+                          WHEN EXISTS (
+                              SELECT 1 FROM planned exact_plan
+                              WHERE exact_plan.category_code = t.category_code
+                          ) THEN t.category_code
+                          WHEN t.category_code LIKE 'food.%'
+                               AND EXISTS (
+                                   SELECT 1 FROM planned parent_plan
+                                   WHERE parent_plan.category_code = 'food'
+                               ) THEN 'food'
+                          ELSE t.category_code
+                      END AS category_code,
+                      SUM(t.amount)::numeric AS actual_uzs
+               FROM transactions t
+               WHERE t.user_id=$1 AND t.type='expense' AND t.currency='UZS'
+                 AND t.occurred_at >= $3 AND t.occurred_at < $4
+               GROUP BY 1
            )
            SELECT COALESCE(p.category_code, a.category_code) AS category_code,
                   COALESCE(p.planned_uzs, 0)::numeric AS planned_uzs,

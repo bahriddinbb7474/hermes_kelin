@@ -270,17 +270,21 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
 5. Canonical SOUL закрепляет один вопрос за сообщение, save только после явного
    подтверждения полного draft, один nutrition web search на cycle с cache 30 дней
    и medical safety. Repo canonical LF SOUL SHA-256:
-   `856fd7f37cd476e5eeae933c2c6cf82ec5fb0ed89c0410d30a74480188cd6c30`.
+   `5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`.
 6. Финальный подробный product report: category summary, затем ровно три колонки
    `Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма`. Отдельной product-
    колонки остатка нет; unknown = `—` или `айтилмаган`; значения не угадываются.
 7. Permanent Stage 5.3, SOUL/effective-prompt и regression tests добавлены.
    Disposable PostgreSQL 16 double-apply migration PASS; `pytest -q` =
-   **185 passed**; ruff, compileall и `git diff --check` — PASS.
+   **189 passed**; ruff, compileall и `git diff --check` — PASS.
 8. **Статус Stage 5.3: OFFLINE PASS / LIVE PENDING.** Repo содержит migration 003,
    но VPS остаётся на migration 002 до отдельного deploy. VPS/Telegram/provider API
    не менялись; реальная Ойижон не подключалась. Stage 5.3A–6 остаются
    **PLANNED / NOT IMPLEMENTED**.
+9. Post-review hardening: product row связан composite FK с category plan; snapshot-
+   поля согласованы DB constraint; factual price сверяется с transactions; amount при
+   snapshot обязан равняться quantity × price; item normalization case-insensitive;
+   дочерние `food.*` корректно учитываются в родительском category plan.
 
 Исполнитель реализует проект **строго по разделам 5–21**, сдаёт этапами (раздел 15) и на каждом этапе выполняет acceptance criteria. Что делать запрещено — раздел 20.
 
@@ -1371,11 +1375,11 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 
 **Статус: OFFLINE PASS / LIVE PENDING.** Repo migration 003 и расширенные tool contracts реализованы; tool count остаётся **21**. VPS по-прежнему использует migration 002 до отдельного deploy.
 
-**Диалог:** Hermes спрашивает последовательно, по одному вопросу в сообщении: (1) месяц; (2) household size; (3) группа расходов; (4) продукты дома; (5) нужные продукты и подтверждённые количества; (6) бюджет и last/average/manual price; (7) полный draft. `set_monthly_budget` вызывается только после явного подтверждения; после исправления draft показывается и подтверждается снова.
+**Диалог:** Hermes спрашивает последовательно, по одному вопросу в сообщении: (1) месяц; (2) household size; (3) группа расходов; (4) продукты дома; (5) нужные продукты; (6) quantity — по одному продукту за сообщение; (7) бюджет, затем отдельным сообщением last/average/manual price; (8) полный draft. `set_monthly_budget` вызывается только после явного подтверждения; после исправления draft показывается и подтверждается снова.
 
 **Продуктовый план:** сначала summary категории `Харажат гуруҳи | Режа | Сарфлангани | Қолгани`, затем таблица `Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма`. Старый пятиколоночный planned-формат заменён; отдельной product-колонки остатка нет. Для item обязательно минимум одно planned value: quantity или amount. Actual quantity/amount берутся только из transactions; quantity и price не угадывать; units не смешивать; unknown = `—` или `айтилмаган`.
 
-**Reference prices:** последняя цена = amount / quantity самой поздней подходящей покупки; средняя — только средневзвешенная, сумма покупок / общее количество одного товара в одной unit. Без normalized item, amount, quantity и unit цену не считать. Следующий план использует last по умолчанию; Ойижон может выбрать average или manual. Snapshot сохраняется repo migration 003 и не меняется от будущих покупок.
+**Reference prices:** последняя цена = amount / quantity самой поздней подходящей покупки; средняя — только средневзвешенная, сумма покупок / общее количество одного товара в одной unit. Без normalized item, amount, quantity и unit цену не считать. Следующий план использует last по умолчанию; Ойижон может выбрать average или manual. Snapshot сохраняется repo migration 003 и не меняется от будущих покупок. При snapshot сумма плана обязана совпадать с quantity × reference price; переданные last/average facts сверяются backend с transactions.
 
 **Nutrition guidance AC:**
 
@@ -1386,7 +1390,7 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 5. При медицинских ограничениях рекомендовать согласовать рацион с врачом.
 6. Точные quantities сохранять только после подтверждения семьи.
 
-**Storage/tools AC:** repo migration 003 создаёт `monthly_budget_items` с `reference_unit_price_uzs`, `price_basis`, `price_as_of` и подготовленную schema-часть `monthly_plan_cycles`; `set_monthly_budget` принимает optional `items[]`; `get_monthly_budget_status(include_items=true)` возвращает product plan/actual/remaining и last/average/reference price. Inventory/dispatch/discovery = 21/21/21. Migration 003 не применена на VPS.
+**Storage/tools AC:** repo migration 003 создаёт `monthly_budget_items` с composite FK на category plan, coherent `reference_unit_price_uzs` / `price_basis` / `price_as_of` и подготовленную schema-часть `monthly_plan_cycles`; `set_monthly_budget` принимает optional `items[]`; `get_monthly_budget_status(include_items=true)` возвращает product plan/actual/remaining и last/average/reference price. Item normalization case-insensitive; дочерние `food.*` учитываются в родительском `food` plan при отсутствии более точного дочернего плана. Inventory/dispatch/discovery = 21/21/21. Migration 003 не применена на VPS.
 
 ### Этап 5.3A — Цикл утверждения плана 25/27/28/1 (v3.10)
 
