@@ -242,7 +242,7 @@ Plugin: `deploy/hermes_plugins/mariyam_identity_guard/`.
 - `display.tool_progress: "off"` настроен.
 - MCP-prefix `mcp__mariyam_backend__<tool>` канонизируется до bare policy name; неизвестные/неразрешённые вызовы блокируются fail-closed.
 - Stage 5 controlled Telegram E2E на «Тест Ойижон» — **PASS**.
-- Текущий VPS runtime: tools/dispatch/MCP discovery **21/21/21**, plugin **1.0.4**, migration 002 active, Stage 5.1 **CLOSED / LIVE PASS**.
+- Текущий VPS runtime: tools/dispatch/MCP discovery **21/21/21**, plugin **1.0.4**, migration 002 active; Stage 5.1 и Stage 5.2 — **CLOSED / LIVE PASS**. Repo Stage 5.3 на VPS ещё не развёрнут.
 
 Значения mapping, реальные Telegram ID и секреты в git/отчёты не добавлять. Реальную Ойижон до handover не подключать.
 
@@ -291,10 +291,17 @@ Stage 5.2 показал второй root cause: Hermes добавляет в s
 
 Stage 5.2 = **CLOSED / LIVE PASS**. Message 1 и Message 2 подтверждены live;
 исправление завершения отчётов закреплено offline без нового платного теста.
-Активен единственный canonical SOUL SHA
+
+Repo Stage 5.3 = **OFFLINE PASS / LIVE PENDING**: migration 003 и расширение двух
+существующих budget tools реализованы, inventory остаётся **21/21/21**. Единственный
+canonical repo-source — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, LF SHA
+`5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`.
+
+VPS runtime пока остаётся на migration 002 и deployed Stage 5.2 SOUL SHA
 `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`;
-активный Mariyam `SKILL.md` отсутствует, skill-protect и `tool_progress=off`
-сохранены. Stage 5.3–6 остаются **PLANNED / NOT IMPLEMENTED**.
+это deployed baseline, а не текущий repo canonical SHA. Активный Mariyam `SKILL.md`
+отсутствует, skill-protect и `tool_progress=off` сохранены. Stage 5.3A–6 остаются
+**PLANNED / NOT IMPLEMENTED**; реальная Ойижон не подключена.
 
 ## Выполненный Stage 5.1 live deploy (история выполнения)
 
