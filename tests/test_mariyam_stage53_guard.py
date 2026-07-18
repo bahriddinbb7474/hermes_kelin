@@ -577,6 +577,9 @@ def test_real_hermes_chain_orders_identity_before_stage53_and_blocks_duplicate(
         ),
         encoding="utf-8",
     )
+    if os.name == "posix":
+        home.chmod(0o700)
+        mapping.chmod(0o600)
     state_db = home / "state.db"
     con = sqlite3.connect(state_db)
     con.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, origin_json TEXT)")
@@ -589,6 +592,8 @@ def test_real_hermes_chain_orders_identity_before_stage53_and_blocks_duplicate(
     )
     con.commit()
     con.close()
+    if os.name == "posix":
+        state_db.chmod(0o600)
 
     monkeypatch.setenv("HERMES_HOME", str(home))
     monkeypatch.setenv("MARIYAM_IDENTITY_MAP_FILE", str(mapping))
