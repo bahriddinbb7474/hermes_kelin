@@ -54,6 +54,31 @@ def test_dialog_is_strictly_sequential_and_draft_first():
     assert "снова получи подтверждение" in section
 
 
+def test_price_choice_requires_read_only_lookup_before_draft():
+    section = _stage53()
+    lookup = "price_lookup_items"
+    assert lookup in section
+    assert "get_monthly_budget_status" in section
+    assert "user_id: 0" in section
+    assert "month" in section
+    assert "item_name_normalized" in section
+    assert "unit" in section
+    assert section.index(lookup) < section.index("полный draft")
+    assert "Draft формируй только из результата этого tool" in section
+    assert "lookup вернул `null`" in section
+    assert "один вопрос о manual price" in section
+    assert "не сохраняй plan" in section
+
+
+def test_financial_flow_forbids_terminal_and_execute_code():
+    section = _stage53()
+    for marker in ("execute_code", "terminal", "shell", "Python"):
+        assert marker in section
+    assert "запрещено" in section
+    assert "quantity × confirmed reference price" in section
+    assert "command approval" in section
+
+
 def test_stage53_dialog_has_required_sequential_fields():
     section = _stage53()
     required = (

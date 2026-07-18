@@ -572,14 +572,44 @@ def _normalize_plan_items(items) -> list[dict]:
     return normalized
 
 
+def _normalize_price_lookup_items(items) -> list[dict]:
+    if not isinstance(items, list):
+        raise ValueError("INVALID_INPUT: price_lookup_items must be an array")
+    if len(items) > 50:
+        raise ValueError("INVALID_INPUT: price_lookup_items supports at most 50 items")
+
+    normalized = []
+    seen = set()
+    for raw in items:
+        if not isinstance(raw, dict):
+            raise ValueError("INVALID_INPUT: price lookup item must be an object")
+        if set(raw) - {"item_name_normalized", "unit"}:
+            raise ValueError("INVALID_INPUT: unexpected price lookup item field")
+        item_name = raw.get("item_name_normalized")
+        unit = raw.get("unit")
+        if not isinstance(item_name, str) or not item_name.strip():
+            raise ValueError("INVALID_INPUT: item_name_normalized is required")
+        if not isinstance(unit, str) or not unit.strip():
+            raise ValueError("INVALID_INPUT: unit is required")
+        item_name = item_name.strip().casefold()
+        unit = unit.strip().lower()
+        _one_of("unit", unit, CANONICAL_UNITS)
+        key = (item_name, unit)
+        if key in seen:
+            raise ValueError("INVALID_INPUT: duplicate price lookup item")
+        seen.add(key)
+        normalized.append({"item_name_normalized": item_name, "unit": unit})
+    return normalized
+
+
 async def _transaction_prices(conn, user_id, item_name: str, unit: str):
     """Return last and weighted-average UZS prices for one exact canonical unit."""
     last = await conn.fetchrow(
         """SELECT amount / quantity AS unit_price, occurred_at
            FROM transactions
            WHERE user_id=$1 AND type='expense' AND currency='UZS'
-             AND item_name_normalized=$2 AND unit=$3
-             AND quantity IS NOT NULL
+             AND LOWER(item_name_normalized)=LOWER($2) AND unit=$3
+             AND quantity IS NOT NULL AND quantity > 0
            ORDER BY occurred_at DESC, id DESC
            LIMIT 1""",
         user_id,
@@ -588,11 +618,12 @@ async def _transaction_prices(conn, user_id, item_name: str, unit: str):
     )
     average = await conn.fetchrow(
         """SELECT SUM(amount) / SUM(quantity) AS unit_price,
-                  MAX(occurred_at) AS price_as_of
+                  MAX(occurred_at) AS price_as_of,
+                  COUNT(*)::integer AS purchase_count
            FROM transactions
            WHERE user_id=$1 AND type='expense' AND currency='UZS'
-             AND item_name_normalized=$2 AND unit=$3
-             AND quantity IS NOT NULL""",
+             AND LOWER(item_name_normalized)=LOWER($2) AND unit=$3
+             AND quantity IS NOT NULL AND quantity > 0""",
         user_id,
         item_name,
         unit,
@@ -606,7 +637,35 @@ async def _transaction_prices(conn, user_id, item_name: str, unit: str):
             else Decimal(average["unit_price"])
         ),
         "average_as_of": None if average is None else average["price_as_of"],
+        "purchase_count": 0 if average is None else average["purchase_count"],
     }
+
+
+async def _get_price_lookup(pool, user_id, items: list[dict]) -> list[dict]:
+    result = []
+    for item in items:
+        prices = await _transaction_prices(
+            pool, user_id, item["item_name_normalized"], item["unit"]
+        )
+        result.append(
+            {
+                "item_name_normalized": item["item_name_normalized"],
+                "unit": item["unit"],
+                "last_unit_price_uzs": (
+                    None
+                    if prices["last_price"] is None
+                    else _json_number(prices["last_price"])
+                ),
+                "last_price_as_of": _iso_utc(prices["last_as_of"]),
+                "average_unit_price_uzs": (
+                    None
+                    if prices["average_price"] is None
+                    else _json_number(prices["average_price"])
+                ),
+                "priced_purchase_count": prices["purchase_count"],
+            }
+        )
+    return result
 
 
 async def _resolve_plan_item_price(conn, user_id, item: dict) -> dict:
@@ -843,9 +902,16 @@ async def _get_monthly_budget_items(
     return result
 
 
-async def get_monthly_budget_status(pool, user_id, month, include_items=False):
+async def get_monthly_budget_status(
+    pool, user_id, month, include_items=False, price_lookup_items=None
+):
     if not isinstance(include_items, bool):
         raise ValueError("INVALID_INPUT: include_items must be boolean")
+    normalized_lookup = (
+        None
+        if price_lookup_items is None
+        else _normalize_price_lookup_items(price_lookup_items)
+    )
     month_date = _budget_month(month)
     start_t = datetime(month_date.year, month_date.month, 1, tzinfo=TASHKENT)
     end_t = _shift_month(start_t, 1)
@@ -912,6 +978,10 @@ async def get_monthly_budget_status(pool, user_id, month, include_items=False):
     if include_items:
         result["items"] = await _get_monthly_budget_items(
             pool, user_id, month_date, start_utc, end_utc
+        )
+    if normalized_lookup is not None:
+        result["price_lookup"] = await _get_price_lookup(
+            pool, user_id, normalized_lookup
         )
     return result
 

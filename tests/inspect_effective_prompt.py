@@ -8,7 +8,9 @@ import os
 from pathlib import Path
 
 from agent.system_prompt import build_system_prompt_parts
+from hermes_cli.config import load_config
 from hermes_cli.prompt_size import _build_inspection_agent
+from toolsets import resolve_toolset
 
 
 FINAL_PHRASE = (
@@ -44,6 +46,18 @@ def main() -> None:
     profile = Path(os.environ["HERMES_HOME"])
     soul = (profile / "SOUL.md").read_text(encoding="utf-8").strip()
     agent = _build_inspection_agent("telegram")
+    config = load_config()
+    disabled_toolsets = (config.get("agent") or {}).get("disabled_toolsets") or []
+    removed_tool_names = sorted(
+        {
+            tool_name
+            for toolset_name in disabled_toolsets
+            for tool_name in resolve_toolset(toolset_name)
+        }
+    )
+    available_tool_names = sorted(
+        tool["function"]["name"] for tool in (getattr(agent, "tools", None) or [])
+    )
     parts = build_system_prompt_parts(agent)
     full = "\n\n".join(
         parts[name] for name in ("stable", "context", "volatile") if parts[name]
@@ -55,6 +69,9 @@ def main() -> None:
         "full_soul_present": soul in full,
         "soul_truncated": "[...truncated SOUL.md:" in full,
         "skills_index_present": "<available_skills>" in full,
+        "disabled_toolsets": sorted(disabled_toolsets),
+        "removed_tool_names": removed_tool_names,
+        "available_tool_names": available_tool_names,
         "markers": {
             "identity_sentinel": full.count("user_id: 0"),
             "language_contract": full.count("только узбекский, кириллица"),
@@ -78,6 +95,8 @@ def main() -> None:
             "stage53_one_question": full.count(ONE_QUESTION),
             "stage53_draft_confirmation": full.count(DRAFT_CONFIRMATION),
             "stage53_nutrition_limit": full.count(NUTRITION_LIMIT),
+            "stage53_price_lookup": full.count("price_lookup_items"),
+            "stage53_execute_code_ban": full.count("execute_code"),
         },
         "forbidden": {
             "dona": "дона" in full,

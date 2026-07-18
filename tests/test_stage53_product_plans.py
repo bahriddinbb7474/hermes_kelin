@@ -147,6 +147,10 @@ def _item(
     return value
 
 
+def _lookup_item(name: str, unit: str) -> dict:
+    return {"item_name_normalized": name, "unit": unit}
+
+
 # ---------------------------------------------------------------------------
 # Migration and static contracts
 # ---------------------------------------------------------------------------
@@ -780,6 +784,165 @@ async def test_no_purchases_keeps_zero_actual_and_unknown_price_quantity_null(st
     assert item["price_as_of"] is None
 
 
+@requires_db
+@pytest.mark.asyncio
+async def test_read_only_price_lookup_returns_exact_scoped_facts_without_mutation(
+    stage53_pool,
+):
+    pool = stage53_pool
+    user_id = await _seed_user(pool)
+    other_user_id = await _seed_user(pool, telegram_id=953002)
+    first_at = datetime(2026, 7, 1, 10, 0, tzinfo=timezone.utc)
+    latest_at = datetime(2026, 7, 2, 12, 0, tzinfo=timezone.utc)
+    await _insert_expense(
+        pool,
+        user_id,
+        amount=48000,
+        category="home",
+        item="кир совуни",
+        quantity=4,
+        unit="pcs",
+        occurred_at=first_at,
+    )
+    # Legacy/mixed-case normalized data must still match case-insensitively.
+    await _insert_expense(
+        pool,
+        user_id,
+        amount=26000,
+        category="home",
+        item="КИР СОВУНИ",
+        quantity=2,
+        unit="pcs",
+        occurred_at=latest_at,
+    )
+    # A newer purchase in another unit must not affect pcs facts.
+    await _insert_expense(
+        pool,
+        user_id,
+        amount=90000,
+        category="home",
+        item="кир совуни",
+        quantity=3,
+        unit="pack",
+        occurred_at=datetime(2026, 7, 3, tzinfo=timezone.utc),
+    )
+    # Missing quantity is not a priced purchase.
+    await _insert_expense(
+        pool,
+        user_id,
+        amount=99999,
+        category="home",
+        item="кир совуни",
+        occurred_at=datetime(2026, 7, 4, tzinfo=timezone.utc),
+    )
+    # Another user's purchase must never leak into the effective user's lookup.
+    await _insert_expense(
+        pool,
+        other_user_id,
+        amount=1,
+        category="home",
+        item="кир совуни",
+        quantity=1,
+        unit="pcs",
+        occurred_at=datetime(2026, 7, 5, tzinfo=timezone.utc),
+    )
+
+    tables = (
+        "transactions",
+        "monthly_budget_plans",
+        "monthly_budget_items",
+        "monthly_plan_cycles",
+    )
+    before = {
+        table: [dict(row) for row in await pool.fetch(f"SELECT * FROM {table}")]
+        for table in tables
+    }
+    status = await db.get_monthly_budget_status(
+        pool,
+        user_id,
+        "2026-07-01",
+        include_items=False,
+        price_lookup_items=[_lookup_item("Кир Совуни", "pcs")],
+    )
+    after = {
+        table: [dict(row) for row in await pool.fetch(f"SELECT * FROM {table}")]
+        for table in tables
+    }
+
+    assert "items" not in status
+    price_lookup = status["price_lookup"]
+    assert len(price_lookup) == 1
+    assert price_lookup[0] == {
+        "item_name_normalized": "кир совуни",
+        "unit": "pcs",
+        "last_unit_price_uzs": 13000,
+        "last_price_as_of": "2026-07-02T12:00:00Z",
+        "average_unit_price_uzs": pytest.approx(74000 / 6),
+        "priced_purchase_count": 2,
+    }
+    assert after == before
+
+
+@requires_db
+@pytest.mark.asyncio
+async def test_price_lookup_unknown_is_null_and_old_status_shapes_stay_compatible(
+    stage53_pool,
+):
+    pool = stage53_pool
+    user_id = await _seed_user(pool)
+
+    old_default = await db.get_monthly_budget_status(pool, user_id, "2026-07-01")
+    old_detailed = await db.get_monthly_budget_status(
+        pool, user_id, "2026-07-01", include_items=True
+    )
+    lookup = await db.get_monthly_budget_status(
+        pool,
+        user_id,
+        "2026-07-01",
+        price_lookup_items=[_lookup_item("номаълум", "kg")],
+    )
+
+    assert "items" not in old_default
+    assert "price_lookup" not in old_default
+    assert old_detailed["items"] == []
+    assert "price_lookup" not in old_detailed
+    assert lookup["price_lookup"] == [
+        {
+            "item_name_normalized": "номаълум",
+            "unit": "kg",
+            "last_unit_price_uzs": None,
+            "last_price_as_of": None,
+            "average_unit_price_uzs": None,
+            "priced_purchase_count": 0,
+        }
+    ]
+
+
+@requires_db
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "lookup_items",
+    [
+        "not-a-list",
+        [{}],
+        [{"item_name_normalized": "", "unit": "pcs"}],
+        [{"item_name_normalized": "кир совуни"}],
+        [{"item_name_normalized": "кир совуни", "unit": "box"}],
+        [_lookup_item(f"item-{index}", "pcs") for index in range(51)],
+    ],
+)
+async def test_price_lookup_input_validation(stage53_pool, lookup_items):
+    pool = stage53_pool
+    user_id = await _seed_user(pool)
+    with pytest.raises(ValueError, match="INVALID_INPUT"):
+        await db.get_monthly_budget_status(
+            pool,
+            user_id,
+            "2026-07-01",
+            price_lookup_items=lookup_items,
+        )
+
+
 # ---------------------------------------------------------------------------
 # MCP schema/dispatch and identity regressions
 # ---------------------------------------------------------------------------
@@ -825,6 +988,16 @@ async def test_stage53_extends_two_schemas_without_new_tools():
     assert schemas["get_monthly_budget_status"]["required"] == ["user_id", "month"]
     include = schemas["get_monthly_budget_status"]["properties"]["include_items"]
     assert include == {"type": "boolean", "default": False}
+    lookup = schemas["get_monthly_budget_status"]["properties"][
+        "price_lookup_items"
+    ]
+    assert lookup["type"] == "array"
+    assert lookup["maxItems"] == 50
+    assert lookup["items"]["required"] == ["item_name_normalized", "unit"]
+    assert lookup["items"]["additionalProperties"] is False
+    assert lookup["items"]["properties"]["unit"]["enum"] == list(
+        db.CANONICAL_UNITS
+    )
     assert "set_monthly_budget" in GUARD.read_text(encoding="utf-8")
     assert "get_monthly_budget_status" in GUARD.read_text(encoding="utf-8")
 
@@ -855,6 +1028,7 @@ async def test_mcp_old_and_new_calls_and_default_include_items(stage53_pool, mon
     )
     assert default_status["ok"] is True
     assert "items" not in default_status
+    assert "price_lookup" not in default_status
 
     new = await _call_json(
         "set_monthly_budget",

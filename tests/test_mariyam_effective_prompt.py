@@ -10,6 +10,8 @@ import subprocess
 
 import yaml
 
+from backend import server
+
 
 REPO = Path(__file__).resolve().parents[1]
 PROFILE_SOURCE = REPO / "deploy" / "hermes_profile_mariyam_oyijon"
@@ -95,7 +97,12 @@ def test_no_second_mariyam_soul_or_skill_exists():
 def test_profile_config_uses_supported_prompt_path_not_noop_enabled_key():
     config = yaml.safe_load(CONFIG_SNIPPET.read_text(encoding="utf-8"))
     assert "enabled" not in config["skills"]
-    assert config["agent"]["disabled_toolsets"] == ["skills"]
+    assert config["agent"]["disabled_toolsets"] == [
+        "skills",
+        "terminal",
+        "code_execution",
+    ]
+    assert config["display"]["tool_progress"] is False
 
 
 def test_effective_telegram_prompt_contains_full_untruncated_contract(tmp_path):
@@ -127,7 +134,28 @@ def test_effective_telegram_prompt_contains_full_untruncated_contract(tmp_path):
     assert markers["stage53_one_question"] == 1
     assert markers["stage53_draft_confirmation"] == 1
     assert markers["stage53_nutrition_limit"] == 1
+    assert markers["stage53_price_lookup"] >= 1
+    assert markers["stage53_execute_code_ban"] >= 1
     assert not any(result["forbidden"].values())
+
+
+def test_effective_mariyam_tools_exclude_execution_but_preserve_other_surfaces(
+    tmp_path,
+):
+    result = _inspect_effective_prompt(tmp_path)
+    available = set(result["available_tool_names"])
+    removed = set(result["removed_tool_names"])
+    assert result["disabled_toolsets"] == [
+        "code_execution",
+        "skills",
+        "terminal",
+    ]
+    assert {"terminal", "process", "execute_code"} <= removed
+    assert not ({"terminal", "process", "execute_code"} & available)
+    assert not ({"browser_navigate", "cronjob", "memory"} & removed)
+    assert "memory" in available
+    assert not ({name for name, _desc, _schema in server.TOOLS} & removed)
+    assert len(server.TOOLS) == len(server.DISPATCH) == 21
 
 
 def test_deploy_closes_stage_with_offline_prompt_gate_and_no_paid_retest():

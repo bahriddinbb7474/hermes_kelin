@@ -42,8 +42,9 @@
 - `ensure_user`: `telegram_id` приводится к **int** (`_to_pos_int`); небезопасное значение → блок.
 - Mapping **вне git**; `MARIYAM_IDENTITY_MAP_FILE` mode **600**; unit + profile `.env` (Hermes может сбросить unit Environment).
 - **Raw Telegram ID и mapping не логируются** (`_mask`).
-- **Repo/VPS runtime:** plugin **1.0.4**; Stage 5.1 identity policy и Stage 5.2 reports live E2E PASS. Stage 5.3 реализован только в repo и имеет статус **OFFLINE PASS / LIVE PENDING**.
-- **Prompt/skill-protect:** единственный repo canonical prompt — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, LF SHA `5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`. На VPS остаётся deployed Stage 5.2 SOUL SHA `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e` до отдельно разрешённого Stage 5.3 deploy; активный Mariyam `SKILL.md` отсутствует, дублирующий repo SKILL не создаётся; skill-protect и `tool_progress=off` сохранены.
+- **Repo/VPS runtime:** plugin **1.0.4**, migration 003 active, tools **21/21/21**; Stage 5.1 identity policy и Stage 5.2 reports live E2E PASS. Stage 5.3 v3.18 fix имеет статус **OFFLINE PASS / LIVE PENDING**.
+- **Prompt/skill-protect:** единственный repo canonical prompt — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, LF SHA `5ae4d0990221f1828188f934c861d386760fed9797205e1316993ee28a602aa4`. На VPS до controlled fix deploy остаётся SOUL SHA `5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`; активный Mariyam `SKILL.md` отсутствует, дублирующий repo SKILL не создаётся; skill-protect и `tool_progress=off` сохранены.
+- **Command execution isolation:** установленный Hermes v0.18.2 относит `terminal`/`process` к toolset `terminal`, а `execute_code` — к отдельному `code_execution`. Mariyam profile отключает `skills`, `terminal`, `code_execution`; MCP tools и browser/cron/memory этими запретами не затрагиваются. Hermes core не меняется.
 
 ## Planned Stage 5.3A–6 security gates — NOT IMPLEMENTED
 

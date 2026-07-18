@@ -40,7 +40,7 @@ GUARD_INIT = (
 )
 # Canonical Git/deploy bytes after CRLF -> LF normalization.
 EXPECTED_SOUL_SHA256 = (
-    "5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266"
+    "5ae4d0990221f1828188f934c861d386760fed9797205e1316993ee28a602aa4"
 )
 PROFILE_SCOPED_DIR = "hermes_profile_mariyam_oyijon"
 SELF_IMPROVEMENT_MARKERS = (
@@ -120,6 +120,17 @@ def test_snippet_memory_notifications_off(protect_cfg):
 
 def test_snippet_disables_skills_toolset(protect_cfg):
     assert "skills" in protect_cfg["agent"]["disabled_toolsets"]
+
+
+def test_snippet_disables_all_command_execution_toolsets(protect_cfg):
+    disabled = protect_cfg["agent"]["disabled_toolsets"]
+    assert "terminal" in disabled
+    # Hermes v0.18.2 maps execute_code to code_execution, not terminal.
+    assert "code_execution" in disabled
+
+
+def test_tool_progress_contract_remains_off(protect_cfg):
+    assert protect_cfg["display"]["tool_progress"] is False
 
 
 def test_snippet_does_not_use_unsupported_skills_enabled(protect_cfg):

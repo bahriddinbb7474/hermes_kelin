@@ -1,8 +1,8 @@
-# Техническое задание v3.17 — FINAL
+# Техническое задание v3.18 — FINAL
 # Hermes Agent «Мариям» — ИИ келинчак для Ойижон
 
 **Статус:** ФИНАЛЬНЫЙ, единый источник истины (single source of truth)
-**Версия:** 3.17 — Stage 5.3 реализован локально и имеет статус **OFFLINE PASS / LIVE PENDING**: repo содержит идемпотентную migration 003, product plans, price snapshots, расширенные 21 tools и canonical SOUL; VPS по-прежнему использует migration 002 и предыдущий deployed SOUL. Stage 5.1 и Stage 5.2 остаются CLOSED / LIVE PASS; Stage 5.3A–6 остаются PLANNED / NOT IMPLEMENTED. Имя файла не меняется, документ остаётся единственным источником истины.
+**Версия:** 3.18 — Stage 5.3 остаётся **OFFLINE PASS / LIVE PENDING** после блокирующего live-дефекта. Существующий `get_monthly_budget_status` расширен read-only reference-price lookup без нового tool; Mariyam profile отключает `terminal` и `code_execution`, поэтому command shell и `execute_code` недоступны. Repo/VPS inventory остаётся 21; migration 003 active на VPS, controlled fix deploy и повторный Telegram E2E pending. Stage 5.1 и Stage 5.2 остаются CLOSED / LIVE PASS; Stage 5.3A–6 — PLANNED / NOT IMPLEMENTED. Имя файла не меняется, документ остаётся единственным источником истины.
 **Проект:** персональный Telegram ИИ-агент для пожилой женщины из Узбекистана
 **Имя агента:** Мариям · **Образ:** ИИ келинчак
 **Основной пользователь:** Ойижон · **Администратор:** Бахриддин ака
@@ -10,7 +10,7 @@
 **Архитектура:** Hermes-first
 **Язык общения с Ойижон:** только узбекский, кириллица
 **Часовой пояс:** Asia/Tashkent (UTC+5)
-**Дата:** 2026-07-16
+**Дата:** 2026-07-18
 
 ---
 
@@ -285,6 +285,37 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
    поля согласованы DB constraint; factual price сверяется с transactions; amount при
    snapshot обязан равняться quantity × price; item normalization case-insensitive;
    дочерние `food.*` корректно учитываются в родительском category plan.
+
+### 0.18. Изменения v3.17 → v3.18 (2026-07-18) — Stage 5.3 read-only price lookup и запрет command execution
+
+1. Live acceptance выявил блокирующий backend-path defect: до сохранения будущего
+   product item отсутствовал точный read-only MCP lookup последней/средней цены;
+   модель выбрала `execute_code`, Telegram раскрыл command approval и draft не был
+   сформирован. Stage 5.3 не закрыт.
+2. Существующий `get_monthly_budget_status` принимает optional
+   `price_lookup_items[]` (normalized item + exact canonical unit, максимум 50) и
+   возвращает exact last price/timestamp, weighted average и priced purchase count.
+   Unknown = `null`; разные units и users не смешиваются; lookup не изменяет БД.
+3. Используется существующая Stage 5.3 price-логика: expense, UZS amount,
+   `quantity > 0`, case-insensitive normalized item и exact unit. Нового алгоритма,
+   таблицы, migration или tool нет; inventory/dispatch/discovery = **21/21/21**.
+4. Canonical SOUL требует lookup после выбора last/average и до полного draft;
+   draft строится только из tool result; при `null` задаётся один manual-price
+   вопрос без save. `set_monthly_budget` вызывается только после подтверждения.
+5. Аудит установленного Hermes v0.18.2 подтвердил: `terminal`/`process` входят в
+   toolset `terminal`, а `execute_code` — в отдельный `code_execution`. Mariyam
+   profile отключает `skills`, `terminal`, `code_execution`; MCP tools и
+   browser/cron/memory не отключаются. Hermes core не менялся.
+6. Permanent backend/SOUL/effective-prompt/profile regression tests добавлены.
+   Targeted disposable PostgreSQL suite = **60 passed**; full disposable suite =
+   **202 passed**; ruff, compileall и `git diff --check` — PASS.
+7. Repo canonical LF SOUL SHA-256 =
+   `5ae4d0990221f1828188f934c861d386760fed9797205e1316993ee28a602aa4`.
+   VPS baseline до fix deploy: migration 003 active, tools 21/21/21, plugin 1.0.4,
+   deployed SOUL `5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`.
+8. **Статус Stage 5.3: OFFLINE PASS / LIVE PENDING.** Controlled deploy, повторный
+   Telegram E2E, provider cost verification и live evidence ещё не выполнены.
+   Реальная Ойижон не подключена; Stage 5.3A–6 остаются PLANNED / NOT IMPLEMENTED.
 
 Исполнитель реализует проект **строго по разделам 5–21**, сдаёт этапами (раздел 15) и на каждом этапе выполняет acceptance criteria. Что делать запрещено — раздел 20.
 
@@ -738,7 +769,7 @@ CREATE TABLE monthly_budget_plans (
     UNIQUE (user_id, month, category_code)
 );
 
--- v3.17 REPO IMPLEMENTED / VPS NOT APPLIED — migration 003
+-- v3.18 REPO IMPLEMENTED / VPS ACTIVE — migration 003
 CREATE TABLE monthly_budget_items (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -1371,15 +1402,17 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 7. JSON, tool names, technical fields и traces Ойижон не показывать; суммы только из tools.
 8. Wrapper-маркеры stored prompt и Telegram profile names не являются AC. Identity AC: exact Telegram session → private mapping → `requested=0` → effective test-user.
 
-### Этап 5.3 — Семейный и продуктовый план (v3.17)
+### Этап 5.3 — Семейный и продуктовый план (v3.18)
 
-**Статус: OFFLINE PASS / LIVE PENDING.** Repo migration 003 и расширенные tool contracts реализованы; tool count остаётся **21**. VPS по-прежнему использует migration 002 до отдельного deploy.
+**Статус: OFFLINE PASS / LIVE PENDING.** Migration 003 active на VPS; v3.18 read-only lookup и профильный запрет command execution прошли offline gates, но controlled fix deploy и повторный Telegram E2E ещё не выполнены. Tool count остаётся **21**.
 
 **Диалог:** Hermes спрашивает последовательно, по одному вопросу в сообщении: (1) месяц; (2) household size; (3) группа расходов; (4) продукты дома; (5) нужные продукты; (6) quantity — по одному продукту за сообщение; (7) бюджет, затем отдельным сообщением last/average/manual price; (8) полный draft. `set_monthly_budget` вызывается только после явного подтверждения; после исправления draft показывается и подтверждается снова.
 
 **Продуктовый план:** сначала summary категории `Харажат гуруҳи | Режа | Сарфлангани | Қолгани`, затем таблица `Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма`. Старый пятиколоночный planned-формат заменён; отдельной product-колонки остатка нет. Для item обязательно минимум одно planned value: quantity или amount. Actual quantity/amount берутся только из transactions; quantity и price не угадывать; units не смешивать; unknown = `—` или `айтилмаган`.
 
-**Reference prices:** последняя цена = amount / quantity самой поздней подходящей покупки; средняя — только средневзвешенная, сумма покупок / общее количество одного товара в одной unit. Без normalized item, amount, quantity и unit цену не считать. Следующий план использует last по умолчанию; Ойижон может выбрать average или manual. Snapshot сохраняется repo migration 003 и не меняется от будущих покупок. При snapshot сумма плана обязана совпадать с quantity × reference price; переданные last/average facts сверяются backend с transactions.
+**Reference prices:** последняя цена = amount / quantity самой поздней подходящей покупки; средняя — только средневзвешенная, сумма покупок / общее количество одного товара в одной unit. Без normalized item, amount, `quantity > 0` и exact unit цену не считать. После выбора last/average Hermes до draft вызывает read-only `get_monthly_budget_status(price_lookup_items=[...])`; результат не меняет transactions/plans/cycles. Unknown = `null`: цену не угадывать, задать один вопрос о manual price и не сохранять plan. Snapshot сохраняется repo migration 003 и не меняется от будущих покупок. При snapshot сумма плана обязана совпадать с quantity × reference price; переданные last/average facts сверяются backend с transactions.
+
+**Command execution:** для Mariyam profile отключены Hermes toolsets `terminal` и `code_execution`; `terminal`, `process` и `execute_code` недоступны. Для цен, расходов, бюджета и product plan shell/Python/calculator без tool-backed financial facts запрещены. MCP tools и browser/cron/memory остаются вне этих disabled toolsets; Hermes core не меняется.
 
 **Nutrition guidance AC:**
 
@@ -1390,7 +1423,7 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 5. При медицинских ограничениях рекомендовать согласовать рацион с врачом.
 6. Точные quantities сохранять только после подтверждения семьи.
 
-**Storage/tools AC:** repo migration 003 создаёт `monthly_budget_items` с composite FK на category plan, coherent `reference_unit_price_uzs` / `price_basis` / `price_as_of` и подготовленную schema-часть `monthly_plan_cycles`; `set_monthly_budget` принимает optional `items[]`; `get_monthly_budget_status(include_items=true)` возвращает product plan/actual/remaining и last/average/reference price. Item normalization case-insensitive; дочерние `food.*` учитываются в родительском `food` plan при отсутствии более точного дочернего плана. Inventory/dispatch/discovery = 21/21/21. Migration 003 не применена на VPS.
+**Storage/tools AC:** migration 003 создаёт `monthly_budget_items` с composite FK на category plan, coherent `reference_unit_price_uzs` / `price_basis` / `price_as_of` и подготовленную schema-часть `monthly_plan_cycles`; `set_monthly_budget` принимает optional `items[]`; `get_monthly_budget_status(include_items=true)` возвращает product plan/actual/remaining и last/average/reference price, а optional `price_lookup_items` — read-only price facts до draft. Item normalization case-insensitive; дочерние `food.*` учитываются в родительском `food` plan при отсутствии более точного дочернего плана. Inventory/dispatch/discovery = 21/21/21. Migration 003 active на VPS.
 
 ### Этап 5.3A — Цикл утверждения плана 25/27/28/1 (v3.10)
 

@@ -1,9 +1,9 @@
 # Tools Contracts
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (полные примеры вход/выход — §15).
-Реализация: `backend/server.py` + `backend/db.py`. **Repo/VPS inventory: 21 tools; repo dispatch/MCP discovery = 21/21.** Stage 5.3 расширяет существующие `set_monthly_budget` и `get_monthly_budget_status`; новых tools нет. VPS deployment Stage 5.3 pending.
+Реализация: `backend/server.py` + `backend/db.py`. **Repo/VPS inventory: 21 tools; repo dispatch/MCP discovery = 21/21.** Stage 5.3 расширяет существующие `set_monthly_budget` и `get_monthly_budget_status`; новых tools нет. Migration 003 active на VPS; v3.18 fix deploy и live acceptance pending.
 
-**v3.17 progression:** Stage 5.3 repo = 21, Stage 5.3A = planned 22, Stage 5.4 = planned 25, Stage 6 = planned 27. Всё сверх текущих 21 — **PLANNED / NOT IMPLEMENTED** и отсутствует в runtime discovery.
+**v3.18 progression:** Stage 5.3 repo/VPS = 21, Stage 5.3A = planned 22, Stage 5.4 = planned 25, Stage 6 = planned 27. Всё сверх текущих 21 — **PLANNED / NOT IMPLEMENTED** и отсутствует в runtime discovery.
 
 ## Общие правила
 
@@ -50,6 +50,7 @@
 - `set_monthly_budget`: optional `items[]`; каждый planned item может содержать `item_name_normalized`, `item_name_display`, `planned_quantity`, `unit`, `planned_amount_uzs`, `reference_unit_price_uzs`, `price_basis`, `price_as_of`, `note`. Минимум одно из `planned_quantity` или `planned_amount_uzs` обязательно.
 - Если `items` отсутствует, product rows не меняются; если передан — category plan и полная замена product rows выполняются атомарно. Default price basis = last; average только явно, manual требует явную reference price. Переданный factual snapshot last/average проверяется против transactions; при snapshot суммы `planned_amount_uzs` и quantity × price обязаны совпадать.
 - `get_monthly_budget_status(include_items=true)` возвращает по item: `planned_quantity`, `planned_unit`, `planned_amount_uzs`, `actual_quantity`, `actual_unit`, `actual_amount_uzs`, `remaining_amount_uzs`, `last_unit_price_uzs`, `average_unit_price_uzs`, `reference_unit_price_uzs`, `price_basis`, `price_as_of`. Unknown = `null`, не `0`; разные units не смешиваются.
+- `get_monthly_budget_status(price_lookup_items=[...])` — optional read-only lookup до draft. Каждый элемент требует `item_name_normalized` и `unit` из `kg|g|l|ml|pcs|pack`; максимум 50. Output `price_lookup[]`: normalized item, unit, exact `last_unit_price_uzs`, `last_price_as_of`, weighted `average_unit_price_uzs` и `priced_purchase_count`. Подходят только expense текущего effective user с case-insensitive normalized item, exact unit, `quantity > 0` и известной UZS amount. Unknown price/timestamp = `null`; lookup не создаёт и не обновляет transactions/plans/cycles/timestamps.
 - Default `include_items=false`, поэтому Stage 5.2 contract не меняется.
 - Backend casefold-нормализует item name, считает точные числа, последнюю и средневзвешенную цену из transactions и сохраняет price snapshot плана; backend не пишет прозу. Цена рассчитывается только при наличии normalized item, amount, quantity и unit. При category plan `food` фактические расходы дочерних `food.*` сворачиваются в родительскую строку, если для конкретной дочерней категории нет более точного плана.
 - Hermes объясняет данные, предлагает last price по умолчанию, спрашивает подтверждение и принимает `average` или `manual` override. Ценовая логика не хранится в LLM memory.

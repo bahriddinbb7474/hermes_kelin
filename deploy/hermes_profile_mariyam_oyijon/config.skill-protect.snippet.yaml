@@ -12,6 +12,8 @@
 # - skills.write_approval: stage skill writes instead of immediate commit
 # - agent.disabled_toolsets: gateway/run.py loads into AIAgent
 # - toolset name "skills" → skills_list, skill_view, skill_manage (toolsets.py)
+# - toolset name "terminal" → terminal, process (toolsets.py)
+# - toolset name "code_execution" → execute_code (toolsets.py)
 
 skills:
   # `skills.enabled` is not a Hermes v0.18.2 loader key. Mariyam's canonical
@@ -27,7 +29,11 @@ display:
   tool_progress: false
 
 agent:
-  # Disable the skill-management toolset. SOUL.md remains in the system prompt;
-  # SKILL.md indexing/loading is intentionally not part of this profile.
+  # Disable skill management and all command-execution surfaces for Mariyam only.
+  # SOUL.md remains in the system prompt; MCP/browser/cron/memory stay available.
+  # Hermes v0.18.2 does not place execute_code in "terminal": both supported
+  # toolsets must be disabled to remove terminal/process/execute_code.
   disabled_toolsets:
     - skills
+    - terminal
+    - code_execution
