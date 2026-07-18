@@ -38,7 +38,7 @@
 
 ## Где мы сейчас (2026-07-18)
 
-ТЗ: **v3.18**. Этапы 5.1 и 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **OFFLINE PASS / LIVE PENDING**. Repo canonical SOUL LF SHA = `5ae4d0990221f1828188f934c861d386760fed9797205e1316993ee28a602aa4`; существующий `get_monthly_budget_status` имеет optional read-only price lookup, новых tools нет и inventory/dispatch/discovery = **21/21/21**. Profile config отключает `skills`, `terminal` и `code_execution`, удаляя `terminal`/`process`/`execute_code` без изменения Hermes core или MCP tools. VPS уже использует plugin **1.0.4** и migration 003, но fix/SOUL/profile config ещё не deployed; повторный Telegram E2E pending. Stage 5.3A–6 — **PLANNED / NOT IMPLEMENTED**; migrations 004/005 отсутствуют. Реальная Ойижон не подключена.
+ТЗ: **v3.18**. Этапы 5.1 и 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **OFFLINE PASS / LIVE PENDING**. Repo canonical SOUL LF SHA = `b78da2252db21fec452763375fee9c6648bfa6d789e3118281020936f5304052`; существующий `get_monthly_budget_status` имеет optional read-only price lookup, новых tools нет и inventory/dispatch/discovery = **21/21/21**. Profile config отключает `skills`, `terminal` и `code_execution`, удаляя `terminal`/`process`/`execute_code` без изменения Hermes core или MCP tools. VPS уже использует plugin **1.0.4** и migration 003, но fix/SOUL/profile config ещё не deployed; повторный Telegram E2E pending. Stage 5.3A–6 — **PLANNED / NOT IMPLEMENTED**; migrations 004/005 отсутствуют. Реальная Ойижон не подключена.
 
 На VPS выполнено (Этап 1, технически):
 - PostgreSQL поднят и **healthy** (контейнер `hermes_mariyam_postgres`, порт 127.0.0.1:5432, init-миграции применены).
@@ -61,7 +61,7 @@
 - **Stage 5.2: CLOSED / LIVE PASS** (v3.16) — Message 1 и Message 2 подтверждены live; report-type completion contract и category-table contract PASS; новый платный тест не выполнялся. Evidence: `EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`.
 - **Stage 5.3: OFFLINE PASS / LIVE PENDING** (v3.18) — после live-дефекта добавлен read-only `price_lookup_items` в существующий status tool; draft строится только по tool facts, а profile-level `terminal` + `code_execution` запрещают command approval/`execute_code`. Migration 003 уже active на VPS; fix deploy/E2E pending.
 - **Planned:** Stage 5.3A approval cycle + cron identity gate; Stage 5.4 utility read-only; Stage 6 recurring obligations. Planned tools 21→22→25→27; current repo/VPS inventory = 21.
-- **Prompt/skill protect:** repo canonical LF SOUL assertion = `5ae4d0990221f1828188f934c861d386760fed9797205e1316993ee28a602aa4`; active VPS Mariyam `SKILL.md` отсутствует; skill-protect и `tool_progress` off; fix deploy добавит profile-only `terminal` + `code_execution` disable.
+- **Prompt/skill protect:** repo canonical LF SOUL assertion = `b78da2252db21fec452763375fee9c6648bfa6d789e3118281020936f5304052`; active VPS Mariyam `SKILL.md` отсутствует; skill-protect и `tool_progress` off; fix deploy добавит profile-only `terminal` + `code_execution` disable.
 - Мариям = бытовой финансовый аналитик; backend считает факты, Hermes объясняет; memory ≠ источник аналитики.
 - очистка тестовых данных БД — выполнена, закрепить аудитом;
 - **Этап 2 (язык): PARTIAL 8/20, НЕ закрыт** — 8 из 20 фраз проверены (8/8 кириллица, `LATIN_LINES: []`), полный AC (20/20, 0 латиницы) не пройден; тест остановлен заказчиком, не из-за FAIL (см. `docs/TZ/EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md`);

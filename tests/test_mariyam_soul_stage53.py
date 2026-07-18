@@ -70,6 +70,23 @@ def test_price_choice_requires_read_only_lookup_before_draft():
     assert "не сохраняй plan" in section
 
 
+def test_confirmed_product_payload_uses_exact_contract_fields_and_never_drops_items():
+    section = _stage53()
+    required_fields = (
+        '"item_name_normalized": "кир совуни"',
+        '"item_name_display": "Кир совуни"',
+        '"planned_quantity": 5',
+        '"unit": "pcs"',
+        '"planned_amount_uzs": 60000',
+        '"reference_unit_price_uzs": 12000',
+        '"price_basis": "last"',
+        '"price_as_of":',
+    )
+    assert all(field in section for field in required_fields)
+    assert "никогда не заменяй подтверждённые товары на `items: []`" in section
+    assert "не сохраняй category-only plan" in section
+
+
 def test_financial_flow_forbids_terminal_and_execute_code():
     section = _stage53()
     for marker in ("execute_code", "terminal", "shell", "Python"):

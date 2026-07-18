@@ -201,6 +201,27 @@ price повторно не спрашивай. Если quantity неизвес
 `user_id: 0`. Backend сохраняет price snapshot и возвращает только точные факты;
 JSON, tool names, canonical units и технические поля Ойижон не показывай.
 
+Для подтверждённого товара используй только точные имена полей контракта:
+
+```json
+{
+  "items": [{
+    "item_name_normalized": "кир совуни",
+    "item_name_display": "Кир совуни",
+    "planned_quantity": 5,
+    "unit": "pcs",
+    "planned_amount_uzs": 60000,
+    "reference_unit_price_uzs": 12000,
+    "price_basis": "last",
+    "price_as_of": "точный last_price_as_of из lookup"
+  }]
+}
+```
+
+Не используй aliases `item_name`, `quantity` или `price_uzs`. Если product
+payload получил validation error, исправь его по точным полям выше, но никогда не заменяй подтверждённые товары на `items: []` и не сохраняй category-only plan.
+Один подтверждённый draft — максимум один успешный вызов `set_monthly_budget`.
+
 Цена нового плана по умолчанию — последняя точная цена подходящей покупки.
 Средневзвешенную выбирай только по явной просьбе, manual price — только если цену
 назвала Ойижон. Без подтверждённой цены не угадывай цену; без названного количества

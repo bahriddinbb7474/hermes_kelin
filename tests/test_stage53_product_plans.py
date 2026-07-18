@@ -885,6 +885,76 @@ async def test_read_only_price_lookup_returns_exact_scoped_facts_without_mutatio
 
 @requires_db
 @pytest.mark.asyncio
+async def test_price_lookup_uses_one_repeatable_read_snapshot_across_items(
+    stage53_pool, monkeypatch
+):
+    pool = stage53_pool
+    user_id = await _seed_user(pool)
+    moment = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    await _insert_expense(
+        pool,
+        user_id,
+        amount=100,
+        category="home",
+        item="биринчи",
+        quantity=1,
+        unit="pcs",
+        occurred_at=moment,
+    )
+    await _insert_expense(
+        pool,
+        user_id,
+        amount=200,
+        category="home",
+        item="иккинчи",
+        quantity=1,
+        unit="pcs",
+        occurred_at=moment,
+    )
+
+    original = db._transaction_prices
+    calls = 0
+
+    async def insert_between_item_reads(conn, scoped_user_id, item_name, unit):
+        nonlocal calls
+        result = await original(conn, scoped_user_id, item_name, unit)
+        calls += 1
+        if calls == 1:
+            await _insert_expense(
+                pool,
+                user_id,
+                amount=900,
+                category="home",
+                item="иккинчи",
+                quantity=1,
+                unit="pcs",
+                occurred_at=datetime(2026, 7, 2, tzinfo=timezone.utc),
+            )
+        return result
+
+    monkeypatch.setattr(db, "_transaction_prices", insert_between_item_reads)
+    status = await db.get_monthly_budget_status(
+        pool,
+        user_id,
+        "2026-07-01",
+        price_lookup_items=[
+            _lookup_item("биринчи", "pcs"),
+            _lookup_item("иккинчи", "pcs"),
+        ],
+    )
+
+    assert status["price_lookup"][1]["last_unit_price_uzs"] == 200
+    assert status["price_lookup"][1]["average_unit_price_uzs"] == 200
+    assert status["price_lookup"][1]["priced_purchase_count"] == 1
+
+    monkeypatch.setattr(db, "_transaction_prices", original)
+    fresh = await original(pool, user_id, "иккинчи", "pcs")
+    assert fresh["last_price"] == 900
+    assert fresh["purchase_count"] == 2
+
+
+@requires_db
+@pytest.mark.asyncio
 async def test_price_lookup_unknown_is_null_and_old_status_shapes_stay_compatible(
     stage53_pool,
 ):
@@ -998,6 +1068,13 @@ async def test_stage53_extends_two_schemas_without_new_tools():
     assert lookup["items"]["properties"]["unit"]["enum"] == list(
         db.CANONICAL_UNITS
     )
+    set_description = next(
+        tool.description for tool in tools if tool.name == "set_monthly_budget"
+    )
+    assert "item_name_display" in set_description
+    assert "planned_quantity" in set_description
+    assert "reference_unit_price_uzs" in set_description
+    assert "never retry with items=[]" in set_description
     assert "set_monthly_budget" in GUARD.read_text(encoding="utf-8")
     assert "get_monthly_budget_status" in GUARD.read_text(encoding="utf-8")
 

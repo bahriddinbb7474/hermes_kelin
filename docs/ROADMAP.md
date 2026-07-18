@@ -29,7 +29,7 @@
 - **Identity guard на момент Stage 5: 1.0.3** — Stage 5 E2E PASS (см. historical evidence); текущий runtime после Stage 5.1 = 1.0.4.
 - **Этап 5.1** — **CLOSED / LIVE PASS** (решение v3.9, сохранено v3.12): runtime 21/1.0.4; migration 002 и skill-protect active; live E2E/cleanup PASS.
 - **Этап 5.2** — **CLOSED / LIVE PASS** (v3.16): canonical SOUL LF SHA `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`; active Mariyam `SKILL.md` отсутствует; evidence `EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`.
-- **Stage 5.3 = OFFLINE PASS / LIVE PENDING (v3.18):** read-only `price_lookup_items` расширяет существующий `get_monthly_budget_status`, не меняет БД и не создаёт новый tool; Mariyam profile отключает `terminal`/`code_execution`, поэтому `execute_code` отсутствует. Inventory/dispatch/discovery = 21/21/21; migration 003 active на VPS, fix deploy/E2E pending.
+- **Stage 5.3 = OFFLINE PASS / LIVE PENDING (v3.18 follow-up):** первый повторный E2E остановлен на Message 3 — invalid product aliases привели к category-only save; cleanup PASS. Follow-up фиксирует exact product payload, запрещает `items: []` fallback и даёт lookup один read-only repeatable snapshot. Inventory/dispatch/discovery = 21/21/21; migration 003 active; новый deploy/E2E pending.
 - **Stages 5.3A–6 planned only:** approval runtime/cron, migrations 004/005, utility connector и obligation tools не реализованы; tool count 27 не является runtime.
 - **Skill-protect:** active 4/4; постоянные SHA/contract tests остаются обязательными.
 - **Тихая блокировка unauthorized решена в ТЗ v3.5** — `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (решение заказчика 2026-07-12, ТЗ §0.5); отдельный gateway-fork не требуется; аудит и merge `d24d01c` в `main` **ВЫПОЛНЕНЫ** (через `dd9261e`).

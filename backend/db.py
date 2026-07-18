@@ -604,67 +604,68 @@ def _normalize_price_lookup_items(items) -> list[dict]:
 
 async def _transaction_prices(conn, user_id, item_name: str, unit: str):
     """Return last and weighted-average UZS prices for one exact canonical unit."""
-    last = await conn.fetchrow(
-        """SELECT amount / quantity AS unit_price, occurred_at
-           FROM transactions
-           WHERE user_id=$1 AND type='expense' AND currency='UZS'
-             AND LOWER(item_name_normalized)=LOWER($2) AND unit=$3
-             AND quantity IS NOT NULL AND quantity > 0
-           ORDER BY occurred_at DESC, id DESC
-           LIMIT 1""",
-        user_id,
-        item_name,
-        unit,
-    )
-    average = await conn.fetchrow(
-        """SELECT SUM(amount) / SUM(quantity) AS unit_price,
-                  MAX(occurred_at) AS price_as_of,
+    prices = await conn.fetchrow(
+        """WITH priced AS MATERIALIZED (
+               SELECT id, amount, quantity, amount / quantity AS unit_price,
+                      occurred_at
+               FROM transactions
+               WHERE user_id=$1 AND type='expense' AND currency='UZS'
+                 AND LOWER(item_name_normalized)=LOWER($2) AND unit=$3
+                 AND quantity IS NOT NULL AND quantity > 0
+           )
+           SELECT (ARRAY_AGG(unit_price ORDER BY occurred_at DESC, id DESC))[1]
+                      AS last_price,
+                  (ARRAY_AGG(occurred_at ORDER BY occurred_at DESC, id DESC))[1]
+                      AS last_as_of,
+                  SUM(amount) / SUM(quantity) AS average_price,
+                  MAX(occurred_at) AS average_as_of,
                   COUNT(*)::integer AS purchase_count
-           FROM transactions
-           WHERE user_id=$1 AND type='expense' AND currency='UZS'
-             AND LOWER(item_name_normalized)=LOWER($2) AND unit=$3
-             AND quantity IS NOT NULL AND quantity > 0""",
+           FROM priced""",
         user_id,
         item_name,
         unit,
     )
     return {
-        "last_price": None if last is None else Decimal(last["unit_price"]),
-        "last_as_of": None if last is None else last["occurred_at"],
+        "last_price": (
+            None if prices["last_price"] is None else Decimal(prices["last_price"])
+        ),
+        "last_as_of": prices["last_as_of"],
         "average_price": (
             None
-            if average is None or average["unit_price"] is None
-            else Decimal(average["unit_price"])
+            if prices["average_price"] is None
+            else Decimal(prices["average_price"])
         ),
-        "average_as_of": None if average is None else average["price_as_of"],
-        "purchase_count": 0 if average is None else average["purchase_count"],
+        "average_as_of": prices["average_as_of"],
+        "purchase_count": prices["purchase_count"],
     }
 
 
 async def _get_price_lookup(pool, user_id, items: list[dict]) -> list[dict]:
     result = []
-    for item in items:
-        prices = await _transaction_prices(
-            pool, user_id, item["item_name_normalized"], item["unit"]
-        )
-        result.append(
-            {
-                "item_name_normalized": item["item_name_normalized"],
-                "unit": item["unit"],
-                "last_unit_price_uzs": (
-                    None
-                    if prices["last_price"] is None
-                    else _json_number(prices["last_price"])
-                ),
-                "last_price_as_of": _iso_utc(prices["last_as_of"]),
-                "average_unit_price_uzs": (
-                    None
-                    if prices["average_price"] is None
-                    else _json_number(prices["average_price"])
-                ),
-                "priced_purchase_count": prices["purchase_count"],
-            }
-        )
+    async with pool.acquire() as conn:
+        async with conn.transaction(isolation="repeatable_read", readonly=True):
+            for item in items:
+                prices = await _transaction_prices(
+                    conn, user_id, item["item_name_normalized"], item["unit"]
+                )
+                result.append(
+                    {
+                        "item_name_normalized": item["item_name_normalized"],
+                        "unit": item["unit"],
+                        "last_unit_price_uzs": (
+                            None
+                            if prices["last_price"] is None
+                            else _json_number(prices["last_price"])
+                        ),
+                        "last_price_as_of": _iso_utc(prices["last_as_of"]),
+                        "average_unit_price_uzs": (
+                            None
+                            if prices["average_price"] is None
+                            else _json_number(prices["average_price"])
+                        ),
+                        "priced_purchase_count": prices["purchase_count"],
+                    }
+                )
     return result
 
 

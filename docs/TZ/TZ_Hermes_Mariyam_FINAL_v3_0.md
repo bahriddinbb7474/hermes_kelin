@@ -307,14 +307,20 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
    profile отключает `skills`, `terminal`, `code_execution`; MCP tools и
    browser/cron/memory не отключаются. Hermes core не менялся.
 6. Permanent backend/SOUL/effective-prompt/profile regression tests добавлены.
-   Targeted disposable PostgreSQL suite = **60 passed**; full disposable suite =
-   **202 passed**; ruff, compileall и `git diff --check` — PASS.
+   После независимого review и первого live FAIL lookup сведён к одному SQL snapshot,
+   multi-item lookup выполняется в read-only `REPEATABLE READ`, а SOUL/tool description
+   фиксируют exact product payload и запрещают fallback на `items: []`.
+   Targeted disposable PostgreSQL suite = **62 passed**; full disposable suite =
+   **204 passed**; ruff, compileall и `git diff --check` — PASS.
 7. Repo canonical LF SOUL SHA-256 =
-   `5ae4d0990221f1828188f934c861d386760fed9797205e1316993ee28a602aa4`.
+   `b78da2252db21fec452763375fee9c6648bfa6d789e3118281020936f5304052`.
    VPS baseline до fix deploy: migration 003 active, tools 21/21/21, plugin 1.0.4,
    deployed SOUL `5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`.
-8. **Статус Stage 5.3: OFFLINE PASS / LIVE PENDING.** Controlled deploy, повторный
-   Telegram E2E, provider cost verification и live evidence ещё не выполнены.
+8. Первый повторный Telegram E2E дошёл до Message 3 и получил **LIVE FAIL**:
+   модель сначала отправила invalid aliases, затем сохранила category-only plan с
+   `items: []`. Тест немедленно остановлен; fixture/plan/session очищены, admin не
+   изменён, Gateway/PostgreSQL/Time-Agent healthy. Follow-up fix = **OFFLINE PASS /
+   LIVE PENDING**; новый controlled deploy и E2E обязательны до LIVE PASS.
    Реальная Ойижон не подключена; Stage 5.3A–6 остаются PLANNED / NOT IMPLEMENTED.
 
 Исполнитель реализует проект **строго по разделам 5–21**, сдаёт этапами (раздел 15) и на каждом этапе выполняет acceptance criteria. Что делать запрещено — раздел 20.
