@@ -47,7 +47,14 @@ async def call_tool(name: str, arguments: dict | None):
         )
         return [types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
 
-    if name == "set_monthly_budget" and "items" in arguments and arguments["items"] == []:
+    if (
+        name == "set_monthly_budget"
+        and "items" in arguments
+        and (
+            not isinstance(arguments["items"], list)
+            or not arguments["items"]
+        )
+    ):
         result = err(
             "INVALID_INPUT",
             "items должен отсутствовать или быть непустым массивом",
@@ -140,15 +147,18 @@ async def t_get_balance_summary(pool, a):
 
 
 async def t_set_monthly_budget(pool, a):
-    r = await db.set_monthly_budget(
+    positional = (
         pool,
         a["user_id"],
         a["month"],
         a["category_code"],
         a["planned_amount_uzs"],
         a.get("note"),
-        a.get("items"),
     )
+    if "items" in a:
+        r = await db.set_monthly_budget(*positional, items=a["items"])
+    else:
+        r = await db.set_monthly_budget(*positional)
     return ok(**r)
 
 

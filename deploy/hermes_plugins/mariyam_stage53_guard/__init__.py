@@ -294,6 +294,11 @@ def _is_success(value) -> bool:
     return isinstance(payload, dict) and payload.get("ok") is True
 
 
+def _is_explicit_failure(value) -> bool:
+    payload = _json_payload(value)
+    return isinstance(payload, dict) and payload.get("ok") is False
+
+
 def _decimal_equal(left, right) -> bool:
     try:
         return Decimal(str(left)) == Decimal(str(right))
@@ -516,11 +521,15 @@ def _handle_mutation(tool_name: str, args: dict, session_id: str, turn_id: str, 
             # Outcome is unknown: downstream may have mutated before raising.
             # Keep the durable claim so a retry cannot execute twice.
             raise
-        if not _is_success(result):
+        if _is_explicit_failure(result):
             try:
                 _release_claim(session_id, turn_id, signature)
             except Exception:
                 return _guard_error()
+            return result
+        if not _is_success(result):
+            # Malformed or unknown outcome may follow a completed mutation.
+            # Keep the durable claim fail-closed, just like an exception.
             return result
         try:
             _record_success(session_id, turn_id, signature)

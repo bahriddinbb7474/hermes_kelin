@@ -749,14 +749,27 @@ async def _resolve_plan_item_price(conn, user_id, item: dict) -> dict:
     return resolved
 
 
+_ITEMS_OMITTED = object()
+
+
 async def set_monthly_budget(
-    pool, user_id, month, category_code, planned_amount_uzs, note=None, items=None
+    pool,
+    user_id,
+    month,
+    category_code,
+    planned_amount_uzs,
+    note=None,
+    items=_ITEMS_OMITTED,
 ):
-    if items is not None and not items:
+    if items is not _ITEMS_OMITTED and (
+        not isinstance(items, list) or not items
+    ):
         raise ValueError("INVALID_INPUT: items must be omitted or non-empty")
     month_date = _budget_month(month)
     amount = _budget_amount(planned_amount_uzs)
-    normalized_items = None if items is None else _normalize_plan_items(items)
+    normalized_items = (
+        None if items is _ITEMS_OMITTED else _normalize_plan_items(items)
+    )
     async with pool.acquire() as conn:
         async with conn.transaction():
             if not await valid_category(conn, category_code):

@@ -396,6 +396,33 @@ def test_failed_mutation_is_not_recorded_as_success():
     assert counter["count"] == 2
 
 
+@pytest.mark.parametrize(
+    "unknown_result",
+    [
+        {"status": "unknown"},
+        {"ok": None},
+        {"ok": "true"},
+        [],
+    ],
+)
+def test_unknown_downstream_result_keeps_claim_fail_closed(unknown_result):
+    counter = {"count": 0}
+    args = {"user_id": 20, "amount": 100}
+    first, _ = _invoke(
+        "save_expense",
+        args,
+        turn_id="same-turn",
+        counter=counter,
+        downstream_result=unknown_result,
+    )
+    second, _ = _invoke(
+        "save_expense", args, turn_id="same-turn", counter=counter
+    )
+    assert first == unknown_result
+    assert second["error_code"] == "DUPLICATE_SUCCESS_BLOCKED"
+    assert counter["count"] == 1
+
+
 def test_post_success_ledger_failure_does_not_allow_second_downstream(
     monkeypatch,
 ):

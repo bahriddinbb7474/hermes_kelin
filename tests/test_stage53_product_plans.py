@@ -360,6 +360,58 @@ async def test_mcp_explicit_empty_items_returns_invalid_before_pool(monkeypatch)
     assert result["error_code"] == "INVALID_INPUT"
 
 
+@pytest.mark.parametrize("invalid_items", [None, {}, "not-an-array", 0])
+@pytest.mark.asyncio
+async def test_mcp_present_non_array_items_returns_invalid_before_pool(
+    monkeypatch, invalid_items
+):
+    async def pool_must_not_be_opened():
+        raise AssertionError("invalid items must be rejected before DB access")
+
+    monkeypatch.setattr(server, "get_pool", pool_must_not_be_opened)
+    result = await _call_json(
+        "set_monthly_budget",
+        {
+            "user_id": 20,
+            "month": "2026-08-01",
+            "category_code": "food",
+            "planned_amount_uzs": 600000,
+            "items": invalid_items,
+        },
+    )
+    assert result["ok"] is False
+    assert result["error_code"] == "INVALID_INPUT"
+
+
+@requires_db
+@pytest.mark.asyncio
+async def test_db_explicit_null_items_rejected_without_any_database_mutation(
+    stage53_pool,
+):
+    pool = stage53_pool
+    user_id = await _seed_user(pool)
+    before = {
+        table: [dict(row) for row in await pool.fetch(f"SELECT * FROM {table}")]
+        for table in ("monthly_budget_plans", "monthly_budget_items")
+    }
+
+    with pytest.raises(ValueError, match="INVALID_INPUT.*items must be omitted or non-empty"):
+        await db.set_monthly_budget(
+            pool,
+            user_id,
+            "2026-08-01",
+            "food",
+            600000,
+            items=None,
+        )
+
+    after = {
+        table: [dict(row) for row in await pool.fetch(f"SELECT * FROM {table}")]
+        for table in ("monthly_budget_plans", "monthly_budget_items")
+    }
+    assert after == before
+
+
 @requires_db
 @pytest.mark.asyncio
 async def test_product_plan_save_and_atomic_stale_replacement(stage53_pool):

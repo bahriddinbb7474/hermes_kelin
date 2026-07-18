@@ -325,9 +325,10 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
 
 ### 0.19. Изменения v3.18 → v3.19 (2026-07-18) — Stage 5.3 hard guards после live FAIL
 
-1. Optional product payload теперь различает omitted и explicit empty: только omitted
-   `items` сохраняет category-only совместимость; explicit `items=[]` возвращает
-   `INVALID_INPUT` до открытия DB pool/transaction и не изменяет category/product rows.
+1. Optional product payload теперь различает omitted и любой explicit invalid payload:
+   только omitted `items` сохраняет category-only совместимость; explicit `items=[]`,
+   `items=null` и non-array возвращают `INVALID_INPUT` до открытия DB pool/transaction
+   и не изменяют category/product rows.
    MCP schema дополнительно требует `minItems: 1` для переданного массива.
 2. Отдельный profile plugin `mariyam_stage53_guard` **1.0.0** хранит structured
    product-draft state после успешного read-only lookup. В пределах одной session
@@ -1455,8 +1456,8 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 **Reference prices:** последняя цена = amount / quantity самой поздней подходящей покупки; средняя — только средневзвешенная, сумма покупок / общее количество одного товара в одной unit. Без normalized item, amount, `quantity > 0` и exact unit цену не считать. После выбора last/average Hermes до draft вызывает read-only `get_monthly_budget_status(price_lookup_items=[...])`; результат не меняет transactions/plans/cycles. Unknown = `null`: цену не угадывать, задать один вопрос о manual price и не сохранять plan. Snapshot сохраняется repo migration 003 и не меняется от будущих покупок. При snapshot сумма плана обязана совпадать с quantity × reference price; переданные last/average facts сверяются backend с transactions.
 
 **Hard guards:** category-only plan допустим только когда key `items` omitted. Если
-`items` передан, он обязан быть непустым и содержать exact product payload;
-explicit `items=[]` всегда даёт `INVALID_INPUT` до DB mutation. Успешный structured
+`items` передан, он обязан быть непустым массивом с exact product payload;
+`items=[]`, `items=null` и любой non-array всегда дают `INVALID_INPUT` до DB mutation. Успешный structured
 price lookup вооружает private product-draft state на 30 минут; missing/empty payload
 или mismatch item/unit/price basis/reference price/`price_as_of` блокируется до MCP.
 До mutating downstream guard атомарно сохраняет canonical claim; идентичный повтор в
