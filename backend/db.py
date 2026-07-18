@@ -583,14 +583,17 @@ def _normalize_price_lookup_items(items) -> list[dict]:
     for raw in items:
         if not isinstance(raw, dict):
             raise ValueError("INVALID_INPUT: price lookup item must be an object")
-        if set(raw) - {"item_name_normalized", "unit"}:
+        if set(raw) - {"item_name_normalized", "unit", "price_basis"}:
             raise ValueError("INVALID_INPUT: unexpected price lookup item field")
         item_name = raw.get("item_name_normalized")
         unit = raw.get("unit")
+        price_basis = raw.get("price_basis")
         if not isinstance(item_name, str) or not item_name.strip():
             raise ValueError("INVALID_INPUT: item_name_normalized is required")
         if not isinstance(unit, str) or not unit.strip():
             raise ValueError("INVALID_INPUT: unit is required")
+        if price_basis not in {"last", "average"}:
+            raise ValueError("INVALID_INPUT: price_basis must be last or average")
         item_name = item_name.strip().casefold()
         unit = unit.strip().lower()
         _one_of("unit", unit, CANONICAL_UNITS)
@@ -598,7 +601,13 @@ def _normalize_price_lookup_items(items) -> list[dict]:
         if key in seen:
             raise ValueError("INVALID_INPUT: duplicate price lookup item")
         seen.add(key)
-        normalized.append({"item_name_normalized": item_name, "unit": unit})
+        normalized.append(
+            {
+                "item_name_normalized": item_name,
+                "unit": unit,
+                "price_basis": price_basis,
+            }
+        )
     return normalized
 
 
@@ -648,6 +657,13 @@ async def _get_price_lookup(pool, user_id, items: list[dict]) -> list[dict]:
                 prices = await _transaction_prices(
                     conn, user_id, item["item_name_normalized"], item["unit"]
                 )
+                price_basis = item["price_basis"]
+                if price_basis == "last":
+                    reference_price = prices["last_price"]
+                    price_as_of = prices["last_as_of"]
+                else:
+                    reference_price = prices["average_price"]
+                    price_as_of = prices["average_as_of"]
                 result.append(
                     {
                         "item_name_normalized": item["item_name_normalized"],
@@ -664,6 +680,13 @@ async def _get_price_lookup(pool, user_id, items: list[dict]) -> list[dict]:
                             else _json_number(prices["average_price"])
                         ),
                         "priced_purchase_count": prices["purchase_count"],
+                        "price_basis": price_basis,
+                        "reference_unit_price_uzs": (
+                            None
+                            if reference_price is None
+                            else _json_number(reference_price)
+                        ),
+                        "price_as_of": _iso_utc(price_as_of),
                     }
                 )
     return result
@@ -729,6 +752,8 @@ async def _resolve_plan_item_price(conn, user_id, item: dict) -> dict:
 async def set_monthly_budget(
     pool, user_id, month, category_code, planned_amount_uzs, note=None, items=None
 ):
+    if items is not None and not items:
+        raise ValueError("INVALID_INPUT: items must be omitted or non-empty")
     month_date = _budget_month(month)
     amount = _budget_amount(planned_amount_uzs)
     normalized_items = None if items is None else _normalize_plan_items(items)

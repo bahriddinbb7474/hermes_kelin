@@ -85,6 +85,14 @@ def test_confirmed_product_payload_uses_exact_contract_fields_and_never_drops_it
     assert all(field in section for field in required_fields)
     assert "никогда не заменяй подтверждённые товары на `items: []`" in section
     assert "не сохраняй category-only plan" in section
+    assert "ровно один вызов `set_monthly_budget`" in section
+    assert "сразу прекрати tool loop" in section
+
+
+def test_oyijon_output_contract_forbids_ascii_letters():
+    text = _text()
+    assert "ASCII letters `[A-Za-z]`" in text
+    assert "ответ Ойижон считается ошибочным" in text
 
 
 def test_financial_flow_forbids_terminal_and_execute_code():

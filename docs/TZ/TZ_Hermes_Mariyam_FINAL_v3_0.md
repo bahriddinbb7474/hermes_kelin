@@ -1,8 +1,8 @@
-# Техническое задание v3.18 — FINAL
+# Техническое задание v3.19 — FINAL
 # Hermes Agent «Мариям» — ИИ келинчак для Ойижон
 
 **Статус:** ФИНАЛЬНЫЙ, единый источник истины (single source of truth)
-**Версия:** 3.18 — Stage 5.3 остаётся **OFFLINE PASS / LIVE PENDING** после блокирующего live-дефекта. Существующий `get_monthly_budget_status` расширен read-only reference-price lookup без нового tool; Mariyam profile отключает `terminal` и `code_execution`, поэтому command shell и `execute_code` недоступны. Repo/VPS inventory остаётся 21; migration 003 active на VPS, controlled fix deploy и повторный Telegram E2E pending. Stage 5.1 и Stage 5.2 остаются CLOSED / LIVE PASS; Stage 5.3A–6 — PLANNED / NOT IMPLEMENTED. Имя файла не меняется, документ остаётся единственным источником истины.
+**Версия:** 3.19 — Stage 5.3 остаётся **OFFLINE PASS / LIVE PENDING** после блокирующего live-дефекта. Explicit `items=[]` запрещён; category-only plan допустим только при omitted `items`. Отдельный structured product-draft guard связывает read-only price lookup с product save, а duplicate-success breaker блокирует повтор идентичного успешного mutating call; profile cap `agent.max_turns` = 6. Identity plugin остаётся 1.0.4, отдельный guard plugin = 1.0.0, Hermes core и migration 003 не менялись. Новых MCP tools нет: repo/VPS inventory остаётся 21; migration 003 active на VPS, controlled guard deploy и повторный Telegram E2E pending. Stage 5.1 и Stage 5.2 остаются CLOSED / LIVE PASS; Stage 5.3A–6 — PLANNED / NOT IMPLEMENTED. Реальная Ойижон не подключена. Имя файла не меняется, документ остаётся единственным источником истины.
 **Проект:** персональный Telegram ИИ-агент для пожилой женщины из Узбекистана
 **Имя агента:** Мариям · **Образ:** ИИ келинчак
 **Основной пользователь:** Ойижон · **Администратор:** Бахриддин ака
@@ -322,6 +322,42 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
    изменён, Gateway/PostgreSQL/Time-Agent healthy. Follow-up fix = **OFFLINE PASS /
    LIVE PENDING**; новый controlled deploy и E2E обязательны до LIVE PASS.
    Реальная Ойижон не подключена; Stage 5.3A–6 остаются PLANNED / NOT IMPLEMENTED.
+
+### 0.19. Изменения v3.18 → v3.19 (2026-07-18) — Stage 5.3 hard guards после live FAIL
+
+1. Optional product payload теперь различает omitted и explicit empty: только omitted
+   `items` сохраняет category-only совместимость; explicit `items=[]` возвращает
+   `INVALID_INPUT` до открытия DB pool/transaction и не изменяет category/product rows.
+   MCP schema дополнительно требует `minItems: 1` для переданного массива.
+2. Отдельный profile plugin `mariyam_stage53_guard` **1.0.0** хранит structured
+   product-draft state после успешного read-only lookup. В пределах одной session
+   он связывает trusted internal user, item, unit, price basis, reference price и
+   `price_as_of`; missing/empty payload и mismatch блокируются до downstream MCP.
+3. Private guard state хранится вне `HERMES_HOME` и git: hashed session key,
+   trusted internal user и structured price facts без Telegram ID/raw mapping;
+   parent принадлежит service user, не является symlink и имеет mode 0700;
+   state/lock — regular non-linked files того же владельца с mode 0600; TTL 30 минут.
+   State очищается после успешного product save, exact session reset или expiry.
+4. Duplicate-success breaker охватывает mutating tools `set_monthly_budget`,
+   `save_expense`, `update_expense`, `update_last_expense`, `delete_last_expense`,
+   `save_health_note`, `save_plan_note`. Canonical signature включает trusted user,
+   tool name и sorted JSON args. Guard атомарно сохраняет private pre-call claim до
+   downstream; identical claim в том же session/turn возвращает
+   `DUPLICATE_SUCCESS_BLOCKED` без второго downstream call. Явный `ok=false`
+   освобождает claim; exception оставляет claim до reset/expiry, потому что факт
+   downstream mutation неизвестен. Успешный downstream не переименовывается в
+   «не выполнено» при ошибке финализации ledger.
+5. Официального force-end-turn plugin hook в Hermes v0.18.2 нет, поэтому profile
+   дополнительно ограничен `agent.max_turns: 6`. Мариям по guard error обязана
+   сразу завершить turn одним коротким ответом без новых tool calls.
+6. Identity plugin не редактировался и остаётся **1.0.4**. Реальный discovery-chain
+   порядок закреплён как identity binding → Stage 5.3 structured guard → downstream
+   MCP. Hermes core и migration 003 не изменялись.
+7. Новых MCP tools нет; inventory/dispatch/discovery остаётся **21/21/21**.
+   Migration 003 уже active на VPS; migrations 004/005 отсутствуют.
+8. **Stage 5.3 остаётся OFFLINE PASS / LIVE PENDING.** Hard guards прошли offline
+   verification; controlled VPS deploy и новый live Telegram retest ещё не выполнены.
+   Реальная Ойижон не подключена. Stage 5.3A–6 остаются PLANNED / NOT IMPLEMENTED.
 
 Исполнитель реализует проект **строго по разделам 5–21**, сдаёт этапами (раздел 15) и на каждом этапе выполняет acceptance criteria. Что делать запрещено — раздел 20.
 
@@ -775,7 +811,7 @@ CREATE TABLE monthly_budget_plans (
     UNIQUE (user_id, month, category_code)
 );
 
--- v3.18 REPO IMPLEMENTED / VPS ACTIVE — migration 003
+-- v3.19 REPO IMPLEMENTED / VPS ACTIVE — migration 003
 CREATE TABLE monthly_budget_items (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -1408,15 +1444,28 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 7. JSON, tool names, technical fields и traces Ойижон не показывать; суммы только из tools.
 8. Wrapper-маркеры stored prompt и Telegram profile names не являются AC. Identity AC: exact Telegram session → private mapping → `requested=0` → effective test-user.
 
-### Этап 5.3 — Семейный и продуктовый план (v3.18)
+### Этап 5.3 — Семейный и продуктовый план (v3.19)
 
-**Статус: OFFLINE PASS / LIVE PENDING.** Migration 003 active на VPS; v3.18 read-only lookup и профильный запрет command execution прошли offline gates, но controlled fix deploy и повторный Telegram E2E ещё не выполнены. Tool count остаётся **21**.
+**Статус: OFFLINE PASS / LIVE PENDING.** Migration 003 active на VPS; v3.19 hard guards прошли offline gates, но controlled deploy и повторный Telegram E2E ещё не выполнены. Tool count остаётся **21**; identity plugin остаётся **1.0.4**, отдельный Stage 5.3 guard plugin = **1.0.0**.
 
 **Диалог:** Hermes спрашивает последовательно, по одному вопросу в сообщении: (1) месяц; (2) household size; (3) группа расходов; (4) продукты дома; (5) нужные продукты; (6) quantity — по одному продукту за сообщение; (7) бюджет, затем отдельным сообщением last/average/manual price; (8) полный draft. `set_monthly_budget` вызывается только после явного подтверждения; после исправления draft показывается и подтверждается снова.
 
 **Продуктовый план:** сначала summary категории `Харажат гуруҳи | Режа | Сарфлангани | Қолгани`, затем таблица `Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма`. Старый пятиколоночный planned-формат заменён; отдельной product-колонки остатка нет. Для item обязательно минимум одно planned value: quantity или amount. Actual quantity/amount берутся только из transactions; quantity и price не угадывать; units не смешивать; unknown = `—` или `айтилмаган`.
 
 **Reference prices:** последняя цена = amount / quantity самой поздней подходящей покупки; средняя — только средневзвешенная, сумма покупок / общее количество одного товара в одной unit. Без normalized item, amount, `quantity > 0` и exact unit цену не считать. После выбора last/average Hermes до draft вызывает read-only `get_monthly_budget_status(price_lookup_items=[...])`; результат не меняет transactions/plans/cycles. Unknown = `null`: цену не угадывать, задать один вопрос о manual price и не сохранять plan. Snapshot сохраняется repo migration 003 и не меняется от будущих покупок. При snapshot сумма плана обязана совпадать с quantity × reference price; переданные last/average facts сверяются backend с transactions.
+
+**Hard guards:** category-only plan допустим только когда key `items` omitted. Если
+`items` передан, он обязан быть непустым и содержать exact product payload;
+explicit `items=[]` всегда даёт `INVALID_INPUT` до DB mutation. Успешный structured
+price lookup вооружает private product-draft state на 30 минут; missing/empty payload
+или mismatch item/unit/price basis/reference price/`price_as_of` блокируется до MCP.
+До mutating downstream guard атомарно сохраняет canonical claim; идентичный повтор в
+том же turn возвращает `DUPLICATE_SUCCESS_BLOCKED`, downstream вызывается ровно один
+раз даже при concurrent processes или неизвестном outcome после exception; profile
+cap `agent.max_turns: 6`. Guard state не содержит Telegram ID, хранится вне
+`HERMES_HOME`: private parent владельца service user без symlink = 0700, regular
+non-linked state/lock = 0600. State очищается после успешного product save, exact
+session reset или expiry.
 
 **Command execution:** для Mariyam profile отключены Hermes toolsets `terminal` и `code_execution`; `terminal`, `process` и `execute_code` недоступны. Для цен, расходов, бюджета и product plan shell/Python/calculator без tool-backed financial facts запрещены. MCP tools и browser/cron/memory остаются вне этих disabled toolsets; Hermes core не меняется.
 
@@ -1429,7 +1478,7 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 5. При медицинских ограничениях рекомендовать согласовать рацион с врачом.
 6. Точные quantities сохранять только после подтверждения семьи.
 
-**Storage/tools AC:** migration 003 создаёт `monthly_budget_items` с composite FK на category plan, coherent `reference_unit_price_uzs` / `price_basis` / `price_as_of` и подготовленную schema-часть `monthly_plan_cycles`; `set_monthly_budget` принимает optional `items[]`; `get_monthly_budget_status(include_items=true)` возвращает product plan/actual/remaining и last/average/reference price, а optional `price_lookup_items` — read-only price facts до draft. Item normalization case-insensitive; дочерние `food.*` учитываются в родительском `food` plan при отсутствии более точного дочернего плана. Inventory/dispatch/discovery = 21/21/21. Migration 003 active на VPS.
+**Storage/tools AC:** migration 003 создаёт `monthly_budget_items` с composite FK на category plan, coherent `reference_unit_price_uzs` / `price_basis` / `price_as_of` и подготовленную schema-часть `monthly_plan_cycles`; `set_monthly_budget` принимает optional `items[]`, где omitted сохраняет category-only план, а explicit empty запрещён; `get_monthly_budget_status(include_items=true)` возвращает product plan/actual/remaining и last/average/reference price, а optional `price_lookup_items` — read-only price facts до draft. Item normalization case-insensitive; дочерние `food.*` учитываются в родительском `food` plan при отсутствии более точного дочернего плана. Inventory/dispatch/discovery = 21/21/21. Новых MCP tools нет. Migration 003 active на VPS.
 
 ### Этап 5.3A — Цикл утверждения плана 25/27/28/1 (v3.10)
 

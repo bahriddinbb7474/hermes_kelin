@@ -147,8 +147,12 @@ def _item(
     return value
 
 
-def _lookup_item(name: str, unit: str) -> dict:
-    return {"item_name_normalized": name, "unit": unit}
+def _lookup_item(name: str, unit: str, price_basis: str = "last") -> dict:
+    return {
+        "item_name_normalized": name,
+        "unit": unit,
+        "price_basis": price_basis,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -307,6 +311,53 @@ async def test_category_only_budget_remains_compatible_and_does_not_delete_items
     assert await pool.fetchval(
         "SELECT count(*) FROM monthly_budget_items WHERE user_id=$1", user_id
     ) == 1
+
+
+@requires_db
+@pytest.mark.asyncio
+async def test_explicit_empty_items_rejected_without_any_database_mutation(stage53_pool):
+    pool = stage53_pool
+    user_id = await _seed_user(pool)
+    before = {
+        table: [dict(row) for row in await pool.fetch(f"SELECT * FROM {table}")]
+        for table in ("monthly_budget_plans", "monthly_budget_items")
+    }
+
+    with pytest.raises(ValueError, match="INVALID_INPUT.*items must be omitted or non-empty"):
+        await db.set_monthly_budget(
+            pool,
+            user_id,
+            "2026-08-01",
+            "food",
+            600000,
+            items=[],
+        )
+
+    after = {
+        table: [dict(row) for row in await pool.fetch(f"SELECT * FROM {table}")]
+        for table in ("monthly_budget_plans", "monthly_budget_items")
+    }
+    assert after == before
+
+
+@pytest.mark.asyncio
+async def test_mcp_explicit_empty_items_returns_invalid_before_pool(monkeypatch):
+    async def pool_must_not_be_opened():
+        raise AssertionError("explicit empty items must be rejected before DB access")
+
+    monkeypatch.setattr(server, "get_pool", pool_must_not_be_opened)
+    result = await _call_json(
+        "set_monthly_budget",
+        {
+            "user_id": 20,
+            "month": "2026-08-01",
+            "category_code": "food",
+            "planned_amount_uzs": 600000,
+            "items": [],
+        },
+    )
+    assert result["ok"] is False
+    assert result["error_code"] == "INVALID_INPUT"
 
 
 @requires_db
@@ -879,6 +930,9 @@ async def test_read_only_price_lookup_returns_exact_scoped_facts_without_mutatio
         "last_price_as_of": "2026-07-02T12:00:00Z",
         "average_unit_price_uzs": pytest.approx(74000 / 6),
         "priced_purchase_count": 2,
+        "price_basis": "last",
+        "reference_unit_price_uzs": 13000,
+        "price_as_of": "2026-07-02T12:00:00Z",
     }
     assert after == before
 
@@ -984,6 +1038,9 @@ async def test_price_lookup_unknown_is_null_and_old_status_shapes_stay_compatibl
             "last_price_as_of": None,
             "average_unit_price_uzs": None,
             "priced_purchase_count": 0,
+            "price_basis": "last",
+            "reference_unit_price_uzs": None,
+            "price_as_of": None,
         }
     ]
 
@@ -998,6 +1055,14 @@ async def test_price_lookup_unknown_is_null_and_old_status_shapes_stay_compatibl
         [{"item_name_normalized": "", "unit": "pcs"}],
         [{"item_name_normalized": "кир совуни"}],
         [{"item_name_normalized": "кир совуни", "unit": "box"}],
+        [{"item_name_normalized": "кир совуни", "unit": "pcs"}],
+        [
+            {
+                "item_name_normalized": "кир совуни",
+                "unit": "pcs",
+                "price_basis": "manual",
+            }
+        ],
         [_lookup_item(f"item-{index}", "pcs") for index in range(51)],
     ],
 )
@@ -1030,6 +1095,7 @@ async def test_stage53_extends_two_schemas_without_new_tools():
         "planned_amount_uzs",
     ]
     assert "items" in schemas["set_monthly_budget"]["properties"]
+    assert schemas["set_monthly_budget"]["properties"]["items"]["minItems"] == 1
     item_schema = schemas["set_monthly_budget"]["properties"]["items"]["items"]
     assert set(item_schema["properties"]) >= {
         "item_name_normalized",
@@ -1063,18 +1129,26 @@ async def test_stage53_extends_two_schemas_without_new_tools():
     ]
     assert lookup["type"] == "array"
     assert lookup["maxItems"] == 50
-    assert lookup["items"]["required"] == ["item_name_normalized", "unit"]
+    assert lookup["items"]["required"] == [
+        "item_name_normalized",
+        "unit",
+        "price_basis",
+    ]
     assert lookup["items"]["additionalProperties"] is False
     assert lookup["items"]["properties"]["unit"]["enum"] == list(
         db.CANONICAL_UNITS
     )
+    assert lookup["items"]["properties"]["price_basis"]["enum"] == [
+        "last",
+        "average",
+    ]
     set_description = next(
         tool.description for tool in tools if tool.name == "set_monthly_budget"
     )
     assert "item_name_display" in set_description
     assert "planned_quantity" in set_description
     assert "reference_unit_price_uzs" in set_description
-    assert "never retry with items=[]" in set_description
+    assert "explicit items=[] всегда INVALID_INPUT" in set_description
     assert "set_monthly_budget" in GUARD.read_text(encoding="utf-8")
     assert "get_monthly_budget_status" in GUARD.read_text(encoding="utf-8")
 

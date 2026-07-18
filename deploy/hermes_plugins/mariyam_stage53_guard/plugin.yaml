@@ -1,0 +1,8 @@
+name: mariyam_stage53_guard
+version: "1.0.0"
+description: >-
+  Profile-scoped structured Stage 5.3 execution guard. Binds a successful
+  reference-price lookup to the next product-plan mutation, blocks omitted or
+  empty product items while that draft is active, and atomically suppresses
+  repeated identical mutating calls within one Hermes turn.
+author: Hermes/Mariyam

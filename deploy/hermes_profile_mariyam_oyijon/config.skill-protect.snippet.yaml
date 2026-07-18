@@ -29,6 +29,9 @@ display:
   tool_progress: false
 
 agent:
+  # Six model iterations preserve existing Stage 5-5.2 workflows while capping
+  # a turn even if the model ignores DUPLICATE_SUCCESS_BLOCKED.
+  max_turns: 6
   # Disable skill management and all command-execution surfaces for Mariyam only.
   # SOUL.md remains in the system prompt; MCP/browser/cron/memory stay available.
   # Hermes v0.18.2 does not place execute_code in "terminal": both supported
@@ -37,3 +40,10 @@ agent:
     - skills
     - terminal
     - code_execution
+
+plugins:
+  # Alphabetical profile discovery loads identity first; the permanent runtime
+  # integration test asserts the exact middleware order.
+  enabled:
+    - mariyam_identity_guard
+    - mariyam_stage53_guard

@@ -10,7 +10,7 @@
 
 > **Stage 5.1 status (2026-07-15): CLOSED / LIVE PASS.** VPS/profile = tools **21**, plugin **1.0.4**, migration 002 active, SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, skill-protect **4/4**, `tool_progress` off. Controlled E2E и cleanup PASS.
 
-> **ТЗ v3.18:** Stage 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **OFFLINE PASS / LIVE PENDING**. Единственный repo canonical prompt — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, LF SHA `b78da2252db21fec452763375fee9c6648bfa6d789e3118281020936f5304052`; active Mariyam `SKILL.md` отсутствует. Repo = 21 tools + read-only price lookup; VPS = 21 tools / plugin 1.0.4 / migration 003, но fix/SOUL/profile config ещё не deployed. Stage 5.3A–6 остаются **PLANNED / NOT IMPLEMENTED**; migrations 004/005 отсутствуют. Реальная Ойижон не подключалась.
+> **ТЗ v3.19:** Stage 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **OFFLINE PASS / LIVE PENDING**. Единственный repo canonical prompt — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, LF SHA `0ec1eeed95ec90030f1e7e11dd88a1428076cdd44a9a8ffa93c57c4b5726012f`; active Mariyam `SKILL.md` отсутствует. Repo = 21 tools + explicit-empty DB rejection + отдельный `mariyam_stage53_guard` 1.0.0; identity plugin остаётся 1.0.4, Hermes core не менялся. Guard state хранится вне model-visible profile, mode 0600, TTL 30 минут; profile limit = 6 iterations. Controlled deploy и Telegram E2E pending. Stage 5.3A–6 остаются **PLANNED / NOT IMPLEMENTED**; реальная Ойижон не подключалась.
 
 **Модель профиля:** `gpt-5.6-luna` через api.n1n.ai (`provider: custom`, `base_url: https://api.n1n.ai/v1`, ключ `N1N_API_KEY` в профильном `.env`, 600). Резерв: `deepseek/deepseek-v4-flash` (DECISIONS.md, 2026-07-12).
 
@@ -26,6 +26,8 @@
     - `skills.write_approval: true` — skill_manage не пишет сразу (staging);
     - `display.memory_notifications: "off"` — нет служебных «Self-improvement review» в Telegram;
     - `agent.disabled_toolsets: [skills, terminal, code_execution]` — нет `skill_manage`, `terminal`, `process` и `execute_code`; critical prompt загружается через SOUL, MCP tools и browser/cron/memory этими toolsets не отключаются.
+    - `agent.max_turns: 6` — profile-scoped cap после duplicate-success blocker;
+    - plugins: `mariyam_identity_guard` затем отдельный `mariyam_stage53_guard`.
     Root cause: Hermes `agent/turn_finalizer.py` → `background_review` → `skill_manage` patch SKILL.md.
     После merge — restart gateway. Проверка: `tests/test_mariyam_skill_protection.py`.
 6. Зарегистрировать backend как **stdio MCP-сервер** (точный синтаксис сверить с документацией установленной версии Hermes):
