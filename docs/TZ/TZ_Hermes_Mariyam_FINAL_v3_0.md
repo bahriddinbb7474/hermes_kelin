@@ -356,8 +356,8 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
    MCP. Hermes core и migration 003 не изменялись.
 7. Новых MCP tools нет; inventory/dispatch/discovery остаётся **21/21/21**.
    Migration 003 уже active на VPS; migrations 004/005 отсутствуют.
-8. **Stage 5.3 остаётся OFFLINE PASS / LIVE PENDING.** Hard guards прошли offline
-   verification; controlled VPS deploy и новый live Telegram retest ещё не выполнены.
+8. **Stage 5.3 остаётся OFFLINE PASS / LIVE PENDING.** Hard guards и controlled VPS
+   deploy прошли offline verification; новый live Telegram retest ещё не выполнен.
    Реальная Ойижон не подключена. Stage 5.3A–6 остаются PLANNED / NOT IMPLEMENTED.
 
 Исполнитель реализует проект **строго по разделам 5–21**, сдаёт этапами (раздел 15) и на каждом этапе выполняет acceptance criteria. Что делать запрещено — раздел 20.
@@ -958,7 +958,7 @@ CREATE TABLE usage_costs (
 ### 13.2. Миграции и seed (обязательно, v3.1)
 
 - SQL-файлы нумеруются: `001_init.sql`, `002_*.sql`, … Каждый файл **идемпотентен** (`CREATE TABLE IF NOT EXISTS`, `ON CONFLICT DO NOTHING`).
-- **Repo v3.17:** migrations 001+002+003; migration 003 содержит `monthly_budget_items` с price snapshot и подготовленную schema-часть `monthly_plan_cycles`. **VPS runtime:** только 001+002 active; migration 003 не применена. Migrations 004 (`utility_accounts`, `utility_snapshots`) и 005 (`recurring_obligations`) остаются **PLANNED / NOT IMPLEMENTED**.
+- **Repo/VPS v3.19:** migrations 001+002+003 active; migration 003 содержит `monthly_budget_items` с price snapshot и подготовленную schema-часть `monthly_plan_cycles`. Migrations 004 (`utility_accounts`, `utility_snapshots`) и 005 (`recurring_obligations`) остаются **PLANNED / NOT IMPLEMENTED**.
 - Для utility snapshots правило отрицательного prepaid balance против отдельного debt утверждается только после исследования реального кабинета; без явного provider rule одновременно хранить оба представления долга запрещено.
 - `docker-entrypoint-initdb.d` применяет скрипты **только при первом создании volume**. Любое изменение схемы после этого применяется вручную: `docker compose exec hermes_mariyam_postgres psql -U hermes -d hermes -f /docker-entrypoint-initdb.d/00N_*.sql`. Эта команда документируется в deploy-доке.
 - **Seed пользователей (v3.4):** обязателен `role=admin` (Бахриддин ака) — до первого реального вызова tools в таблице `users` он должен существовать. Опционально разрешён **временный test-user** для end-to-end тестов: `role=oyijon`, `display_name="Тест Ойижон"`, **только на втором Telegram-аккаунте, контролируемом заказчиком** (не реальная Ойижон). Настоящий ID Ойижон и настоящий seed `role=oyijon` выполняются **только при handover** (§0.4, §21). Создание — через tool `ensure_user` (см. 15.15) при настройке профиля Hermes, либо документированным SQL-скриптом в deploy-доке. Перед handover временный test-user и его данные удаляются. Первый вызов `save_expense` на пустой таблице `users` (без admin) не должен быть возможен «по недосмотру».
@@ -1100,7 +1100,7 @@ out: {
 }
 ```
 
-### 15.5a. set_monthly_budget (реализован offline; VPS pending)
+### 15.5a. set_monthly_budget (repo/VPS active; Telegram E2E pending)
 
 ```jsonc
 in:  {
@@ -1114,7 +1114,7 @@ out: { "ok": true, "plan_id": 7 }
 // upsert by (user_id, month, category_code)
 ```
 
-### 15.5b. get_monthly_budget_status (реализован offline; VPS pending)
+### 15.5b. get_monthly_budget_status (repo/VPS active; Telegram E2E pending)
 
 ```jsonc
 in:  { "user_id": 1, "month": "2026-07-01" }

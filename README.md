@@ -94,14 +94,15 @@ hermes-mariyam/
 - evidence: `docs/EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`.
 
 **Stage 5.3 — OFFLINE PASS / LIVE PENDING (v3.19):**
-- product plan, last/weighted average/manual reference prices и immutable snapshot реализованы локально в migration 003 и двух существующих tools;
+- product plan, last/weighted average/manual reference prices и immutable snapshot реализованы и active repo/VPS в migration 003 и двух существующих tools;
 - `get_monthly_budget_status(price_lookup_items=[...])` возвращает exact last/weighted-average facts до draft и не изменяет БД; неизвестная цена = `null`, разные units не смешиваются;
 - category-only разрешён только при omitted `items`; explicit `items=[]` возвращает `INVALID_INPUT` с нулевой DB mutation;
 - structured product-draft guard хранит private session-local lookup state максимум 30 минут и требует совпадения item/unit/reference price; duplicate-success breaker не выполняет одинаковую mutation второй раз;
 - отдельный `mariyam_stage53_guard` работает после `mariyam_identity_guard 1.0.4`; tool count остаётся 21, Hermes core/backend-router не добавлены;
 - Mariyam profile отключает `terminal` и `code_execution`; `execute_code` отсутствует, Hermes core не менялся;
 - detailed product report: `Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма`; отдельной product-колонки остатка нет;
-- full offline gates PASS; controlled fix deploy и повторный Telegram E2E ещё не выполнены.
+- full offline gates и controlled VPS deploy PASS; migration 003, canonical SOUL и
+  guard chain активны. Повторный Telegram E2E ещё не выполнен.
 
 **Planned after Stage 5.3 — NOT IMPLEMENTED:**
 - Stage 5.3A: approval cycle 25/27/28/1 и `approve_monthly_plan`; schema cycles подготовлена в migration 003, planned count 22;

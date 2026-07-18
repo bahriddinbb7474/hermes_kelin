@@ -15,7 +15,7 @@
 
 ИСТОЧНИК ИСТИНЫ — репозиторий, не этот промпт:
 - docs/TZ/TZ_Hermes_Mariyam_FINAL_v3_0.md — единственное ТЗ. Актуальная версия и
-  changelog — внутри файла (§0.x; сейчас **v3.17**). §20 — запреты, §21 — этапы и приёмка.
+  changelog — внутри файла (§0.x; сейчас **v3.19**). §20 — запреты, §21 — этапы и приёмка.
 - README.md — состояние и карта кода; docs/ и docs/TZ/ — рабочие доки
   (DECISIONS, ROADMAP, контракты tools, БД, cron, профиль, голос, безопасность).
 - Код: ветка `main` (после merge `dd9261e` feature-ветка `feature/hermes-mariyam-mvp`
@@ -30,9 +30,9 @@
   кириллица и только текстом (TTS отключён, v3.2; голосовой ввод остаётся).
   Точные данные — только через tools. Сомнительные суммы — переспрос.
   Медицина без диагноза + алерт админу. Бюджет 10–15 USD/мес.
-- Current ТЗ: **v3.17**. Stage 5.1/5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **OFFLINE PASS / LIVE PENDING**; Stage 5.3A–6 = **PLANNED / NOT IMPLEMENTED**.
-- Repo canonical LF SOUL SHA обновлён Stage 5.3; VPS остаётся на previous deployed SOUL. Repo inventory/dispatch/discovery = 21/21/21; plugin не менялся.
-- VPS runtime: **21 tools / plugin 1.0.4 / migration 002**. Repo migration 003 готова, но не применена на VPS. Migrations 004/005 и counts 22/25/27 — только planned.
+- Current ТЗ: **v3.19**. Stage 5.1/5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **OFFLINE PASS / LIVE PENDING**; Stage 5.3A–6 = **PLANNED / NOT IMPLEMENTED**.
+- Repo/VPS canonical LF SOUL SHA = `0ec1eeed95ec90030f1e7e11dd88a1428076cdd44a9a8ffa93c57c4b5726012f`. Inventory/dispatch/discovery = 21/21/21; identity plugin 1.0.4 загружается перед guard plugin 1.0.0.
+- VPS runtime: **21 tools / identity 1.0.4 + guard 1.0.0 / migration 003**; controlled deploy PASS, Telegram E2E pending. Migrations 004/005 и counts 22/25/27 — только planned.
 - Utility integration только read-only после исследования official cabinet;
   credentials никогда не доступны LLM; payments/settings/cards запрещены.
 - User-scoped cron calls требуют deterministic trusted-job identity; unknown

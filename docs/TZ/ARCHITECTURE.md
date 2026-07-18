@@ -2,7 +2,7 @@
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md`
 
-**Статус v3.17:** архитектура Hermes-first не меняется. Stage 5.1 и Stage 5.2 — **CLOSED / LIVE PASS**. Stage 5.3 — **OFFLINE PASS / LIVE PENDING**: repo canonical LF SOUL SHA `5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`, migration 003 и расширенные два tools готовы; inventory = 21. VPS остаётся на 21 tools / plugin 1.0.4 / migration 002 и предыдущем deployed SOUL. Stage 5.3A–6 — **PLANNED / NOT IMPLEMENTED**; migrations 004/005 отсутствуют; реальная Ойижон не подключалась.
+**Статус v3.19:** архитектура Hermes-first не меняется. Stage 5.1 и Stage 5.2 — **CLOSED / LIVE PASS**. Stage 5.3 — **OFFLINE PASS / LIVE PENDING**: repo/VPS canonical LF SOUL SHA `0ec1eeed95ec90030f1e7e11dd88a1428076cdd44a9a8ffa93c57c4b5726012f`, migration 003 и controlled guard deploy active/PASS; inventory = 21, identity plugin 1.0.4 загружается перед guard 1.0.0. Stage 5.3A–6 — **PLANNED / NOT IMPLEMENTED**; migrations 004/005 отсутствуют; реальная Ойижон не подключалась, Telegram E2E pending.
 
 ## Принцип Hermes-first
 

@@ -100,7 +100,7 @@ Stage 5.2 live evidence зафиксировано для SOUL SHA `3135a12e0752
 5. Последняя цена используется для следующего плана по умолчанию; явный запрос возвращает средневзвешенную цену; разрешён manual override. Без quantity unit price не считается, разные units не смешиваются.
 6. Repo migration 003 идемпотентна; product rows сохраняются атомарно, actuals берутся только из transactions, price snapshot immutable; inventory/dispatch/discovery = 21/21/21.
 7. Unknown = `null` в backend и `—`/`айтилмаган` в ответе; количество и цену не угадывать; `pcs → та`.
-8. Full offline suite, ruff, compileall и diff checks PASS; VPS остаётся на migration 002, поэтому LIVE PASS не объявляется.
+8. Full offline suite, ruff, compileall, diff checks и controlled VPS deploy PASS; migration 003 active. LIVE PASS не объявляется до повторного Telegram E2E.
 
 ### 5.3A. Утверждение 25/27/28/1 — PLANNED / NOT IMPLEMENTED
 

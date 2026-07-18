@@ -1,9 +1,9 @@
 # Database
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (DDL всех таблиц — §13).
-Repo implementation: `backend/sql/001_init.sql` + идемпотентные migrations `002_stage51_quantity_budget.sql` и `003_stage53_product_plans.sql`. Migration 003 проверена offline двойным применением на чистой PostgreSQL 16. На production/VPS применена только migration 002; жёсткий DB guard (`tests/db_guard.py`) блокирует destructive tests против production-БД.
+Repo implementation: `backend/sql/001_init.sql` + идемпотентные migrations `002_stage51_quantity_budget.sql` и `003_stage53_product_plans.sql`. Migration 003 проверена offline двойным применением на чистой PostgreSQL 16 и active на production/VPS; жёсткий DB guard (`tests/db_guard.py`) блокирует destructive tests против production-БД.
 
-**v3.17 status:** repo schema = 001+002+003; VPS schema = 001+002 до отдельного deploy. Migrations 004/005 остаются **PLANNED / NOT IMPLEMENTED**.
+**v3.19 status:** repo/VPS schema = 001+002+003. Migrations 004/005 остаются **PLANNED / NOT IMPLEMENTED**.
 
 ## Назначение
 
@@ -17,7 +17,7 @@ PostgreSQL хранит точные данные. Hermes memory хранит т
 - `expense_categories` — фиксированные категории и подкатегории расходов.
 - `transactions` — расходы и доходы: сумма, валюта, категория, предмет, description, source, время. **Migration 002 active:** nullable `item_name_normalized`, `quantity`, `unit` (`kg|g|l|ml|pcs|pack`); unit только с quantity; quantity>0; старые rows без quantity валидны.
 - `monthly_budget_plans` — **migration 002 active:** plan на `(user_id, month, category_code)`: planned_amount_uzs, note, timestamps.
-- `monthly_budget_items` — **migration 003 repo / VPS pending:** product plan на `(user_id, month, category_code, item_name_normalized)` с planned quantity/unit/amount и immutable reference price snapshot.
+- `monthly_budget_items` — **migration 003 active repo/VPS:** product plan на `(user_id, month, category_code, item_name_normalized)` с planned quantity/unit/amount и immutable reference price snapshot.
 - `monthly_plan_cycles` — **migration 003 prepared schema only:** таблица создана migration, но Stage 5.3A runtime/status transitions/cron не реализованы.
 - `quran_progress` — сура/жуз/страница/заметка и дата обновления.
 - `health_notes` — заметки о самочувствии с severity, без диагноза.
@@ -42,7 +42,7 @@ PostgreSQL хранит точные данные. Hermes memory хранит т
 
 ## Миграции и seed (ТЗ §13.2)
 
-- SQL-файлы нумерованные (`001_init.sql`, `002_*.sql`, `003_*.sql`), каждый идемпотентен (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`). Migration 003 есть в repo, но не applied на VPS. Planned numbering: 004 utilities, 005 obligations; до implementation не объявлять их applied.
+- SQL-файлы нумерованные (`001_init.sql`, `002_*.sql`, `003_*.sql`), каждый идемпотентен (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`). Migration 003 active repo/VPS. Planned numbering: 004 utilities, 005 obligations; до implementation не объявлять их applied.
 - `docker-entrypoint-initdb.d` применяется только при первом создании volume; последующие изменения схемы применяются вручную через `psql -f` (команда — в deploy-доке).
 - До первого реального вызова tools в `users` обязателен `role=admin` (Бахриддин ака). Опционально разрешён **временный test-user** (`role=oyijon`, `display_name="Тест Ойижон"`) **только на втором аккаунте заказчика** для end-to-end тестов (ТЗ §0.4). Настоящий ID Ойижон и seed — только при handover. Создание через tool `ensure_user` или документированный SQL-seed; перед handover временный test-user и его данные удаляются.
 
