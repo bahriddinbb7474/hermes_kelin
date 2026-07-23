@@ -1139,7 +1139,7 @@ async def test_price_lookup_input_validation(stage53_pool, lookup_items):
 async def test_stage53_extends_two_schemas_without_new_tools():
     tools = await server.list_tools()
     schemas = {tool.name: tool.inputSchema for tool in tools}
-    assert len(tools) == len(server.DISPATCH) == len(server.TOOLS) == 22
+    assert len(tools) == len(server.DISPATCH) == len(server.TOOLS) == 23
     assert schemas["set_monthly_budget"]["required"] == [
         "user_id",
         "month",

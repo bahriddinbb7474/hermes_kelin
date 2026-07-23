@@ -180,13 +180,14 @@ async def test_mcp_smoke(pool):
         "ensure_user", "save_expense", "save_income", "update_expense", "update_last_expense",
         "delete_expense", "delete_last_expense", "get_expense_report", "get_balance_summary",
         "set_monthly_budget", "get_monthly_budget_status", "approve_monthly_plan",
+        "open_monthly_plan_cycle",
         "save_quran_progress", "get_quran_progress", "save_health_note", "save_alert_event",
         "save_plan_note", "get_admin_report_data", "backup_data", "get_backup_status",
         "get_bot_status", "log_usage_cost",
     ]
     assert names == expected, names
     required_sets = [tuple(t.inputSchema.get("required", [])) for t in tools]
-    assert len(tools) == 22
+    assert len(tools) == 23
     assert all("required" in t.inputSchema for t in tools)
     assert len(set(required_sets)) > 10, required_sets
 

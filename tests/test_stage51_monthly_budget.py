@@ -55,7 +55,7 @@ def test_budget_amount_zero_and_negative_or_nonnumeric():
 async def test_tool_inventory_and_separate_required_schemas():
     tools = await server.list_tools()
     names = [tool.name for tool in tools]
-    assert len(tools) == len(server.DISPATCH) == 22
+    assert len(tools) == len(server.DISPATCH) == 23
     assert [name for name in names if name in OLD_19_TOOLS] == list(OLD_19_TOOLS)
     assert names.count("set_monthly_budget") == 1
     assert names.count("get_monthly_budget_status") == 1

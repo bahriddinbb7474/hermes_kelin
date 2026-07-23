@@ -1206,6 +1206,90 @@ async def approve_monthly_plan(
     return _cycle_result(month_date, new, idempotent=False, plan_copied=plan_copied)
 
 
+CYCLE_ACTIONS = ("open", "escalate")
+
+
+def _open_result(month_date: date, row, *, idempotent: bool, created: bool) -> dict:
+    return {
+        "month": month_date.isoformat(),
+        "status": row["status"],
+        "source": row["source"],
+        "household_size": row["household_size"],
+        "idempotent": idempotent,
+        "created": created,
+    }
+
+
+async def open_monthly_plan_cycle(
+    pool, user_id, month, action, household_size=None, now=None,
+):
+    """Narrow cron/user cycle-status mutation (variant A, 2026-07-24).
+
+    action=open     : create waiting_oyijon draft row (future month, valid draft).
+    action=escalate : waiting_oyijon → waiting_admin (future month).
+    Never writes monthly_budget_plans / monthly_budget_items / transactions.
+    """
+    _one_of("action", action, CYCLE_ACTIONS)
+    month_date = _budget_month(month)
+
+    if household_size is not None and (
+        isinstance(household_size, bool)
+        or not isinstance(household_size, int)
+        or household_size <= 0
+    ):
+        raise ValueError("INVALID_INPUT: household_size must be a positive integer")
+
+    now_utc = now or datetime.now(timezone.utc)
+    now_t = now_utc.astimezone(TASHKENT)
+    month_start_t = datetime(month_date.year, month_date.month, 1, tzinfo=TASHKENT)
+
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                """SELECT status, source, household_size
+                   FROM monthly_plan_cycles WHERE user_id=$1 AND month=$2 FOR UPDATE""",
+                user_id, month_date,
+            )
+            current_status = row["status"] if row else None
+
+            if action == "open":
+                # Existing row of any status → idempotent, no mutation.
+                if row is not None:
+                    return _open_result(month_date, row, idempotent=True, created=False)
+                if now_t >= month_start_t:
+                    return _cycle_err("MONTH_ALREADY_STARTED")
+                if not await _plan_is_valid(conn, user_id, month_date):
+                    return _cycle_err("EMPTY_DRAFT")
+                new = await conn.fetchrow(
+                    """INSERT INTO monthly_plan_cycles
+                       (user_id, month, status, household_size, source)
+                       VALUES ($1,$2,'waiting_oyijon',$3,'calculated')
+                       RETURNING status, source, household_size""",
+                    user_id, month_date, household_size,
+                )
+                return _open_result(month_date, new, idempotent=False, created=True)
+
+            # action == "escalate"
+            if row is None:
+                return _cycle_err("NO_DRAFT")
+            if current_status == "waiting_admin":
+                return _open_result(month_date, row, idempotent=True, created=False)
+            if current_status in _CYCLE_TERMINAL:
+                return _cycle_err("INVALID_STATUS_TRANSITION")
+            # current_status ∈ {draft, waiting_oyijon}
+            if now_t >= month_start_t:
+                return _cycle_err("MONTH_ALREADY_STARTED")
+            new = await conn.fetchrow(
+                """UPDATE monthly_plan_cycles
+                   SET status='waiting_admin',
+                       household_size=COALESCE($3, household_size), updated_at=now()
+                   WHERE user_id=$1 AND month=$2
+                   RETURNING status, source, household_size""",
+                user_id, month_date, household_size,
+            )
+            return _open_result(month_date, new, idempotent=False, created=False)
+
+
 async def save_quran_progress(pool, user_id, surah, juz, page, note):
     return await pool.fetchval(
         """INSERT INTO quran_progress (user_id, surah, juz, page, note)

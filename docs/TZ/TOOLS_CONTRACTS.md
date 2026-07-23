@@ -1,9 +1,9 @@
 # Tools Contracts
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (полные примеры вход/выход — §15).
-Реализация: `backend/server.py` + `backend/db.py`. **Repo inventory: 22 tools (dispatch/MCP discovery = 22/22); deployed на VPS: 21.** Stage 5.3A добавляет `approve_monthly_plan` (репозиторий); backend/БД deploy — отдельным шагом. Migration 003 (со схемой `monthly_plan_cycles`) уже active на VPS; guard deploy active/PASS; [Telegram live acceptance evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md).
+Реализация: `backend/server.py` + `backend/db.py`. **Repo inventory: 23 tools (dispatch/MCP discovery = 23/23); deployed на VPS: 21.** Stage 5.3A добавляет `approve_monthly_plan` и `open_monthly_plan_cycle` (репозиторий); backend/БД deploy — отдельным шагом (imp02). Migration 003 (со схемой `monthly_plan_cycles`) уже active на VPS; guard deploy active/PASS; [Telegram live acceptance evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md).
 
-**v3.19 progression:** Stage 5.3 = 21, Stage 5.3A repo = 22 (deployed 21), Stage 5.4 = planned 25, Stage 6 = planned 27. Всё сверх repo 22 — **PLANNED / NOT IMPLEMENTED** и отсутствует в runtime discovery.
+**v3.19 progression:** Stage 5.3 = 21, Stage 5.3A repo = 23 (deployed 21), Stage 5.4 = planned +3, Stage 6 = planned +2. Всё сверх repo 23 — **PLANNED / NOT IMPLEMENTED** и отсутствует в runtime discovery.
 
 ## Общие правила
 
@@ -94,6 +94,20 @@
 
 **Identity rails (backend-уровень, дублируют guard):** `oyijon` с `approved_by_user_id != user_id` → `SELF_ONLY_VIOLATION`; `admin` без target или target == user_id → `ADMIN_TARGET_REQUIRED`; `auto` с `approved_by_user_id` → `INVALID_APPROVER`. Проверка `allowed_target_user_ids` — на стороне identity guard.
 
+### Stage 5.3A — `open_monthly_plan_cycle` (repo 23, deployed 21; вариант A 2026-07-24)
+
+**Назначение.** Единственная узкая мутация статуса цикла (создаёт draft-строку и делает escalate), которой не было у `approve_monthly_plan`. Пишет **только** строку `monthly_plan_cycles`; `monthly_budget_plans`/`monthly_budget_items`/`transactions` не трогает. Identity (Oyijon self-only, admin narrow cross-target, cron trusted job) — на стороне identity guard.
+
+**Параметры:** `user_id` (int, req), `month` (`YYYY-MM-01`, req), `action` (enum `open`|`escalate`, req), `household_size` (int ≥1, optional).
+
+**Результат (ok):** `{month, status, source, household_size, idempotent, created}`.
+
+- `action=open`: если строки цикла нет — создаёт `waiting_oyijon` (`source=calculated`, `created:true`) для future month (Asia/Tashkent, строго до начала месяца), требует valid budget draft (та же валидация, что `EMPTY_DRAFT` в approve: ≥1 строка `monthly_budget_plans` за месяц, `SUM>0`). Строка любого статуса уже есть → идемпотентный ответ (`idempotent:true`, `created:false`), без мутации и без дублей.
+- `action=escalate`: `waiting_oyijon`/`draft` → `waiting_admin` (future month). Уже `waiting_admin` → идемпотентный no-op. Terminal-статус → `INVALID_STATUS_TRANSITION`. Нет строки → `NO_DRAFT`. Всё — без мутации при отказе.
+- Коды ошибок: `MONTH_ALREADY_STARTED`, `EMPTY_DRAFT`, `INVALID_STATUS_TRANSITION`, `NO_DRAFT` (+ `INVALID_INPUT` на bad `action`/`household_size`).
+
+**Связка (вариант A end-to-end):** `open` → «ха»-approve Oyijon (`approved_by_oyijon`); `open` → `escalate` → admin approve (`approved_by_admin`); `open` → job 1 `auto` (`auto_approved`, approve существующего draft, без copy).
+
 ### Stage 5.4 — +3, planned 25
 
 - `set_utility_threshold`, `sync_utility_account`, `get_utility_status`.
@@ -123,7 +137,8 @@
 | `get_balance_summary` | user_id | |
 | `set_monthly_budget` | user_id, month, category_code, planned_amount_uzs | runtime active; live E2E PASS |
 | `get_monthly_budget_status` | user_id, month | runtime active; live E2E PASS |
-| `approve_monthly_plan` | user_id, month, source | repo 22; deploy отдельно; не трогает transactions |
+| `approve_monthly_plan` | user_id, month, source | repo 23; deploy отдельно; не трогает transactions |
+| `open_monthly_plan_cycle` | user_id, month, action | repo 23; deploy отдельно; только строка monthly_plan_cycles |
 | `save_quran_progress` | user_id | |
 | `get_quran_progress` | user_id | |
 | `save_health_note` | user_id, note | |

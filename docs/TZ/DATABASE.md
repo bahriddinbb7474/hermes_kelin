@@ -18,7 +18,7 @@ PostgreSQL хранит точные данные. Hermes memory хранит т
 - `transactions` — расходы и доходы: сумма, валюта, категория, предмет, description, source, время. **Migration 002 active:** nullable `item_name_normalized`, `quantity`, `unit` (`kg|g|l|ml|pcs|pack`); unit только с quantity; quantity>0; старые rows без quantity валидны.
 - `monthly_budget_plans` — **migration 002 active:** plan на `(user_id, month, category_code)`: planned_amount_uzs, note, timestamps.
 - `monthly_budget_items` — **migration 003 active repo/VPS:** product plan на `(user_id, month, category_code, item_name_normalized)` с planned quantity/unit/amount и immutable reference price snapshot.
-- `monthly_plan_cycles` — **migration 003:** схема (status, household_size, source, approval metadata; unique `user/month`; status/source CHECK) достаточна для Stage 5.3A. `approve_monthly_plan` реализует детерминированную state machine поверх неё **без новой migration** (004 не требуется); production cron 25/27/28/1 остаётся PLANNED.
+- `monthly_plan_cycles` — **migration 003:** схема (status, household_size, source, approval metadata; unique `user/month`; status/source CHECK) достаточна для Stage 5.3A. `approve_monthly_plan` (terminal-статусы) и `open_monthly_plan_cycle` (`waiting_oyijon`/`waiting_admin` — оба в существующем status CHECK) реализуют детерминированную state machine поверх неё **без новой migration** (004 не требуется); production cron 25/27/28/1 остаётся PLANNED.
 - `quran_progress` — сура/жуз/страница/заметка и дата обновления.
 - `health_notes` — заметки о самочувствии с severity, без диагноза.
 - `alert_events` — срочные события: тип, severity, исходная фраза, ответ бота, `detected_by`, отправлено ли админу.

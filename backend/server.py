@@ -199,6 +199,17 @@ async def t_approve_monthly_plan(pool, a):
     return ok(**r)
 
 
+async def t_open_monthly_plan_cycle(pool, a):
+    r = await db.open_monthly_plan_cycle(
+        pool, a["user_id"], a["month"], a["action"], a.get("household_size"),
+    )
+    code = r.get("_cycle_error")
+    if code:
+        ru, uz = CYCLE_ERRORS[code]
+        return err(code, ru, uz)
+    return ok(**r)
+
+
 async def t_save_quran_progress(pool, a):
     rid = await db.save_quran_progress(
         pool, a["user_id"], a.get("surah"), a.get("juz"), a.get("page"), a.get("note"))
@@ -281,6 +292,7 @@ DISPATCH = {
     "set_monthly_budget": t_set_monthly_budget,
     "get_monthly_budget_status": t_get_monthly_budget_status,
     "approve_monthly_plan": t_approve_monthly_plan,
+    "open_monthly_plan_cycle": t_open_monthly_plan_cycle,
     "save_quran_progress": t_save_quran_progress,
     "get_quran_progress": t_get_quran_progress,
     "save_health_note": t_save_health_note,
@@ -363,6 +375,7 @@ P = {
         },
     },
     "source": {"type": "string", "enum": list(db.APPROVAL_SOURCES)},
+    "action": {"type": "string", "enum": list(db.CYCLE_ACTIONS)},
     "approved_by_user_id": {"type": "integer"},
     "household_size": {"type": "integer", "minimum": 1},
     "surah": {"type": "string"},
@@ -403,6 +416,7 @@ TOOLS = [
     ("set_monthly_budget", "Создать/обновить план категории и атомарно заменить optional product items. Category-only допустим только когда items omitted; explicit items=[] всегда INVALID_INPUT. Для подтверждённого товара используй exact fields item_name_normalized, item_name_display, planned_quantity, unit, planned_amount_uzs, reference_unit_price_uzs, price_basis, price_as_of", schema({**pick("user_id", "month", "category_code", "planned_amount_uzs", "note"), "items": P["budget_items"]}, ["user_id", "month", "category_code", "planned_amount_uzs"])),
     ("get_monthly_budget_status", "Точные plan/fact за месяц; include_items=true добавляет product plan, actual и reference prices; price_lookup_items требует price_basis=last|average и возвращает read-only selected reference-price facts", schema(pick("user_id", "month", "include_items", "price_lookup_items"), ["user_id", "month"])),
     ("approve_monthly_plan", "Утвердить месячный план (draft→approved). source=oyijon|admin|auto. Работает только до начала планового месяца (Asia/Tashkent); auto — только в 1-й день. Не читает и не меняет transactions. Идемпотентен по user/month; недопустимый переход статуса отклоняется без мутации. source=auto копирует последний approved plan, если нет draft", schema(pick("user_id", "month", "source", "approved_by_user_id", "household_size"), ["user_id", "month", "source"])),
+    ("open_monthly_plan_cycle", "Узкая мутация статуса цикла плана. action=open: создать draft-строку waiting_oyijon для будущего месяца (нужен valid budget draft); action=escalate: waiting_oyijon→waiting_admin. Только строка monthly_plan_cycles — не трогает monthly_budget_plans/items/transactions. Future month (Asia/Tashkent); идемпотентно, недопустимый переход отклоняется без мутации", schema(pick("user_id", "month", "action", "household_size"), ["user_id", "month", "action"])),
     ("save_quran_progress", "Сохранить прогресс Корана", schema(pick("user_id", "surah", "juz", "page", "note"), ["user_id"])),
     ("get_quran_progress", "Последний прогресс Корана", schema(pick("user_id"), ["user_id"])),
     ("save_health_note", "Заметка о самочувствии (без диагноза)", schema(pick("user_id", "note", "severity", "source_text"), ["user_id", "note"])),
