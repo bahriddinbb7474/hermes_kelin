@@ -123,7 +123,7 @@ async def test_tool_registered_and_schema():
     tools = await server.list_tools()
     names = [t.name for t in tools]
     assert names.count("open_monthly_plan_cycle") == 1
-    assert len(tools) == len(server.TOOLS) == len(server.DISPATCH) == 23
+    assert len(tools) == len(server.TOOLS) == len(server.DISPATCH) == 24
     schema = {t.name: t.inputSchema for t in tools}["open_monthly_plan_cycle"]
     assert schema["required"] == ["user_id", "month", "action"]
     assert schema["properties"]["action"]["enum"] == ["open", "escalate"]

@@ -1,9 +1,9 @@
 # Tools Contracts
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (полные примеры вход/выход — §15).
-Реализация: `backend/server.py` + `backend/db.py`. **Repo inventory: 23 tools (dispatch/MCP discovery = 23/23); deployed на VPS: 21.** Stage 5.3A добавляет `approve_monthly_plan` и `open_monthly_plan_cycle` (репозиторий); backend/БД deploy — отдельным шагом (imp02). Migration 003 (со схемой `monthly_plan_cycles`) уже active на VPS; guard deploy active/PASS; [Telegram live acceptance evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md).
+Реализация: `backend/server.py` + `backend/db.py`. **Repo inventory: 24 tools (dispatch/MCP discovery = 24/24); deployed на VPS: 21.** Stage 5.3A добавляет `approve_monthly_plan`, `open_monthly_plan_cycle`, `get_monthly_plan_cycle` (репозиторий); backend deploy — imp02. Migration 003 (со схемой `monthly_plan_cycles`) уже active на VPS; guard deploy active/PASS; [Telegram live acceptance evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md).
 
-**v3.19 progression:** Stage 5.3 = 21, Stage 5.3A repo = 23 (deployed 21), Stage 5.4 = planned +3, Stage 6 = planned +2. Всё сверх repo 23 — **PLANNED / NOT IMPLEMENTED** и отсутствует в runtime discovery.
+**v3.19 progression:** Stage 5.3 = 21, Stage 5.3A repo = 24 (deployed 21), Stage 5.4 = planned +3, Stage 6 = planned +2. Всё сверх repo 24 — **PLANNED / NOT IMPLEMENTED** и отсутствует в runtime discovery.
 
 ## Общие правила
 
@@ -106,6 +106,14 @@
 - `action=escalate`: `waiting_oyijon`/`draft` → `waiting_admin` (future month). Уже `waiting_admin` → идемпотентный no-op. Terminal-статус → `INVALID_STATUS_TRANSITION`. Нет строки → `NO_DRAFT`. Всё — без мутации при отказе.
 - Коды ошибок: `MONTH_ALREADY_STARTED`, `NO_PLAN_SOURCE` (open: нет источника для draft), `EMPTY_DRAFT` (open: уже есть zero-sum plan, не перезаписывается), `INVALID_STATUS_TRANSITION`, `NO_DRAFT` (+ `INVALID_INPUT` на bad `action`/`household_size`).
 
+### Stage 5.3A — `get_monthly_plan_cycle` (repo 24; read-only)
+
+**Назначение.** Read-only статус цикла для cron-гейтинга (jobs 27/28/1b): узнать, одобрила ли Ойижон план. Мутаций нет.
+
+**Параметры:** `user_id` (int, req), `month` (`YYYY-MM-01`, req).
+
+**Результат (ok):** `{month, exists, status, source, household_size, proposed_at, approved_at, approved_by_user_id}`. Нет строки → `exists:false`, остальные поля `null` (не ошибка). `status` ∈ шести статусов цикла.
+
 **Связка (вариант A end-to-end):** `open` → «ха»-approve Oyijon (`approved_by_oyijon`); `open` → `escalate` → admin approve (`approved_by_admin`); `open` → job 1 `auto` (`auto_approved`, approve существующего draft, без copy).
 
 ### Stage 5.4 — +3, planned 25
@@ -138,7 +146,8 @@
 | `set_monthly_budget` | user_id, month, category_code, planned_amount_uzs | runtime active; live E2E PASS |
 | `get_monthly_budget_status` | user_id, month | runtime active; live E2E PASS |
 | `approve_monthly_plan` | user_id, month, source | repo 23; deploy отдельно; не трогает transactions |
-| `open_monthly_plan_cycle` | user_id, month, action | repo 23; deploy отдельно; только строка monthly_plan_cycles |
+| `open_monthly_plan_cycle` | user_id, month, action | repo 24; deploy отдельно; monthly_plan_cycles (+ сген. draft) |
+| `get_monthly_plan_cycle` | user_id, month | repo 24; read-only статус цикла |
 | `save_quran_progress` | user_id | |
 | `get_quran_progress` | user_id | |
 | `save_health_note` | user_id, note | |

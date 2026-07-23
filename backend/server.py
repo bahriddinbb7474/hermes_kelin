@@ -210,6 +210,11 @@ async def t_open_monthly_plan_cycle(pool, a):
     return ok(**r)
 
 
+async def t_get_monthly_plan_cycle(pool, a):
+    r = await db.get_monthly_plan_cycle(pool, a["user_id"], a["month"])
+    return ok(**r)
+
+
 async def t_save_quran_progress(pool, a):
     rid = await db.save_quran_progress(
         pool, a["user_id"], a.get("surah"), a.get("juz"), a.get("page"), a.get("note"))
@@ -293,6 +298,7 @@ DISPATCH = {
     "get_monthly_budget_status": t_get_monthly_budget_status,
     "approve_monthly_plan": t_approve_monthly_plan,
     "open_monthly_plan_cycle": t_open_monthly_plan_cycle,
+    "get_monthly_plan_cycle": t_get_monthly_plan_cycle,
     "save_quran_progress": t_save_quran_progress,
     "get_quran_progress": t_get_quran_progress,
     "save_health_note": t_save_health_note,
@@ -417,6 +423,7 @@ TOOLS = [
     ("get_monthly_budget_status", "Точные plan/fact за месяц; include_items=true добавляет product plan, actual и reference prices; price_lookup_items требует price_basis=last|average и возвращает read-only selected reference-price facts", schema(pick("user_id", "month", "include_items", "price_lookup_items"), ["user_id", "month"])),
     ("approve_monthly_plan", "Утвердить месячный план (draft→approved). source=oyijon|admin|auto. Работает только до начала планового месяца (Asia/Tashkent); auto — только в 1-й день. Не читает и не меняет transactions. Идемпотентен по user/month; недопустимый переход статуса отклоняется без мутации. source=auto копирует последний approved plan, если нет draft", schema(pick("user_id", "month", "source", "approved_by_user_id", "household_size"), ["user_id", "month", "source"])),
     ("open_monthly_plan_cycle", "Узкая мутация статуса цикла плана. action=open: создать draft-строку waiting_oyijon для будущего месяца; если у пользователя нет budget-draft — backend детерминированно вычисляет и персистит его (последний approved plan + среднее за 3 месяца), draft_generated=true. action=escalate: waiting_oyijon→waiting_admin. Не трогает monthly_budget_items/transactions. Future month (Asia/Tashkent); идемпотентно, недопустимый переход отклоняется без мутации", schema(pick("user_id", "month", "action", "household_size"), ["user_id", "month", "action"])),
+    ("get_monthly_plan_cycle", "Read-only статус цикла месячного плана: exists, status (draft/waiting_oyijon/waiting_admin/approved_by_oyijon/approved_by_admin/auto_approved), source, household_size, proposed_at, approved_at, approved_by_user_id. Мутаций нет. Для cron-гейтинга (27/28/1b)", schema(pick("user_id", "month"), ["user_id", "month"])),
     ("save_quran_progress", "Сохранить прогресс Корана", schema(pick("user_id", "surah", "juz", "page", "note"), ["user_id"])),
     ("get_quran_progress", "Последний прогресс Корана", schema(pick("user_id"), ["user_id"])),
     ("save_health_note", "Заметка о самочувствии (без диагноза)", schema(pick("user_id", "note", "severity", "source_text"), ["user_id", "note"])),

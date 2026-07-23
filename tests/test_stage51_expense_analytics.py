@@ -143,14 +143,14 @@ def test_dispatch_keeps_old_19_and_adds_exactly_two_budget_tools():
     }
     new_tools = {
         "set_monthly_budget", "get_monthly_budget_status",
-        "approve_monthly_plan", "open_monthly_plan_cycle",
+        "approve_monthly_plan", "open_monthly_plan_cycle", "get_monthly_plan_cycle",
     }
     dispatch_names = set(DISPATCH)
     listed_names = {name for name, _description, _schema in TOOLS}
 
     assert len(old_19) == 19
     assert dispatch_names == listed_names == old_19 | new_tools
-    assert len(DISPATCH) == len(TOOLS) == 23
+    assert len(DISPATCH) == len(TOOLS) == 24
 
 
 # ---------------------------------------------------------------------------

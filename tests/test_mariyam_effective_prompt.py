@@ -155,7 +155,7 @@ def test_effective_mariyam_tools_exclude_execution_but_preserve_other_surfaces(
     assert not ({"browser_navigate", "cronjob", "memory"} & removed)
     assert "memory" in available
     assert not ({name for name, _desc, _schema in server.TOOLS} & removed)
-    assert len(server.TOOLS) == len(server.DISPATCH) == 23
+    assert len(server.TOOLS) == len(server.DISPATCH) == 24
 
 
 def test_deploy_closes_stage_with_offline_prompt_gate_and_no_paid_retest():

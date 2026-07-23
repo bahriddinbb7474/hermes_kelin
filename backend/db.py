@@ -1366,6 +1366,33 @@ async def open_monthly_plan_cycle(
             return _open_result(month_date, new, idempotent=False, created=False)
 
 
+async def get_monthly_plan_cycle(pool, user_id, month):
+    """Read-only cycle status for a month (cron gating; no mutation)."""
+    month_date = _budget_month(month)
+    row = await pool.fetchrow(
+        """SELECT status, source, household_size, proposed_at,
+                  approved_at, approved_by_user_id
+           FROM monthly_plan_cycles WHERE user_id=$1 AND month=$2""",
+        user_id, month_date,
+    )
+    if row is None:
+        return {
+            "month": month_date.isoformat(), "exists": False, "status": None,
+            "source": None, "household_size": None, "proposed_at": None,
+            "approved_at": None, "approved_by_user_id": None,
+        }
+    return {
+        "month": month_date.isoformat(),
+        "exists": True,
+        "status": row["status"],
+        "source": row["source"],
+        "household_size": row["household_size"],
+        "proposed_at": _iso_utc(row["proposed_at"]),
+        "approved_at": _iso_utc(row["approved_at"]),
+        "approved_by_user_id": row["approved_by_user_id"],
+    }
+
+
 async def save_quran_progress(pool, user_id, surah, juz, page, note):
     return await pool.fetchval(
         """INSERT INTO quran_progress (user_id, surah, juz, page, note)

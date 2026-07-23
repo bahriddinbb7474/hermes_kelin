@@ -126,7 +126,7 @@ async def test_tool_is_registered_and_callable():
     tools = await server.list_tools()
     names = [t.name for t in tools]
     assert names.count("approve_monthly_plan") == 1
-    assert len(tools) == len(server.TOOLS) == len(server.DISPATCH) == 23
+    assert len(tools) == len(server.TOOLS) == len(server.DISPATCH) == 24
     assert "approve_monthly_plan" in server.DISPATCH
 
     schema = {t.name: t.inputSchema for t in tools}["approve_monthly_plan"]
