@@ -1,4 +1,4 @@
-"""Deterministic, role-aware, fail-closed Telegram identity guard.
+"""Deterministic, role-aware, fail-closed Telegram and cron identity guard.
 
 Hermes ``tool_execution`` middleware. Runs BEFORE the MCP tool call and forces
 the correct internal ``users.id`` into tool arguments so that user-scoped MCP
@@ -19,10 +19,15 @@ so the heavy ``hermes_cli`` import only happens inside
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import logging
 import os
+import re
+import sqlite3
 import stat
+import threading
+from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
 
@@ -48,6 +53,9 @@ USER_SCOPED_TOOLS = frozenset(
         "save_alert_event",
         "save_plan_note",
         "get_admin_report_data",
+        # Planned Stage 5.3A tool. Classifying it now does not add it to Hermes
+        # inventory; if exposed later, it cannot bypass identity enforcement.
+        "approve_monthly_plan",
     }
 )
 
@@ -88,12 +96,51 @@ SAFE_ERROR_CODES = frozenset(
         "IDENTITY_MAPPING_INVALID",
         "IDENTITY_MAPPING_PERMISSIONS",
         "IDENTITY_GUARD_ERROR",
+        "CRON_IDENTITY_UNRESOLVED",
+        "CRON_JOB_UNTRUSTED",
+        "CRON_TOOL_FORBIDDEN",
     }
 )
 
 LOG = logging.getLogger("mariyam_identity_guard")
 
 VALID_ROLES = ("admin", "oyijon")
+
+CRON_MAPPING_VERSION = 1
+CRON_MAPPING_MAX_BYTES = 64 * 1024
+CRON_JOBS_MAX_BYTES = 2 * 1024 * 1024
+CRON_SESSION_RE = re.compile(r"^cron_([0-9a-f]{12})_[0-9]{8}_[0-9]{6}$")
+CRON_MAPPING_ROOT_KEYS = frozenset({"version", "jobs"})
+CRON_MAPPING_ENTRY_KEYS = frozenset(
+    {
+        "user_id",
+        "role",
+        "purpose",
+        "allowed_tools",
+        "job_fingerprint_sha256",
+        "prompt_sha256",
+    }
+)
+CRON_JOB_FINGERPRINT_FIELDS = (
+    "id",
+    "name",
+    "prompt",
+    "schedule",
+    "repeat",
+    "deliver",
+    "origin",
+    "skills",
+    "script",
+    "no_agent",
+    "context_from",
+    "enabled_toolsets",
+    "workdir",
+    "model",
+    "provider",
+    "base_url",
+)
+_LOWER_HEX_64_RE = re.compile(r"^[0-9a-f]{64}$")
+_CRON_READ_LOCK = threading.RLock()
 
 # Hermes isolates a middleware callback failure and continues the chain with
 # the original payload. The primary guard sets this context-local capability
@@ -170,6 +217,299 @@ def _state_db_path() -> Path | None:
     if hermes_home:
         return Path(hermes_home) / "state.db"
     return None
+
+
+def _strict_posix_permissions() -> bool:
+    return os.name == "posix"
+
+
+def _effective_uid():
+    getter = getattr(os, "geteuid", None)
+    return getter() if callable(getter) else None
+
+
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _canonical_repeat(value):
+    """Keep only the operator-controlled repeat limit, not run counters."""
+    if isinstance(value, dict):
+        return {"times": value.get("times")}
+    return value
+
+
+def canonical_cron_job(job) -> dict:
+    """Return the immutable job definition used for operator fingerprints."""
+    if not isinstance(job, dict):
+        raise ValueError("cron job must be an object")
+    value = {
+        field: copy.deepcopy(job.get(field))
+        for field in CRON_JOB_FINGERPRINT_FIELDS
+    }
+    value["repeat"] = _canonical_repeat(value["repeat"])
+    return value
+
+
+def cron_job_fingerprint(job) -> str:
+    """SHA-256 of the canonical immutable cron job definition."""
+    encoded = json.dumps(
+        canonical_cron_job(job),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+    return _sha256_text(encoded)
+
+
+def _validate_private_file(path: Path) -> os.stat_result:
+    """Validate the cron mapping path without following symlinks."""
+    if not path.is_absolute():
+        raise PermissionError("cron identity mapping path must be absolute")
+    parent = path.parent
+    parent_stat = os.lstat(parent)
+    file_stat = os.lstat(path)
+    if stat.S_ISLNK(parent_stat.st_mode) or not stat.S_ISDIR(parent_stat.st_mode):
+        raise PermissionError("cron identity mapping parent is unsafe")
+    if stat.S_ISLNK(file_stat.st_mode) or not stat.S_ISREG(file_stat.st_mode):
+        raise PermissionError("cron identity mapping file is unsafe")
+    if _strict_posix_permissions():
+        uid = _effective_uid()
+        if uid is None or parent_stat.st_uid != uid or file_stat.st_uid != uid:
+            raise PermissionError("cron identity mapping owner is unsafe")
+        if stat.S_IMODE(parent_stat.st_mode) != 0o700:
+            raise PermissionError("cron identity mapping parent must be mode 0700")
+        if stat.S_IMODE(file_stat.st_mode) != 0o600:
+            raise PermissionError("cron identity mapping file must be mode 0600")
+    return file_stat
+
+
+def _read_bounded_regular_file(path: Path, max_bytes: int, *, private: bool) -> bytes:
+    """Read one regular non-symlink file with lstat/fstat race checks."""
+    before = _validate_private_file(path) if private else os.lstat(path)
+    if not private and (stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode)):
+        raise PermissionError("unsafe file")
+    if before.st_size > max_bytes:
+        raise ValueError("file too large")
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(str(path), flags)
+    try:
+        opened = os.fstat(fd)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_dev != before.st_dev
+            or opened.st_ino != before.st_ino
+        ):
+            raise PermissionError("file changed during validation")
+        data = b""
+        while len(data) <= max_bytes:
+            chunk = os.read(fd, min(65536, max_bytes + 1 - len(data)))
+            if not chunk:
+                break
+            data += chunk
+        if len(data) > max_bytes:
+            raise ValueError("file too large")
+        return data
+    finally:
+        os.close(fd)
+
+
+@contextmanager
+def _shared_cron_jobs_lock(cron_dir: Path):
+    """Take Hermes' cross-process jobs lock in shared mode on POSIX."""
+    lock_path = cron_dir / ".jobs.lock"
+    lock_stat = os.lstat(lock_path)
+    if stat.S_ISLNK(lock_stat.st_mode) or not stat.S_ISREG(lock_stat.st_mode):
+        raise PermissionError("unsafe cron jobs lock")
+    with _CRON_READ_LOCK:
+        handle = open(lock_path, "rb")
+        try:
+            if _strict_posix_permissions():
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_SH)
+            yield
+        finally:
+            if _strict_posix_permissions():
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            handle.close()
+
+
+def _load_exact_cron_job(job_id: str):
+    home = os.environ.get("HERMES_HOME")
+    if not home:
+        return None
+    cron_dir = Path(home) / "cron"
+    jobs_path = cron_dir / "jobs.json"
+    try:
+        with _shared_cron_jobs_lock(cron_dir):
+            raw = _read_bounded_regular_file(
+                jobs_path, CRON_JOBS_MAX_BYTES, private=False
+            )
+            store = json.loads(raw.decode("utf-8"))
+    except Exception:
+        return None
+    if not isinstance(store, dict) or set(store) - {"jobs", "updated_at"}:
+        return None
+    jobs = store.get("jobs")
+    if not isinstance(jobs, list):
+        return None
+    matches = [job for job in jobs if isinstance(job, dict) and job.get("id") == job_id]
+    if len(matches) != 1:
+        return None
+    job = matches[0]
+    if job.get("enabled") is not True:
+        return None
+    if job.get("state") not in {"scheduled", "running"}:
+        return None
+    if (
+        job.get("script") is not None
+        or job.get("context_from") is not None
+        or job.get("workdir") is not None
+        or job.get("no_agent") is not False
+    ):
+        return None
+    return job
+
+
+def validate_cron_mapping_schema(value) -> bool:
+    """Strict schema v1; any unknown key invalidates the entire mapping."""
+    if not isinstance(value, dict) or set(value) != CRON_MAPPING_ROOT_KEYS:
+        return False
+    if value.get("version") != CRON_MAPPING_VERSION:
+        return False
+    jobs = value.get("jobs")
+    if not isinstance(jobs, dict) or not jobs:
+        return False
+    for job_id, entry in jobs.items():
+        if not isinstance(job_id, str) or not re.fullmatch(r"[0-9a-f]{12}", job_id):
+            return False
+        if not isinstance(entry, dict) or set(entry) != CRON_MAPPING_ENTRY_KEYS:
+            return False
+        if not _is_pos_int(entry.get("user_id")) or entry.get("role") != "oyijon":
+            return False
+        purpose = entry.get("purpose")
+        if not isinstance(purpose, str) or not purpose.strip():
+            return False
+        allowed = entry.get("allowed_tools")
+        if (
+            not isinstance(allowed, list)
+            or not allowed
+            or any(not isinstance(tool, str) for tool in allowed)
+            or len(allowed) != len(set(allowed))
+            or any(
+                tool not in USER_SCOPED_TOOLS or tool == ENSURE_USER
+                for tool in allowed
+            )
+        ):
+            return False
+        if not _LOWER_HEX_64_RE.fullmatch(
+            str(entry.get("job_fingerprint_sha256") or "")
+        ):
+            return False
+        if not _LOWER_HEX_64_RE.fullmatch(str(entry.get("prompt_sha256") or "")):
+            return False
+    return True
+
+
+def load_cron_identity_map():
+    path_text = os.environ.get("MARIYAM_CRON_IDENTITY_MAP_FILE")
+    if not path_text:
+        return None, "CRON_IDENTITY_UNRESOLVED"
+    try:
+        raw = _read_bounded_regular_file(
+            Path(path_text), CRON_MAPPING_MAX_BYTES, private=True
+        )
+    except FileNotFoundError:
+        return None, "CRON_IDENTITY_UNRESOLVED"
+    except PermissionError:
+        return None, "IDENTITY_MAPPING_PERMISSIONS"
+    except Exception:
+        return None, "IDENTITY_MAPPING_INVALID"
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except Exception:
+        return None, "IDENTITY_MAPPING_INVALID"
+    if not validate_cron_mapping_schema(value):
+        return None, "IDENTITY_MAPPING_INVALID"
+    return value, None
+
+
+def _load_cron_session(session_id: str):
+    db_path = _state_db_path()
+    if not db_path or not db_path.exists():
+        return None
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        try:
+            row = conn.execute(
+                "SELECT source, user_id, origin_json FROM sessions WHERE id = ?",
+                (session_id,),
+            ).fetchone()
+            if row != ("cron", None, None):
+                return None
+            prompt_row = conn.execute(
+                "SELECT content FROM messages "
+                "WHERE session_id = ? AND role = 'user' "
+                "ORDER BY id ASC LIMIT 1",
+                (session_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+    except Exception:
+        return None
+    if not prompt_row or not isinstance(prompt_row[0], str):
+        return None
+    return prompt_row[0]
+
+
+def _cron_prompt_is_bound(session_prompt: str, base_prompt: str) -> bool:
+    return (
+        isinstance(base_prompt, str)
+        and bool(base_prompt)
+        and session_prompt.count(base_prompt) == 1
+        and session_prompt.rstrip().endswith(base_prompt)
+    )
+
+
+def resolve_cron_actor(session_id: str, tool_name: str):
+    """Resolve one trusted cron actor or return a safe error code."""
+    match = CRON_SESSION_RE.fullmatch(session_id or "")
+    if not match:
+        return None, "CRON_IDENTITY_UNRESOLVED", None
+    job_id = match.group(1)
+    session_prompt = _load_cron_session(session_id)
+    if session_prompt is None:
+        return None, "CRON_IDENTITY_UNRESOLVED", job_id
+    mapping, map_err = load_cron_identity_map()
+    if map_err is not None:
+        return None, map_err, job_id
+    entry = mapping["jobs"].get(job_id)
+    if entry is None:
+        return None, "CRON_IDENTITY_UNRESOLVED", job_id
+    if tool_name not in entry["allowed_tools"]:
+        return None, "CRON_TOOL_FORBIDDEN", job_id
+    job = _load_exact_cron_job(job_id)
+    if job is None:
+        return None, "CRON_JOB_UNTRUSTED", job_id
+    prompt = job.get("prompt")
+    try:
+        trusted = (
+            isinstance(prompt, str)
+            and _sha256_text(prompt) == entry["prompt_sha256"]
+            and cron_job_fingerprint(job) == entry["job_fingerprint_sha256"]
+            and _cron_prompt_is_bound(session_prompt, prompt)
+        )
+    except Exception:
+        trusted = False
+    if not trusted:
+        return None, "CRON_JOB_UNTRUSTED", job_id
+    return entry, None, job_id
 
 
 # ---------------------------------------------------------------------------
@@ -361,6 +701,16 @@ def _audit_log(tool_name, actor_role, actor_user_id, requested, effective, decis
     )
 
 
+def _cron_audit_log(job_id, tool_name, decision):
+    """Cron audit deliberately omits session and all user/target identifiers."""
+    LOG.info(
+        "identity_guard cron_job=%s tool=%s decision=%s",
+        job_id,
+        tool_name,
+        decision,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Core policy
 # ---------------------------------------------------------------------------
@@ -457,6 +807,16 @@ def on_tool_execution_middleware(**kwargs):
             tool_name not in USER_SCOPED_TOOLS and tool_name != ENSURE_USER
         ):
             effective_args = args
+        elif CRON_SESSION_RE.fullmatch(session_id or ""):
+            actor, cron_err, job_id = resolve_cron_actor(session_id, tool_name)
+            if cron_err is not None:
+                return _safe_error(session_id, original_tool_name, cron_err)
+            effective_args, err = _compute_effective_args(
+                tool_name, args, actor, None
+            )
+            if err is not None:
+                return _safe_error(session_id, original_tool_name, err)
+            _cron_audit_log(job_id, original_tool_name, "oyijon_self")
         else:
             id_map, map_err = load_identity_map()
             if map_err == "IDENTITY_MAPPING_PERMISSIONS":

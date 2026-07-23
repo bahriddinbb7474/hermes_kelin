@@ -1,11 +1,12 @@
 name: mariyam_identity_guard
-version: "1.0.4"
+version: "1.1.0"
 description: >-
-  Deterministic Telegram session -> internal users.id guard for all
-  user-scoped Mariyam MCP tools. Rewrites tool arguments by the current
-  Telegram session identity from a private mapping. Fail-closed: unknown
-  sender or missing mapping blocks the tool instead of calling it; a second
-  barrier blocks Hermes' fallback if the primary callback itself fails.
+  Deterministic Telegram/cron session -> internal users.id guard for all
+  user-scoped Mariyam MCP tools. Rewrites tool arguments from a private
+  Telegram mapping or a trusted cron job mapping bound to the persisted cron
+  session, immutable job fingerprint, prompt, and tool allowlist. Fail-closed:
+  unknown identity/job or missing mapping blocks the tool instead of calling
+  it; a second barrier blocks Hermes' fallback if the primary callback fails.
   Recognizes live MCP-prefixed names (mcp__mariyam_backend__*) as bare tools.
   ensure_user binds telegram_id as integer (origin may store string).
 author: Hermes/Mariyam

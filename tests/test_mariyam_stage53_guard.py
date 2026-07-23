@@ -213,7 +213,7 @@ def test_profile_limit_plugin_order_and_identity_version_are_pinned():
         "- mariyam_stage53_guard"
     )
     identity_manifest = IDENTITY_MANIFEST.read_text(encoding="utf-8")
-    assert 'version: "1.0.4"' in identity_manifest
+    assert 'version: "1.1.0"' in identity_manifest
 
 
 def test_active_lookup_plus_omitted_items_is_blocked():
