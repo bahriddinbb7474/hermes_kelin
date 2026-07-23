@@ -1025,6 +1025,187 @@ async def get_monthly_budget_status(
     return result
 
 
+# ---------------------------------------------------------------------------
+# Stage 5.3A — monthly plan approval cycle (deterministic state machine).
+# Backend stores/validates only; identity (self-only oyijon, admin narrow
+# cross-target allowlist) is enforced by the identity guard before backend.
+# ---------------------------------------------------------------------------
+APPROVAL_SOURCES = ("oyijon", "admin", "auto")
+_APPROVAL_TARGET_STATUS = {
+    "oyijon": "approved_by_oyijon",
+    "admin": "approved_by_admin",
+    "auto": "auto_approved",
+}
+_CYCLE_TERMINAL = {"approved_by_oyijon", "approved_by_admin", "auto_approved"}
+_CYCLE_NON_TERMINAL = {"draft", "waiting_oyijon", "waiting_admin"}
+
+
+def _cycle_err(code: str) -> dict:
+    return {"_cycle_error": code}
+
+
+def _cycle_result(month_date: date, row, *, idempotent: bool, plan_copied: bool) -> dict:
+    return {
+        "month": month_date.isoformat(),
+        "status": row["status"],
+        "source": row["source"],
+        "household_size": row["household_size"],
+        "approved_by_user_id": row["approved_by_user_id"],
+        "approved_at": _iso_utc(row["approved_at"]),
+        "idempotent": idempotent,
+        "plan_copied": plan_copied,
+    }
+
+
+async def _plan_is_valid(conn, user_id, month_date: date) -> bool:
+    """A valid (non-empty) draft has >=1 category plan row with positive total."""
+    row = await conn.fetchrow(
+        """SELECT COUNT(*) AS cnt, COALESCE(SUM(planned_amount_uzs), 0) AS total
+           FROM monthly_budget_plans WHERE user_id=$1 AND month=$2""",
+        user_id, month_date,
+    )
+    return row["cnt"] > 0 and Decimal(row["total"]) > 0
+
+
+async def _last_approved_month(conn, user_id, before_month: date):
+    return await conn.fetchval(
+        """SELECT c.month FROM monthly_plan_cycles c
+           WHERE c.user_id=$1 AND c.month < $2
+             AND c.status IN ('approved_by_oyijon','approved_by_admin','auto_approved')
+             AND EXISTS (SELECT 1 FROM monthly_budget_plans p
+                         WHERE p.user_id=$1 AND p.month=c.month)
+           ORDER BY c.month DESC LIMIT 1""",
+        user_id, before_month,
+    )
+
+
+async def _copy_plan(conn, user_id, src_month: date, dst_month: date):
+    """Copy category plans and product items from src_month into dst_month."""
+    await conn.execute(
+        """INSERT INTO monthly_budget_plans (user_id, month, category_code, planned_amount_uzs, note)
+           SELECT user_id, $3, category_code, planned_amount_uzs, note
+           FROM monthly_budget_plans WHERE user_id=$1 AND month=$2""",
+        user_id, src_month, dst_month,
+    )
+    await conn.execute(
+        """INSERT INTO monthly_budget_items
+           (user_id, month, category_code, item_name_normalized, item_name_display,
+            planned_quantity, unit, planned_amount_uzs, reference_unit_price_uzs,
+            price_basis, price_as_of, note)
+           SELECT user_id, $3, category_code, item_name_normalized, item_name_display,
+                  planned_quantity, unit, planned_amount_uzs, reference_unit_price_uzs,
+                  price_basis, price_as_of, note
+           FROM monthly_budget_items WHERE user_id=$1 AND month=$2""",
+        user_id, src_month, dst_month,
+    )
+
+
+async def approve_monthly_plan(
+    pool, user_id, month, source,
+    approved_by_user_id=None, household_size=None, now=None,
+):
+    _one_of("source", source, APPROVAL_SOURCES)
+    month_date = _budget_month(month)
+
+    if household_size is not None and (
+        isinstance(household_size, bool)
+        or not isinstance(household_size, int)
+        or household_size <= 0
+    ):
+        raise ValueError("INVALID_INPUT: household_size must be a positive integer")
+    if approved_by_user_id is not None and (
+        isinstance(approved_by_user_id, bool) or not isinstance(approved_by_user_id, int)
+    ):
+        raise ValueError("INVALID_INPUT: approved_by_user_id must be an integer")
+
+    now_utc = now or datetime.now(timezone.utc)
+    now_t = now_utc.astimezone(TASHKENT)
+    month_start_t = datetime(month_date.year, month_date.month, 1, tzinfo=TASHKENT)
+    target_status = _APPROVAL_TARGET_STATUS[source]
+
+    # Backend-level identity guard rails (guard also enforces these upstream).
+    if source == "oyijon":
+        if approved_by_user_id is not None and approved_by_user_id != user_id:
+            return _cycle_err("SELF_ONLY_VIOLATION")
+        approver = user_id
+    elif source == "admin":
+        if approved_by_user_id is None or approved_by_user_id == user_id:
+            return _cycle_err("ADMIN_TARGET_REQUIRED")
+        approver = approved_by_user_id
+    else:
+        if approved_by_user_id is not None:
+            return _cycle_err("INVALID_APPROVER")
+        approver = None
+
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                """SELECT status, source, household_size, approved_by_user_id, approved_at
+                   FROM monthly_plan_cycles WHERE user_id=$1 AND month=$2 FOR UPDATE""",
+                user_id, month_date,
+            )
+            current_status = row["status"] if row else None
+
+            # Idempotent replay: already in the exact target status → no write,
+            # even if the month has since started (retry/cron safety).
+            if current_status == target_status:
+                return _cycle_result(month_date, row, idempotent=True, plan_copied=False)
+            # Any other terminal status is an illegal transition.
+            if current_status in _CYCLE_TERMINAL:
+                return _cycle_err("INVALID_STATUS_TRANSITION")
+
+            # Deterministic month-boundary gate (Asia/Tashkent), before any write.
+            if source in ("oyijon", "admin"):
+                # Manual approval only strictly BEFORE the planned month begins.
+                if now_t >= month_start_t:
+                    return _cycle_err("MONTH_ALREADY_STARTED")
+            else:  # auto: cron "1st" safety net, only on the first calendar day.
+                if now_t < month_start_t:
+                    return _cycle_err("MONTH_NOT_STARTED")
+                if now_t >= month_start_t + timedelta(days=1):
+                    return _cycle_err("MONTH_ALREADY_STARTED")
+
+            plan_copied = False
+            if row is None:
+                if source == "auto":
+                    prev = await _last_approved_month(conn, user_id, month_date)
+                    if prev is None:
+                        return _cycle_err("NO_PLAN_SOURCE")
+                    await _copy_plan(conn, user_id, prev, month_date)
+                    plan_copied = True
+                    cycle_source = "copied_previous"
+                else:
+                    return _cycle_err("NO_DRAFT")
+            else:
+                cycle_source = row["source"]
+
+            if not await _plan_is_valid(conn, user_id, month_date):
+                return _cycle_err("EMPTY_DRAFT")
+
+            if row is None:
+                new = await conn.fetchrow(
+                    """INSERT INTO monthly_plan_cycles
+                       (user_id, month, status, household_size, source,
+                        approved_at, approved_by_user_id)
+                       VALUES ($1,$2,$3,$4,$5,$6,$7)
+                       RETURNING status, source, household_size,
+                                 approved_by_user_id, approved_at""",
+                    user_id, month_date, target_status, household_size,
+                    cycle_source, now_utc, approver,
+                )
+            else:
+                new = await conn.fetchrow(
+                    """UPDATE monthly_plan_cycles
+                       SET status=$3, approved_at=$4, approved_by_user_id=$5,
+                           household_size=COALESCE($6, household_size), updated_at=now()
+                       WHERE user_id=$1 AND month=$2
+                       RETURNING status, source, household_size,
+                                 approved_by_user_id, approved_at""",
+                    user_id, month_date, target_status, now_utc, approver, household_size,
+                )
+    return _cycle_result(month_date, new, idempotent=False, plan_copied=plan_copied)
+
+
 async def save_quran_progress(pool, user_id, surah, juz, page, note):
     return await pool.fetchval(
         """INSERT INTO quran_progress (user_id, surah, juz, page, note)

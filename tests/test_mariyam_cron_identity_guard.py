@@ -469,4 +469,4 @@ def test_max_turns_chain_order_inventory_and_manifest_are_pinned():
         and any(isinstance(target, ast.Name) and target.id == "TOOLS" for target in node.targets)
     )
     assert isinstance(tools_assignment.value, ast.List)
-    assert len(tools_assignment.value.elts) == 21
+    assert len(tools_assignment.value.elts) == 22

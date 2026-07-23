@@ -1,9 +1,9 @@
 # Tools Contracts
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (полные примеры вход/выход — §15).
-Реализация: `backend/server.py` + `backend/db.py`. **Repo/VPS inventory: 21 tools; repo dispatch/MCP discovery = 21/21.** Stage 5.3 расширяет существующие `set_monthly_budget` и `get_monthly_budget_status`; новых tools нет. Migration 003 и v3.19 guard deploy active/PASS на VPS; [Telegram live acceptance evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md).
+Реализация: `backend/server.py` + `backend/db.py`. **Repo inventory: 22 tools (dispatch/MCP discovery = 22/22); deployed на VPS: 21.** Stage 5.3A добавляет `approve_monthly_plan` (репозиторий); backend/БД deploy — отдельным шагом. Migration 003 (со схемой `monthly_plan_cycles`) уже active на VPS; guard deploy active/PASS; [Telegram live acceptance evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md).
 
-**v3.19 progression:** Stage 5.3 repo/VPS = 21, Stage 5.3A = planned 22, Stage 5.4 = planned 25, Stage 6 = planned 27. Всё сверх текущих 21 — **PLANNED / NOT IMPLEMENTED** и отсутствует в runtime discovery.
+**v3.19 progression:** Stage 5.3 = 21, Stage 5.3A repo = 22 (deployed 21), Stage 5.4 = planned 25, Stage 6 = planned 27. Всё сверх repo 22 — **PLANNED / NOT IMPLEMENTED** и отсутствует в runtime discovery.
 
 ## Общие правила
 
@@ -57,10 +57,42 @@
 - Backend casefold-нормализует item name, считает точные числа, последнюю и средневзвешенную цену из transactions и сохраняет price snapshot плана; backend не пишет прозу. Цена рассчитывается только при наличии normalized item, amount, quantity и unit. При category plan `food` фактические расходы дочерних `food.*` сворачиваются в родительскую строку, если для конкретной дочерней категории нет более точного плана.
 - Hermes объясняет данные, предлагает last price по умолчанию, спрашивает подтверждение и принимает `average` или `manual` override. Ценовая логика не хранится в LLM memory.
 
-### Stage 5.3A — +1, planned 22
+### Stage 5.3A — `approve_monthly_plan` (repo 22, deployed 21)
 
-- `approve_monthly_plan`: approve plan + approval method/actor; не изменяет transactions и не удаляет expenses.
-- Tool действует только до начала планового месяца. Oyijon self-only. Admin cross-target только allowed target, future month и узкий allowlist именно этого tool; transaction permissions не расширяются. После начала месяца approval-cycle закрыт; активный plan корректирует только Oyijon self-only, admin edit текущего plan в v3.10 не заявлен.
+**Назначение.** Утвердить месячный план цикла 25/27/28/1. Tool не читает на запись и не изменяет `transactions`; изменение расходов запрещено. Backend хранит/валидирует; identity (Oyijon self-only, admin narrow cross-target allowlist, cron trusted job → users.id) обеспечивает identity guard до backend.
+
+**Параметры (inputSchema):**
+
+| Поле | Тип | Обяз. | Смысл |
+|---|---|---|---|
+| `user_id` | integer | да | субъект плана (guard rebinds) |
+| `month` | string `YYYY-MM-01` | да | плановый месяц |
+| `source` | enum `oyijon`\|`admin`\|`auto` | да | способ утверждения |
+| `approved_by_user_id` | integer | нет | актор для `admin` (target != actor); для `oyijon` — только сам, для `auto` — запрещён |
+| `household_size` | integer ≥1 | нет | размер семьи, пишется в cycle |
+
+**Результат (ok):** `{month, status, source, household_size, approved_by_user_id, approved_at, idempotent, plan_copied}`. `source` в ответе — origin строки cycle (`calculated`\|`copied_previous`\|`manually_created`), не входной approval `source`.
+
+**Детерминированная state machine (`monthly_plan_cycles.status`, unique `user/month`):**
+
+- non-terminal: `draft`, `waiting_oyijon`, `waiting_admin`; terminal: `approved_by_oyijon`, `approved_by_admin`, `auto_approved`.
+- Целевой статус по approval `source`: `oyijon → approved_by_oyijon`, `admin → approved_by_admin`, `auto → auto_approved`.
+- Разрешён переход `non-terminal → target`. `current == target` → идемпотентный replay (`idempotent:true`, без второй записи, `approved_at` не переписывается), допускается даже после начала месяца (безопасность retry/cron). `current ∈ terminal и != target` → `INVALID_STATUS_TRANSITION`, без мутации.
+
+**Границы месяца (Asia/Tashkent), проверка до записи:**
+
+- `oyijon`/`admin` (ручное) — только строго ДО начала планового месяца; иначе `MONTH_ALREADY_STARTED`.
+- `auto` (cron «1 число») — только в первый календарный день месяца; раньше → `MONTH_NOT_STARTED`, позже → `MONTH_ALREADY_STARTED`.
+
+**Валидность draft.** valid draft = ≥1 строка `monthly_budget_plans` за месяц с суммарным `planned_amount_uzs > 0`. Пустой/нулевой → `EMPTY_DRAFT`, без мутации.
+
+**auto (cron «1 число»):** valid draft → `auto_approved` (origin сохраняется); нет cycle-строки → copy последнего approved месяца (его `monthly_budget_plans`+`monthly_budget_items` копируются в плановый месяц, `plan_copied:true`, origin `copied_previous`); нет draft и нет прошлого approved → `NO_PLAN_SOURCE`. Уведомление админа при `NO_PLAN_SOURCE` — задача cron prompt, не backend.
+
+**Ручное без draft:** `oyijon`/`admin` при отсутствии cycle-строки → `NO_DRAFT`.
+
+**Изменение сумм.** Этот tool суммы плана не редактирует (это остаётся `set_monthly_budget`, Oyijon self-only, future month) и не расширяет update/delete transactions; единственная запись плановых сумм — copy последнего approved при `auto`. `household_size` пишется только для future month (ручные пути уже future по границе).
+
+**Identity rails (backend-уровень, дублируют guard):** `oyijon` с `approved_by_user_id != user_id` → `SELF_ONLY_VIOLATION`; `admin` без target или target == user_id → `ADMIN_TARGET_REQUIRED`; `auto` с `approved_by_user_id` → `INVALID_APPROVER`. Проверка `allowed_target_user_ids` — на стороне identity guard.
 
 ### Stage 5.4 — +3, planned 25
 
@@ -91,6 +123,7 @@
 | `get_balance_summary` | user_id | |
 | `set_monthly_budget` | user_id, month, category_code, planned_amount_uzs | runtime active; live E2E PASS |
 | `get_monthly_budget_status` | user_id, month | runtime active; live E2E PASS |
+| `approve_monthly_plan` | user_id, month, source | repo 22; deploy отдельно; не трогает transactions |
 | `save_quran_progress` | user_id | |
 | `get_quran_progress` | user_id | |
 | `save_health_note` | user_id, note | |
@@ -105,4 +138,5 @@
 ## Коды ошибок (единый список, ТЗ §15)
 
 - `BAD_CATEGORY`, `BAD_AMOUNT`, `INVALID_INPUT` (в т.ч. bad quantity/unit), `NOT_FOUND`, `NOT_CONFIGURED`, `UNKNOWN_TOOL`, `INTERNAL`.
+- `approve_monthly_plan` (детерминированные отказы, без мутации): `MONTH_ALREADY_STARTED`, `MONTH_NOT_STARTED`, `NO_DRAFT`, `EMPTY_DRAFT`, `NO_PLAN_SOURCE`, `INVALID_STATUS_TRANSITION`, `SELF_ONLY_VIOLATION`, `ADMIN_TARGET_REQUIRED`, `INVALID_APPROVER`.
 - Identity (middleware, до backend): `IDENTITY_*`.

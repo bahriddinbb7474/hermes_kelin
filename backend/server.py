@@ -173,6 +173,32 @@ async def t_get_monthly_budget_status(pool, a):
     return ok(**r)
 
 
+# Stage 5.3A — deterministic domain refusals from approve_monthly_plan.
+CYCLE_ERRORS = {
+    "MONTH_ALREADY_STARTED": ("Плановый месяц уже начался", "Режалаштирилган ой аллақачон бошланган"),
+    "MONTH_NOT_STARTED": ("Плановый месяц ещё не начался", "Режалаштирилган ой ҳали бошланмаган"),
+    "NO_DRAFT": ("Черновик плана не найден", "План лойиҳаси топилмади"),
+    "EMPTY_DRAFT": ("План пустой, подтверждать нечего", "План бўш, тасдиқлаш учун маълумот йўқ"),
+    "NO_PLAN_SOURCE": ("Нет ни черновика, ни прошлого плана", "На лойиҳа, на олдинги план мавжуд"),
+    "INVALID_STATUS_TRANSITION": ("Недопустимый переход статуса плана", "Режа ҳолатининг нотўғри ўзгариши"),
+    "SELF_ONLY_VIOLATION": ("Ойижон может подтверждать только свой план", "Ойижон фақат ўз режасини тасдиқлай олади"),
+    "ADMIN_TARGET_REQUIRED": ("Админ должен указать целевого пользователя", "Админ мақсадли фойдаланувчини кўрсатиши керак"),
+    "INVALID_APPROVER": ("Авто-утверждение не принимает approved_by_user_id", "Авто-тасдиқ approved_by_user_id ни қабул қилмайди"),
+}
+
+
+async def t_approve_monthly_plan(pool, a):
+    r = await db.approve_monthly_plan(
+        pool, a["user_id"], a["month"], a["source"],
+        a.get("approved_by_user_id"), a.get("household_size"),
+    )
+    code = r.get("_cycle_error")
+    if code:
+        ru, uz = CYCLE_ERRORS[code]
+        return err(code, ru, uz)
+    return ok(**r)
+
+
 async def t_save_quran_progress(pool, a):
     rid = await db.save_quran_progress(
         pool, a["user_id"], a.get("surah"), a.get("juz"), a.get("page"), a.get("note"))
@@ -254,6 +280,7 @@ DISPATCH = {
     "get_balance_summary": t_get_balance_summary,
     "set_monthly_budget": t_set_monthly_budget,
     "get_monthly_budget_status": t_get_monthly_budget_status,
+    "approve_monthly_plan": t_approve_monthly_plan,
     "save_quran_progress": t_save_quran_progress,
     "get_quran_progress": t_get_quran_progress,
     "save_health_note": t_save_health_note,
@@ -335,6 +362,9 @@ P = {
             "additionalProperties": False,
         },
     },
+    "source": {"type": "string", "enum": list(db.APPROVAL_SOURCES)},
+    "approved_by_user_id": {"type": "integer"},
+    "household_size": {"type": "integer", "minimum": 1},
     "surah": {"type": "string"},
     "juz": {"type": "integer"},
     "page": {"type": "integer"},
@@ -372,6 +402,7 @@ TOOLS = [
     ("get_balance_summary", "Доход/расход/остаток за период", schema(pick("user_id", "period"), ["user_id"])),
     ("set_monthly_budget", "Создать/обновить план категории и атомарно заменить optional product items. Category-only допустим только когда items omitted; explicit items=[] всегда INVALID_INPUT. Для подтверждённого товара используй exact fields item_name_normalized, item_name_display, planned_quantity, unit, planned_amount_uzs, reference_unit_price_uzs, price_basis, price_as_of", schema({**pick("user_id", "month", "category_code", "planned_amount_uzs", "note"), "items": P["budget_items"]}, ["user_id", "month", "category_code", "planned_amount_uzs"])),
     ("get_monthly_budget_status", "Точные plan/fact за месяц; include_items=true добавляет product plan, actual и reference prices; price_lookup_items требует price_basis=last|average и возвращает read-only selected reference-price facts", schema(pick("user_id", "month", "include_items", "price_lookup_items"), ["user_id", "month"])),
+    ("approve_monthly_plan", "Утвердить месячный план (draft→approved). source=oyijon|admin|auto. Работает только до начала планового месяца (Asia/Tashkent); auto — только в 1-й день. Не читает и не меняет transactions. Идемпотентен по user/month; недопустимый переход статуса отклоняется без мутации. source=auto копирует последний approved plan, если нет draft", schema(pick("user_id", "month", "source", "approved_by_user_id", "household_size"), ["user_id", "month", "source"])),
     ("save_quran_progress", "Сохранить прогресс Корана", schema(pick("user_id", "surah", "juz", "page", "note"), ["user_id"])),
     ("get_quran_progress", "Последний прогресс Корана", schema(pick("user_id"), ["user_id"])),
     ("save_health_note", "Заметка о самочувствии (без диагноза)", schema(pick("user_id", "note", "severity", "source_text"), ["user_id", "note"])),
