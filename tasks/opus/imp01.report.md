@@ -87,4 +87,4 @@ python tests/run_tests.py →
   amount-adjustment в approve.
 
 ## Коммит
-`feat: approve_monthly_plan tool and cycle statuses (5.3A)` — hash: 9f3504b
+`feat: approve_monthly_plan tool and cycle statuses (5.3A)` — hash: aa769d7
