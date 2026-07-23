@@ -1209,7 +1209,9 @@ async def approve_monthly_plan(
 CYCLE_ACTIONS = ("open", "escalate")
 
 
-def _open_result(month_date: date, row, *, idempotent: bool, created: bool) -> dict:
+def _open_result(
+    month_date: date, row, *, idempotent: bool, created: bool, draft_generated: bool = False
+) -> dict:
     return {
         "month": month_date.isoformat(),
         "status": row["status"],
@@ -1217,17 +1219,77 @@ def _open_result(month_date: date, row, *, idempotent: bool, created: bool) -> d
         "household_size": row["household_size"],
         "idempotent": idempotent,
         "created": created,
+        "draft_generated": draft_generated,
     }
+
+
+async def _generate_month_draft(conn, user_id, month_date: date) -> int:
+    """Deterministic next-month budget draft when Oyijon has none yet (ТЗ 5.3A п.1).
+
+    Sources, no invented sums:
+    - last approved month's category plans (prior explicit decision); plus
+    - categories seen in the last 3 calendar months of actual expenses, at their
+      rounded 3-month average (observed spending only).
+    Recurring obligations are a Stage 6 feature (not implemented) → omitted.
+    Persists monthly_budget_plans rows (never items/transactions). Returns count.
+    """
+    month_start_t = datetime(month_date.year, month_date.month, 1, tzinfo=TASHKENT)
+    span_start = _shift_month(month_start_t, -3).astimezone(timezone.utc)
+    span_end = month_start_t.astimezone(timezone.utc)
+
+    plan_amounts: dict[str, Decimal] = {}
+    prev = await _last_approved_month(conn, user_id, month_date)
+    if prev is not None:
+        for r in await conn.fetch(
+            """SELECT category_code, planned_amount_uzs FROM monthly_budget_plans
+               WHERE user_id=$1 AND month=$2""",
+            user_id, prev,
+        ):
+            plan_amounts[r["category_code"]] = Decimal(r["planned_amount_uzs"])
+
+    avg_amounts: dict[str, Decimal] = {}
+    for r in await conn.fetch(
+        """SELECT category_code, SUM(amount)::numeric AS s FROM transactions
+           WHERE user_id=$1 AND type='expense' AND currency='UZS'
+             AND category_code IS NOT NULL
+             AND occurred_at >= $2 AND occurred_at < $3
+           GROUP BY category_code""",
+        user_id, span_start, span_end,
+    ):
+        avg = (Decimal(r["s"]) / 3).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        if avg > 0:
+            avg_amounts[r["category_code"]] = avg
+
+    merged = {
+        cat: plan_amounts.get(cat, avg_amounts.get(cat))
+        for cat in set(plan_amounts) | set(avg_amounts)
+    }
+    merged = {cat: amt for cat, amt in merged.items() if amt is not None and amt > 0}
+    if not merged:
+        return 0
+
+    for cat, amt in sorted(merged.items()):
+        await conn.execute(
+            """INSERT INTO monthly_budget_plans
+               (user_id, month, category_code, planned_amount_uzs, note)
+               VALUES ($1,$2,$3,$4,'auto draft 5.3A')
+               ON CONFLICT (user_id, month, category_code) DO NOTHING""",
+            user_id, month_date, cat, amt,
+        )
+    return len(merged)
 
 
 async def open_monthly_plan_cycle(
     pool, user_id, month, action, household_size=None, now=None,
 ):
-    """Narrow cron/user cycle-status mutation (variant A, 2026-07-24).
+    """Narrow cron/user cycle-status mutation (variant A, 2026-07-24; extended
+    2026-07-25 per customer decision).
 
-    action=open     : create waiting_oyijon draft row (future month, valid draft).
+    action=open     : create waiting_oyijon draft row for a future month. If Oyijon
+                      has no budget content yet, backend deterministically computes
+                      and persists the draft (see _generate_month_draft).
     action=escalate : waiting_oyijon → waiting_admin (future month).
-    Never writes monthly_budget_plans / monthly_budget_items / transactions.
+    Never writes monthly_budget_items or transactions.
     """
     _one_of("action", action, CYCLE_ACTIONS)
     month_date = _budget_month(month)
@@ -1258,8 +1320,19 @@ async def open_monthly_plan_cycle(
                     return _open_result(month_date, row, idempotent=True, created=False)
                 if now_t >= month_start_t:
                     return _cycle_err("MONTH_ALREADY_STARTED")
+                draft_generated = False
                 if not await _plan_is_valid(conn, user_id, month_date):
-                    return _cycle_err("EMPTY_DRAFT")
+                    existing = await conn.fetchval(
+                        """SELECT COUNT(*) FROM monthly_budget_plans
+                           WHERE user_id=$1 AND month=$2""",
+                        user_id, month_date,
+                    )
+                    if existing > 0:
+                        # Degenerate zero-sum plan already present; do not overwrite.
+                        return _cycle_err("EMPTY_DRAFT")
+                    if await _generate_month_draft(conn, user_id, month_date) == 0:
+                        return _cycle_err("NO_PLAN_SOURCE")
+                    draft_generated = True
                 new = await conn.fetchrow(
                     """INSERT INTO monthly_plan_cycles
                        (user_id, month, status, household_size, source)
@@ -1267,7 +1340,10 @@ async def open_monthly_plan_cycle(
                        RETURNING status, source, household_size""",
                     user_id, month_date, household_size,
                 )
-                return _open_result(month_date, new, idempotent=False, created=True)
+                return _open_result(
+                    month_date, new, idempotent=False, created=True,
+                    draft_generated=draft_generated,
+                )
 
             # action == "escalate"
             if row is None:

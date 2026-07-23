@@ -158,14 +158,69 @@ async def test_open_creates_waiting_oyijon(pool):
 
 @requires_db
 @pytest.mark.asyncio
-async def test_open_requires_valid_draft(pool):
+async def test_open_no_source_data(pool):
+    # No budget rows, no prior approved plan, no expenses → nothing to compute.
     uid = await _seed_user(pool)
-    empty = await db.open_monthly_plan_cycle(pool, uid, MONTH, "open", now=BEFORE)
-    assert empty["_cycle_error"] == "EMPTY_DRAFT"
-    await _plan(pool, uid, planned=0)
-    zero = await db.open_monthly_plan_cycle(pool, uid, MONTH, "open", now=BEFORE)
-    assert zero["_cycle_error"] == "EMPTY_DRAFT"
+    r = await db.open_monthly_plan_cycle(pool, uid, MONTH, "open", now=BEFORE)
+    assert r["_cycle_error"] == "NO_PLAN_SOURCE"
     assert await _count(pool, uid) == 0
+
+
+@requires_db
+@pytest.mark.asyncio
+async def test_open_existing_zero_sum_plan_is_empty(pool):
+    # Degenerate zero-sum plan already present → do not overwrite, refuse.
+    uid = await _seed_user(pool)
+    await _plan(pool, uid, planned=0)
+    r = await db.open_monthly_plan_cycle(pool, uid, MONTH, "open", now=BEFORE)
+    assert r["_cycle_error"] == "EMPTY_DRAFT"
+    assert await _count(pool, uid) == 0
+
+
+@requires_db
+@pytest.mark.asyncio
+async def test_open_generates_draft_from_last_approved(pool):
+    uid = await _seed_user(pool)
+    # last approved month (July) with category plans, no August content.
+    await _plan(pool, uid, month=date(2026, 7, 1), category="food", planned=400000)
+    await _plan(pool, uid, month=date(2026, 7, 1), category="transport", planned=120000)
+    await _cycle(pool, uid, month=date(2026, 7, 1), status="approved_by_oyijon")
+    r = await db.open_monthly_plan_cycle(pool, uid, MONTH, "open", now=BEFORE)
+    assert r.get("_cycle_error") is None, r
+    assert r["status"] == "waiting_oyijon"
+    assert r["created"] is True and r["draft_generated"] is True
+    gen = await pool.fetch(
+        "SELECT category_code, planned_amount_uzs FROM monthly_budget_plans "
+        "WHERE user_id=$1 AND month=$2 ORDER BY category_code",
+        uid, MONTH_D,
+    )
+    assert [(g["category_code"], int(g["planned_amount_uzs"])) for g in gen] == [
+        ("food", 400000),
+        ("transport", 120000),
+    ]
+
+
+@requires_db
+@pytest.mark.asyncio
+async def test_open_generates_draft_from_three_month_average(pool):
+    uid = await _seed_user(pool)
+    # No prior approved plan; expenses across the 3 months before August.
+    for m, amount in [(5, 300000), (6, 300000), (7, 300000)]:
+        await pool.execute(
+            "INSERT INTO transactions (user_id, type, amount, currency, category_code, "
+            "item_name, source_type, occurred_at) VALUES "
+            "($1,'expense',$2,'UZS','food','нон','text',$3)",
+            uid, amount, datetime(2026, m, 10, 12, tzinfo=TASHKENT),
+        )
+    r = await db.open_monthly_plan_cycle(pool, uid, MONTH, "open", now=BEFORE)
+    assert r.get("_cycle_error") is None, r
+    assert r["draft_generated"] is True
+    amt = await pool.fetchval(
+        "SELECT planned_amount_uzs FROM monthly_budget_plans "
+        "WHERE user_id=$1 AND month=$2 AND category_code='food'",
+        uid, MONTH_D,
+    )
+    assert int(amt) == 300000  # (300k*3)/3
 
 
 @requires_db

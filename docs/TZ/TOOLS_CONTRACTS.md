@@ -96,15 +96,15 @@
 
 ### Stage 5.3A — `open_monthly_plan_cycle` (repo 23, deployed 21; вариант A 2026-07-24)
 
-**Назначение.** Единственная узкая мутация статуса цикла (создаёт draft-строку и делает escalate), которой не было у `approve_monthly_plan`. Пишет **только** строку `monthly_plan_cycles`; `monthly_budget_plans`/`monthly_budget_items`/`transactions` не трогает. Identity (Oyijon self-only, admin narrow cross-target, cron trusted job) — на стороне identity guard.
+**Назначение.** Единственная узкая мутация статуса цикла (создаёт draft-строку и делает escalate), которой не было у `approve_monthly_plan`. `monthly_budget_items`/`transactions` не трогает; при генерации draft (см. `open`) пишет `monthly_budget_plans`. Identity (Oyijon self-only, admin narrow cross-target, cron trusted job) — на стороне identity guard.
 
 **Параметры:** `user_id` (int, req), `month` (`YYYY-MM-01`, req), `action` (enum `open`|`escalate`, req), `household_size` (int ≥1, optional).
 
-**Результат (ok):** `{month, status, source, household_size, idempotent, created}`.
+**Результат (ok):** `{month, status, source, household_size, idempotent, created, draft_generated}`.
 
-- `action=open`: если строки цикла нет — создаёт `waiting_oyijon` (`source=calculated`, `created:true`) для future month (Asia/Tashkent, строго до начала месяца), требует valid budget draft (та же валидация, что `EMPTY_DRAFT` в approve: ≥1 строка `monthly_budget_plans` за месяц, `SUM>0`). Строка любого статуса уже есть → идемпотентный ответ (`idempotent:true`, `created:false`), без мутации и без дублей.
+- `action=open`: строки цикла нет — создаёт `waiting_oyijon` (`source=calculated`, `created:true`) для future month (Asia/Tashkent, строго до начала месяца). Уже есть valid budget-draft (≥1 строка `monthly_budget_plans`, `SUM>0`) → просто открывает цикл (`draft_generated:false`). Content нет → **backend детерминированно вычисляет и персистит draft** (решение 2026-07-25): последний approved plan ∪ категории расходов за 3 последних месяца по округлённому среднему; сумм не выдумывает; обязательные платежи (Stage 6) пока не включаются; пишет `monthly_budget_plans`, `draft_generated:true`. Строка цикла любого статуса уже есть → идемпотентно (`idempotent:true`, `created:false`), без мутации и дублей.
 - `action=escalate`: `waiting_oyijon`/`draft` → `waiting_admin` (future month). Уже `waiting_admin` → идемпотентный no-op. Terminal-статус → `INVALID_STATUS_TRANSITION`. Нет строки → `NO_DRAFT`. Всё — без мутации при отказе.
-- Коды ошибок: `MONTH_ALREADY_STARTED`, `EMPTY_DRAFT`, `INVALID_STATUS_TRANSITION`, `NO_DRAFT` (+ `INVALID_INPUT` на bad `action`/`household_size`).
+- Коды ошибок: `MONTH_ALREADY_STARTED`, `NO_PLAN_SOURCE` (open: нет источника для draft), `EMPTY_DRAFT` (open: уже есть zero-sum plan, не перезаписывается), `INVALID_STATUS_TRANSITION`, `NO_DRAFT` (+ `INVALID_INPUT` на bad `action`/`household_size`).
 
 **Связка (вариант A end-to-end):** `open` → «ха»-approve Oyijon (`approved_by_oyijon`); `open` → `escalate` → admin approve (`approved_by_admin`); `open` → job 1 `auto` (`auto_approved`, approve существующего draft, без copy).
 
