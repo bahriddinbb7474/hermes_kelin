@@ -64,4 +64,4 @@ Deploy (это imp02); Hermes core/plugins/SOUL, transactions, контракт
 `approve_monthly_plan` — не менялись; production cron jobs/mapping не создавались.
 
 ## Коммит
-`feat: open_monthly_plan_cycle tool for approval cycle (5.3A)` — hash: a89f73f
+`feat: open_monthly_plan_cycle tool for approval cycle (5.3A)` — hash: b26b4bb
