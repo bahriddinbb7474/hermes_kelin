@@ -384,7 +384,9 @@ def validate_cron_mapping_schema(value) -> bool:
     if value.get("version") != CRON_MAPPING_VERSION:
         return False
     jobs = value.get("jobs")
-    if not isinstance(jobs, dict) or not jobs:
+    # An operator may deploy the guard before any production cron job is
+    # approved, and cleanup intentionally leaves this valid empty baseline.
+    if not isinstance(jobs, dict):
         return False
     for job_id, entry in jobs.items():
         if not isinstance(job_id, str) or not re.fullmatch(r"[0-9a-f]{12}", job_id):

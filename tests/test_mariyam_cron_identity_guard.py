@@ -94,6 +94,21 @@ def _write_mapping(path: Path, job: dict, allowed_tools=None) -> None:
     _chmod(path, 0o600)
 
 
+def test_empty_cron_mapping_is_valid_operator_baseline(tmp_path, monkeypatch):
+    secrets = tmp_path / "secrets"
+    secrets.mkdir()
+    _chmod(secrets, 0o700)
+    mapping = secrets / "cron-identity-map.json"
+    mapping.write_text('{"version":1,"jobs":{}}\n', encoding="utf-8")
+    _chmod(mapping, 0o600)
+    monkeypatch.setenv("MARIYAM_CRON_IDENTITY_MAP_FILE", str(mapping))
+
+    value, error = guard.load_cron_identity_map()
+
+    assert error is None
+    assert value == {"version": 1, "jobs": {}}
+
+
 def _write_jobs(home: Path, job: dict) -> None:
     cron = home / "cron"
     cron.mkdir(mode=0o700)
