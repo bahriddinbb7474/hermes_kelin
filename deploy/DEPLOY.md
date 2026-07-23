@@ -242,7 +242,7 @@ Plugin: `deploy/hermes_plugins/mariyam_identity_guard/`.
 - `display.tool_progress: "off"` настроен.
 - MCP-prefix `mcp__mariyam_backend__<tool>` канонизируется до bare policy name; неизвестные/неразрешённые вызовы блокируются fail-closed.
 - Stage 5 controlled Telegram E2E на «Тест Ойижон» — **PASS**.
-- Baseline перед v3.19 controlled deploy: tools/dispatch/MCP discovery **21/21/21**, identity plugin **1.0.4**, migration 003 active; Stage 5.1 и Stage 5.2 — **CLOSED / LIVE PASS**, Stage 5.3 — **OFFLINE PASS / LIVE PENDING**.
+- Baseline перед v3.19 controlled deploy: tools/dispatch/MCP discovery **21/21/21**, identity plugin **1.0.4**, migration 003 active; Stage 5.1 и Stage 5.2 — **CLOSED / LIVE PASS**, Stage 5.3 — **CLOSED / LIVE PASS** ([evidence](../docs/EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)).
 
 Значения mapping, реальные Telegram ID и секреты в git/отчёты не добавлять. Реальную Ойижон до handover не подключать.
 
@@ -295,7 +295,7 @@ Stage 5.2 показал второй root cause: Hermes добавляет в s
 Stage 5.2 = **CLOSED / LIVE PASS**. Message 1 и Message 2 подтверждены live;
 исправление завершения отчётов закреплено offline без нового платного теста.
 
-Repo Stage 5.3 = **OFFLINE PASS / LIVE PENDING**: migration 003 и расширение двух
+Repo Stage 5.3 = **CLOSED / LIVE PASS** ([evidence](../docs/EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)): migration 003 и расширение двух
 существующих budget tools реализованы, inventory остаётся **21/21/21**. v3.19
 разделяет omitted `items` и explicit empty, добавляет отдельный
 `mariyam_stage53_guard` и profile-only `max_turns: 6`; identity plugin 1.0.4 и

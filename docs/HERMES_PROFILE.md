@@ -10,7 +10,7 @@
 
 > **Stage 5.1 status (2026-07-15): CLOSED / LIVE PASS.** VPS/profile = tools **21**, plugin **1.0.4**, migration 002 active, SKILL SHA `b12311829a35e8faa9f97872b52a9edbb2b68f499b8c757b7204686e447147e4`, skill-protect **4/4**, `tool_progress` off. Controlled E2E и cleanup PASS.
 
-> **ТЗ v3.19:** Stage 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **OFFLINE PASS / LIVE PENDING**. Единственный repo/VPS canonical prompt — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, LF SHA `0ec1eeed95ec90030f1e7e11dd88a1428076cdd44a9a8ffa93c57c4b5726012f`; active Mariyam `SKILL.md` отсутствует. Repo/VPS = 21 tools + explicit-empty DB rejection + отдельный `mariyam_stage53_guard` 1.0.0; identity plugin остаётся 1.0.4, Hermes core не менялся. Guard state хранится вне model-visible profile, mode 0600, TTL 30 минут; profile limit = 6 iterations. Controlled deploy PASS; Telegram E2E pending. Stage 5.3A–6 остаются **PLANNED / NOT IMPLEMENTED**; реальная Ойижон не подключалась.
+> **ТЗ v3.19:** Stage 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **CLOSED / LIVE PASS** ([evidence](EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)). Единственный repo/VPS canonical prompt — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, LF SHA `0ec1eeed95ec90030f1e7e11dd88a1428076cdd44a9a8ffa93c57c4b5726012f`; active Mariyam `SKILL.md` отсутствует. Repo/VPS = 21 tools + explicit-empty DB rejection + отдельный `mariyam_stage53_guard` 1.0.0; identity plugin остаётся 1.0.4, Hermes core не менялся. Guard state хранится вне model-visible profile, mode 0600, TTL 30 минут; profile limit = 6 iterations. Controlled deploy PASS; [Telegram E2E live acceptance evidence](EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md). Stage 5.3A–6 остаются **PLANNED / NOT IMPLEMENTED**; реальная Ойижон не подключалась.
 
 **Модель профиля:** `gpt-5.6-luna` через api.n1n.ai (`provider: custom`, `base_url: https://api.n1n.ai/v1`, ключ `N1N_API_KEY` в профильном `.env`, 600). Резерв: `deepseek/deepseek-v4-flash` (DECISIONS.md, 2026-07-12).
 
@@ -61,7 +61,7 @@
   подтверждения; подробный report использует три product-колонки.
 - Hermes v0.18.2 хранит `execute_code` в toolset `code_execution`, а terminal shell
   в `terminal`; поэтому для Mariyam отключены оба. Hermes core не менялся. Migration
-  003 active на VPS; controlled fix deploy PASS, повторный Telegram E2E pending.
+  003 active на VPS; controlled fix deploy PASS, [Telegram E2E live acceptance evidence](EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md).
 - Stage 5.3A: до создания cron cycle проверить Hermes v0.18.2 cron identity; trusted job id → private mapping 0600 → internal user id; unknown job fail closed.
 - Stage 5.4: utility credentials не помещать в profile/model-visible env; только VPS connector secrets. Hermes browser с открытыми credentials запрещён.
 - Vision smoke перед handover сначала через native image input текущего model path; отдельная vision-модель только после фактического FAIL.

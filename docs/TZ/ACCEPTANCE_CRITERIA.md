@@ -91,7 +91,7 @@ AC (измеримые):
 
 Stage 5.2 live evidence зафиксировано для SOUL SHA `3135a12e07529222b9db350ccca07f52d79b76b0ca2b8597bec50a4a0f9a176e`; Stage 5.3 repo SOUL SHA = `5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`. Message 1 и Message 2 подтверждены live; новый платный тест не выполнялся. Wrapper-маркеры stored prompt не являются AC. Telegram profile names не являются identity: identity AC — только `exact Telegram session → private mapping → requested=0 → effective=test-user`. Evidence: `../EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`. Реальная Ойижон не подключена.
 
-### 5.3. Семейный и продуктовый план — OFFLINE PASS / LIVE PENDING
+### 5.3. Семейный и продуктовый план — CLOSED / LIVE PASS
 
 1. Семь вопросов/шагов задаются последовательно; save только после подтверждения draft.
 2. Product report содержит summary категории, затем ровно `Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма`; старый пятиколоночный формат и отдельная product-колонка остатка отсутствуют; минимум planned quantity или planned amount.

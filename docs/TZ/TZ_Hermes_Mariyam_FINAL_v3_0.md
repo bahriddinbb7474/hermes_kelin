@@ -2,7 +2,7 @@
 # Hermes Agent «Мариям» — ИИ келинчак для Ойижон
 
 **Статус:** ФИНАЛЬНЫЙ, единый источник истины (single source of truth)
-**Версия:** 3.19 — Stage 5.3 остаётся **OFFLINE PASS / LIVE PENDING** после блокирующего live-дефекта. Explicit `items=[]` запрещён; category-only plan допустим только при omitted `items`. Отдельный structured product-draft guard связывает read-only price lookup с product save, а duplicate-success breaker блокирует повтор идентичного успешного mutating call; profile cap `agent.max_turns` = 6. Identity plugin остаётся 1.0.4, отдельный guard plugin = 1.0.0, Hermes core и migration 003 не менялись. Новых MCP tools нет: repo/VPS inventory остаётся 21; migration 003 active на VPS, controlled guard deploy и повторный Telegram E2E pending. Stage 5.1 и Stage 5.2 остаются CLOSED / LIVE PASS; Stage 5.3A–6 — PLANNED / NOT IMPLEMENTED. Реальная Ойижон не подключена. Имя файла не меняется, документ остаётся единственным источником истины.
+**Версия:** 3.19 — Stage 5.3 = **CLOSED / LIVE PASS** ([evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)). Explicit `items=[]` запрещён; category-only plan допустим только при omitted `items`. Отдельный structured product-draft guard связывает read-only price lookup с product save, а duplicate-success breaker блокирует повтор идентичного успешного mutating call; profile cap `agent.max_turns` = 6. Identity plugin остаётся 1.0.4, отдельный guard plugin = 1.0.0, Hermes core и migration 003 не менялись. Новых MCP tools нет: repo/VPS inventory остаётся 21; migration 003 active на VPS, controlled guard deploy и [Telegram E2E live acceptance evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md). Stage 5.1 и Stage 5.2 остаются CLOSED / LIVE PASS; Stage 5.3A–6 — PLANNED / NOT IMPLEMENTED. Реальная Ойижон не подключена. Имя файла не меняется, документ остаётся единственным источником истины.
 **Проект:** персональный Telegram ИИ-агент для пожилой женщины из Узбекистана
 **Имя агента:** Мариям · **Образ:** ИИ келинчак
 **Основной пользователь:** Ойижон · **Администратор:** Бахриддин ака
@@ -277,7 +277,7 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
 7. Permanent Stage 5.3, SOUL/effective-prompt и regression tests добавлены.
    Disposable PostgreSQL 16 double-apply migration PASS; `pytest -q` =
    **189 passed**; ruff, compileall и `git diff --check` — PASS.
-8. **Статус Stage 5.3: OFFLINE PASS / LIVE PENDING.** Repo содержит migration 003,
+8. **Статус Stage 5.3: CLOSED / LIVE PASS.** Repo содержит migration 003,
    но VPS остаётся на migration 002 до отдельного deploy. VPS/Telegram/provider API
    не менялись; реальная Ойижон не подключалась. Stage 5.3A–6 остаются
    **PLANNED / NOT IMPLEMENTED**.
@@ -356,8 +356,8 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
    MCP. Hermes core и migration 003 не изменялись.
 7. Новых MCP tools нет; inventory/dispatch/discovery остаётся **21/21/21**.
    Migration 003 уже active на VPS; migrations 004/005 отсутствуют.
-8. **Stage 5.3 остаётся OFFLINE PASS / LIVE PENDING.** Hard guards и controlled VPS
-   deploy прошли offline verification; новый live Telegram retest ещё не выполнен.
+8. **Stage 5.3 = CLOSED / LIVE PASS.** Hard guards и controlled VPS
+   deploy прошли offline verification; [Telegram E2E live acceptance evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md).
    Реальная Ойижон не подключена. Stage 5.3A–6 остаются PLANNED / NOT IMPLEMENTED.
 
 Исполнитель реализует проект **строго по разделам 5–21**, сдаёт этапами (раздел 15) и на каждом этапе выполняет acceptance criteria. Что делать запрещено — раздел 20.
@@ -631,7 +631,7 @@ Backend только проверяет, что `category_code` есть в эт
 
 **Stage 5.2 — одна группа:** сначала таблица summary `Харажат гуруҳи | Режа | Сарфлангани | Қолгани`, затем фактические товары `Маҳсулот | Миқдор | Сарфлангани`. Строка `Жами` допустима. После таблиц ответ завершается без финальной фразы общего отчёта и без вопросов. Missing quantity = `—` или не показывается; количество не угадывается. Product plan на Stage 5.2 не показывается. User-facing units: `kg→кг`, `g→г`, `l→л`, `ml→мл`, `pcs→та`, `pack→қадоқ`.
 
-**Stage 5.3 — OFFLINE PASS / LIVE PENDING:** product table после category summary имеет три колонки: `Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма`. Actual берётся только из transactions. Последняя цена используется по умолчанию для следующего плана; Ойижон может выбрать weighted average или manual price. Разные units не смешиваются; отдельная product-колонка остатка не показывается.
+**Stage 5.3 — CLOSED / LIVE PASS:** product table после category summary имеет три колонки: `Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма`. Actual берётся только из transactions. Последняя цена используется по умолчанию для следующего плана; Ойижон может выбрать weighted average или manual price. Разные units не смешиваются; отдельная product-колонка остатка не показывается.
 
 ---
 
@@ -1100,7 +1100,7 @@ out: {
 }
 ```
 
-### 15.5a. set_monthly_budget (repo/VPS active; Telegram E2E pending)
+### 15.5a. set_monthly_budget (repo/VPS active; [Telegram E2E live acceptance evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md))
 
 ```jsonc
 in:  {
@@ -1114,7 +1114,7 @@ out: { "ok": true, "plan_id": 7 }
 // upsert by (user_id, month, category_code)
 ```
 
-### 15.5b. get_monthly_budget_status (repo/VPS active; Telegram E2E pending)
+### 15.5b. get_monthly_budget_status (repo/VPS active; [Telegram E2E live acceptance evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md))
 
 ```jsonc
 in:  { "user_id": 1, "month": "2026-07-01" }
@@ -1447,7 +1447,7 @@ Quantity/unit + item normalization; compare previous; trend series; monthly budg
 
 ### Этап 5.3 — Семейный и продуктовый план (v3.19)
 
-**Статус: OFFLINE PASS / LIVE PENDING.** Migration 003 active на VPS; v3.19 hard guards прошли offline gates, но controlled deploy и повторный Telegram E2E ещё не выполнены. Tool count остаётся **21**; identity plugin остаётся **1.0.4**, отдельный Stage 5.3 guard plugin = **1.0.0**.
+**Статус: CLOSED / LIVE PASS** ([evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)). Migration 003 active на VPS; v3.19 hard guards прошли offline gates, controlled deploy и Telegram E2E. Tool count остаётся **21**; identity plugin остаётся **1.0.4**, отдельный Stage 5.3 guard plugin = **1.0.0**.
 
 **Диалог:** Hermes спрашивает последовательно, по одному вопросу в сообщении: (1) месяц; (2) household size; (3) группа расходов; (4) продукты дома; (5) нужные продукты; (6) quantity — по одному продукту за сообщение; (7) бюджет, затем отдельным сообщением last/average/manual price; (8) полный draft. `set_monthly_budget` вызывается только после явного подтверждения; после исправления draft показывается и подтверждается снова.
 

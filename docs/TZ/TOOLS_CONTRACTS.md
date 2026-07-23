@@ -1,7 +1,7 @@
 # Tools Contracts
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (полные примеры вход/выход — §15).
-Реализация: `backend/server.py` + `backend/db.py`. **Repo/VPS inventory: 21 tools; repo dispatch/MCP discovery = 21/21.** Stage 5.3 расширяет существующие `set_monthly_budget` и `get_monthly_budget_status`; новых tools нет. Migration 003 и v3.19 guard deploy active/PASS на VPS; Telegram live acceptance pending.
+Реализация: `backend/server.py` + `backend/db.py`. **Repo/VPS inventory: 21 tools; repo dispatch/MCP discovery = 21/21.** Stage 5.3 расширяет существующие `set_monthly_budget` и `get_monthly_budget_status`; новых tools нет. Migration 003 и v3.19 guard deploy active/PASS на VPS; [Telegram live acceptance evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md).
 
 **v3.19 progression:** Stage 5.3 repo/VPS = 21, Stage 5.3A = planned 22, Stage 5.4 = planned 25, Stage 6 = planned 27. Всё сверх текущих 21 — **PLANNED / NOT IMPLEMENTED** и отсутствует в runtime discovery.
 

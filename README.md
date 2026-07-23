@@ -56,7 +56,7 @@ hermes-mariyam/
 
 ## Текущее состояние (2026-07-18)
 
-ТЗ: **v3.19**. Stage 5.1 и Stage 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **OFFLINE PASS / LIVE PENDING**. `items` omitted остаётся category-only совместимостью; explicit empty/null/non-array `items` детерминированно отклоняется до DB mutation. Новый отдельный profile plugin `mariyam_stage53_guard` связывает structured price lookup с product save и блокирует повтор идентичного mutating call после success или неизвестного outcome; identity plugin остаётся **1.0.4**, Hermes core не менялся. Новых tools нет, inventory/dispatch/discovery = **21/21/21**. Profile также отключает `skills`, `terminal`, `code_execution` и ограничивает turn шестью model iterations. Repo canonical SOUL LF SHA `0ec1eeed95ec90030f1e7e11dd88a1428076cdd44a9a8ffa93c57c4b5726012f`. Migration 003 active на VPS; controlled guard deploy выполняется отдельно до Telegram E2E. Stage 5.3A–6 остаются **PLANNED / NOT IMPLEMENTED**; реальная Ойижон не подключена.
+ТЗ: **v3.19**. Stage 5.1 и Stage 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **CLOSED / LIVE PASS** ([evidence](docs/EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)). `items` omitted остаётся category-only совместимостью; explicit empty/null/non-array `items` детерминированно отклоняется до DB mutation. Новый отдельный profile plugin `mariyam_stage53_guard` связывает structured price lookup с product save и блокирует повтор идентичного mutating call после success или неизвестного outcome; identity plugin остаётся **1.0.4**, Hermes core не менялся. Новых tools нет, inventory/dispatch/discovery = **21/21/21**. Profile также отключает `skills`, `terminal`, `code_execution` и ограничивает turn шестью model iterations. Repo canonical SOUL LF SHA `0ec1eeed95ec90030f1e7e11dd88a1428076cdd44a9a8ffa93c57c4b5726012f`. Migration 003 active на VPS; controlled guard deploy PASS; [Telegram E2E live acceptance evidence](docs/EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md). Stage 5.3A–6 остаются **PLANNED / NOT IMPLEMENTED**; реальная Ойижон не подключена.
 
 Этап 1 (VPS + Hermes + Telegram) — **закрыт по решению заказчика (2026-07-12, ТЗ v3.5)**:
 - ✅ PostgreSQL healthy (порт 127.0.0.1:5432, init-миграции применены);
@@ -93,7 +93,7 @@ hermes-mariyam/
 - identity AC: exact Telegram session → private mapping → `requested=0` → effective test-user; wrapper-маркеры stored prompt и Telegram profile names не являются AC;
 - evidence: `docs/EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`.
 
-**Stage 5.3 — OFFLINE PASS / LIVE PENDING (v3.19):**
+**Stage 5.3 — CLOSED / LIVE PASS (v3.19):**
 - product plan, last/weighted average/manual reference prices и immutable snapshot реализованы и active repo/VPS в migration 003 и двух существующих tools;
 - `get_monthly_budget_status(price_lookup_items=[...])` возвращает exact last/weighted-average facts до draft и не изменяет БД; неизвестная цена = `null`, разные units не смешиваются;
 - category-only разрешён только при omitted `items`; explicit `items=[]` возвращает `INVALID_INPUT` с нулевой DB mutation;
@@ -102,7 +102,7 @@ hermes-mariyam/
 - Mariyam profile отключает `terminal` и `code_execution`; `execute_code` отсутствует, Hermes core не менялся;
 - detailed product report: `Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма`; отдельной product-колонки остатка нет;
 - full offline gates и controlled VPS deploy PASS; migration 003, canonical SOUL и
-  guard chain активны. Повторный Telegram E2E ещё не выполнен.
+  guard chain активны. [Stage 5.3 live acceptance evidence](docs/EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md).
 
 **Planned after Stage 5.3 — NOT IMPLEMENTED:**
 - Stage 5.3A: approval cycle 25/27/28/1 и `approve_monthly_plan`; schema cycles подготовлена в migration 003, planned count 22;
