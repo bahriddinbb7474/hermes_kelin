@@ -319,8 +319,8 @@ Stage 5.1 **не переоткрывается и не меняется**: CLOS
 8. Первый повторный Telegram E2E дошёл до Message 3 и получил **LIVE FAIL**:
    модель сначала отправила invalid aliases, затем сохранила category-only plan с
    `items: []`. Тест немедленно остановлен; fixture/plan/session очищены, admin не
-   изменён, Gateway/PostgreSQL/Time-Agent healthy. Follow-up fix = **OFFLINE PASS /
-   LIVE PENDING**; новый controlled deploy и E2E обязательны до LIVE PASS.
+   изменён, Gateway/PostgreSQL/Time-Agent healthy. Follow-up fix = **CLOSED / LIVE
+   PASS**; повторный Telegram E2E пройден, см. `docs/EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md`.
    Реальная Ойижон не подключена; Stage 5.3A–6 остаются PLANNED / NOT IMPLEMENTED.
 
 ### 0.19. Изменения v3.18 → v3.19 (2026-07-18) — Stage 5.3 hard guards после live FAIL
