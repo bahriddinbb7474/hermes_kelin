@@ -85,6 +85,23 @@ mapping не менялся; Telegram-сообщения не отправлял
 `USER_SCOPED_TOOLS` guard (+bump версии, +regression-тесты, redeploy guard).
 После этого: записать mapping, resume jobs, controlled E2E, cleanup, evidence.
 
-## Коммит
-Backend 24 tools задеплоен (`4c69a47`). Prompts — `8166ae4`. Feature-коммит
-`feat: Stage 5.3A production approval cycle live` — после снятия блокера и E2E.
+## БЛОКЕР СНЯТ (решение заказчика 2026-07-25, вариант 1 с условиями)
+- Guard **1.1.0 → 1.2.0**, минимальный diff: `open_/get_monthly_plan_cycle` в
+  `USER_SCOPED_TOOLS`; resolver/Telegram/cron логику не трогал. Commit `6f166f5`.
+- Regression до redeploy: ruff clean; guard suites 89 passed (Telegram 1.0.4 без
+  правок + cron); полный suite 325 passed; run_tests 4 маркера.
+- Guard redeploy на VPS (backup сделан), Gateway restart, guard 1.2.0 active,
+  классифицирует open/get/approve = user-scoped → **unbound-окно закрыто**.
+- Private mapping записан (0600, atomic, umask 077): 5 jobs, fingerprints/prompt
+  hashes функциями guard; `load_cron_identity_map` грузит 5 jobs.
+- **Offline security gates PASS**: integrity, forged-block, allowlist-block,
+  tamper-detection. Evidence: `docs/EVIDENCE_STAGE_5_3A_E2E_2026-07-24.md`.
+
+## Осталось (checkpoint): live Telegram happy-path E2E
+- `cron run` happy-path с доставкой шлёт реальные сообщения на admin и тест-Ойижон.
+- Шаг «ха»-approve отправляется человеком из аккаунта тест-Ойижон (агент не может).
+- 5 jobs пока **paused**; resume после успешного controlled E2E; затем cleanup.
+
+## Коммиты
+`4c69a47` backend 24, `8166ae4` prompts, `6f166f5` guard 1.2.0. Итоговый
+`feat: Stage 5.3A production approval cycle live` — после live E2E.
