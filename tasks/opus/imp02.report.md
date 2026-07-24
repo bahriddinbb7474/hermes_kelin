@@ -97,10 +97,22 @@ mapping не менялся; Telegram-сообщения не отправлял
 - **Offline security gates PASS**: integrity, forged-block, allowlist-block,
   tamper-detection. Evidence: `docs/EVIDENCE_STAGE_5_3A_E2E_2026-07-24.md`.
 
-## Осталось (checkpoint): live Telegram happy-path E2E
-- `cron run` happy-path с доставкой шлёт реальные сообщения на admin и тест-Ойижон.
-- Шаг «ха»-approve отправляется человеком из аккаунта тест-Ойижон (агент не может).
-- 5 jobs пока **paused**; resume после успешного controlled E2E; затем cleanup.
+## Live E2E (non-«ха» части) — PASS
+Scoped exception заказчика: seed тест-расходов только user_id 20 + точный cleanup.
+- **25**: open→draft (`food.bread=204000`, `food.meat=400000`), `waiting_oyijon`,
+  для user_id **20** (guard rebind cron 0→20 live); одно сообщение тест-Ойижон,
+  чистая узбекская кириллица.
+- **27**: одно напоминание, gate по статусу, **duplicate rows = 0**.
+- **28**: `waiting_oyijon→waiting_admin`, одно сообщение админу.
+- **Cleanup**: удалено ровно seeded (6) + test cycle (1) + draft (2); baseline
+  восстановлен (tx=1, plans=0, cycles=0).
+- 5 production jobs оставлены **active** (запуски по реальным датам, delivery на
+  тест-аккаунты). Детали: `docs/EVIDENCE_STAGE_5_3A_E2E_2026-07-24.md`.
+
+## Осталось (человек, позже)
+- «ха»-approve из аккаунта тест-Ойижон (→ `approved_by_oyijon`) — агент не может
+  слать от её имени.
+- Live 1a/1b на 1-е число (можно `cron run` заранее с seed + cleanup, как выше).
 
 ## Коммиты
 `4c69a47` backend 24, `8166ae4` prompts, `6f166f5` guard 1.2.0. Итоговый
