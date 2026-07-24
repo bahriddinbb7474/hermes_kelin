@@ -1,5 +1,5 @@
 name: mariyam_identity_guard
-version: "1.1.0"
+version: "1.2.0"
 description: >-
   Deterministic Telegram/cron session -> internal users.id guard for all
   user-scoped Mariyam MCP tools. Rewrites tool arguments from a private

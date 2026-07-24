@@ -53,9 +53,12 @@ USER_SCOPED_TOOLS = frozenset(
         "save_alert_event",
         "save_plan_note",
         "get_admin_report_data",
-        # Planned Stage 5.3A tool. Classifying it now does not add it to Hermes
-        # inventory; if exposed later, it cannot bypass identity enforcement.
+        # Stage 5.3A monthly plan approval cycle tools (self-only oyijon; cron
+        # via trusted mapping). Classifying them enforces identity binding on the
+        # Telegram path and routes cron calls through resolve_cron_actor.
         "approve_monthly_plan",
+        "open_monthly_plan_cycle",
+        "get_monthly_plan_cycle",
     }
 )
 
