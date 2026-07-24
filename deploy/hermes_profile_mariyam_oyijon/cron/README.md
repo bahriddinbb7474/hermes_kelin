@@ -33,3 +33,17 @@ mapped user. Delivery-цель отдельная от tool-identity.
 5. Offline/controlled E2E (`cron run` каждого job) + forged/unknown probe → block.
 
 Реальная Ойижон не подключена; доставка ей запрещена (CRON_AND_REMINDERS п.13).
+
+## Чистая доставка (без cron-обёртки) — обязательно
+
+Hermes по умолчанию оборачивает КАЖДУЮ cron-доставку заголовком
+`Cronjob Response: <name> (job_id: …)` и футером «To stop or manage this job…»
+(`cron/scheduler.py`, `cron.wrap_response` default `true`). Это technical traces
+и риск случайной остановки job Ойижон. Отключить в профиле:
+
+```
+hermes --profile mariyam_oyijon config set cron.wrap_response false
+```
+
+(пишет `cron.wrap_response: false` в profile `config.yaml`; restart Gateway).
+Проверять доставку только с этим выключенным флагом.

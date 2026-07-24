@@ -84,6 +84,19 @@ Seed: 6 помеченных (`source_text='E2E_SEED_5_3A'`) food.bread/food.mea
 **active** (следующие запуски по реальным датам 25/27/28/1, delivery на
 тест-аккаунты; реальная Ойижон не подключена).
 
+## Cron-обёртка доставки — исправлено (fix01, 2026-07-24)
+- Причина: `cron/scheduler.py:1443–1461`, `cron.wrap_response` default `True` →
+  каждая cron-доставка обёрнута `Cronjob Response: … (job_id: …)` + футер «To stop
+  or manage this job…». Применяется и к штатному тику, и к ручному `cron run`
+  (общий путь доставки), не только к ручному. В output-файлах обёртки нет (только
+  в отправке) — поэтому ранее не попала в evidence.
+- Фикс без изменения core: `hermes --profile mariyam_oyijon config set
+  cron.wrap_response false` → profile `config.yaml`; Gateway restart. Повторный
+  `cron run` 25 → доставка без обёртки (визуальное подтверждение — заказчик).
+- **Открыто:** «ха»-approve заблокирован deployed SOUL (`SOUL.md:280` запрещает
+  вызывать Stage 5.3A tools). Нужен апдейт SOUL (владелец — архитектор/sol) до
+  live «ха»/1a/1b и до статуса 5.3A = CLOSED / LIVE PASS.
+
 ## Rollback (задокументировано, не выполнялось)
 - Backend: восстановить db.py/server.py из backup, `.deployed-origin-main`
   предыдущий, restart Gateway.
