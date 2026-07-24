@@ -301,7 +301,7 @@ Repo Stage 5.3 = **CLOSED / LIVE PASS** ([evidence](../docs/EVIDENCE_STAGE_5_3_L
 `mariyam_stage53_guard` и profile-only `max_turns: 6`; identity plugin 1.0.4 и
 Hermes core не меняются. Единственный canonical repo-source —
 `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, LF SHA
-`4e52ffb0115f02a4cfc28d8d29088f4e89e55f58291f3cbaeee78155feda9582`.
+`bbf21c877366fc5fb025c12a78555547c5f1996e84aca99304c0d5836a914d62`.
 
 Controlled deploy guard:
 
