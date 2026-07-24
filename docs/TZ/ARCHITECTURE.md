@@ -2,7 +2,7 @@
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md`
 
-**Статус v3.19:** архитектура Hermes-first не меняется. Stage 5.1 и Stage 5.2 — **CLOSED / LIVE PASS**. Stage 5.3 — **CLOSED / LIVE PASS** ([evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)): repo/VPS canonical LF SOUL SHA `0ec1eeed95ec90030f1e7e11dd88a1428076cdd44a9a8ffa93c57c4b5726012f`, migration 003 и controlled guard deploy active/PASS; inventory = 21, identity plugin 1.0.4 загружается перед guard 1.0.0. Stage 5.3A–6 — **PLANNED / NOT IMPLEMENTED**; migrations 004/005 отсутствуют; реальная Ойижон не подключалась, [Telegram E2E live acceptance evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md).
+**Статус v3.19:** архитектура Hermes-first не меняется. Stage 5.1 и Stage 5.2 — **CLOSED / LIVE PASS**. Stage 5.3 — **CLOSED / LIVE PASS** ([evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)): repo/VPS canonical LF SOUL SHA `4e52ffb0115f02a4cfc28d8d29088f4e89e55f58291f3cbaeee78155feda9582`, migration 003 и controlled guard deploy active/PASS; inventory = 21, identity plugin 1.0.4 загружается перед guard 1.0.0. Stage 5.3A–6 — **PLANNED / NOT IMPLEMENTED**; migrations 004/005 отсутствуют; реальная Ойижон не подключалась, [Telegram E2E live acceptance evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md).
 
 ## Принцип Hermes-first
 

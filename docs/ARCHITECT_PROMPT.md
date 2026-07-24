@@ -31,7 +31,7 @@
   Точные данные — только через tools. Сомнительные суммы — переспрос.
   Медицина без диагноза + алерт админу. Бюджет 10–15 USD/мес.
 - Current ТЗ: **v3.19**. Stage 5.1/5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **CLOSED / LIVE PASS** ([evidence](EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)); Stage 5.3A–6 = **PLANNED / NOT IMPLEMENTED**.
-- Repo/VPS canonical LF SOUL SHA = `0ec1eeed95ec90030f1e7e11dd88a1428076cdd44a9a8ffa93c57c4b5726012f`. Inventory/dispatch/discovery = 21/21/21; identity plugin 1.0.4 загружается перед guard plugin 1.0.0.
+- Repo/VPS canonical LF SOUL SHA = `4e52ffb0115f02a4cfc28d8d29088f4e89e55f58291f3cbaeee78155feda9582`. Inventory/dispatch/discovery = 21/21/21; identity plugin 1.0.4 загружается перед guard plugin 1.0.0.
 - VPS runtime: **21 tools / identity 1.0.4 + guard 1.0.0 / migration 003**; controlled deploy PASS, [Telegram E2E live acceptance evidence](EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md). Migrations 004/005 и counts 22/25/27 — только planned.
 - Utility integration только read-only после исследования official cabinet;
   credentials никогда не доступны LLM; payments/settings/cards запрещены.

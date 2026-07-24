@@ -44,7 +44,7 @@
 - **Raw Telegram ID и mapping не логируются** (`_mask`).
 - **Repo/VPS runtime:** identity plugin **1.0.4**, migration 003 active, tools **21/21/21**; Stage 5.1 identity policy и Stage 5.2 reports live E2E PASS. Stage 5.3 v3.19 guard имеет статус **CLOSED / LIVE PASS** ([evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)).
 - **Stage 5.3 private state:** отдельный plugin хранит только hashed session key, trusted internal user и structured price facts вне `HERMES_HOME`/git, state + lock mode 0600, TTL ≤30 минут; raw Telegram ID не логируется. Session reset очищает exact state.
-- **Prompt/skill-protect:** единственный repo canonical prompt — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, LF SHA `0ec1eeed95ec90030f1e7e11dd88a1428076cdd44a9a8ffa93c57c4b5726012f`; активный Mariyam `SKILL.md` отсутствует, дублирующий repo SKILL не создаётся; skill-protect и `tool_progress=off` сохранены.
+- **Prompt/skill-protect:** единственный repo canonical prompt — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, LF SHA `4e52ffb0115f02a4cfc28d8d29088f4e89e55f58291f3cbaeee78155feda9582`; активный Mariyam `SKILL.md` отсутствует, дублирующий repo SKILL не создаётся; skill-protect и `tool_progress=off` сохранены.
 - **Command execution isolation:** установленный Hermes v0.18.2 относит `terminal`/`process` к toolset `terminal`, а `execute_code` — к отдельному `code_execution`. Mariyam profile отключает `skills`, `terminal`, `code_execution`; MCP tools и browser/cron/memory этими запретами не затрагиваются. Hermes core не меняется.
 
 ## Planned Stage 5.3A–6 security gates — NOT IMPLEMENTED

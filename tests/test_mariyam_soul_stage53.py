@@ -172,10 +172,14 @@ def test_stage53_unknown_values_units_and_no_technical_fields():
     assert "JSON" in text and "tool names" in text
 
 
-def test_stage53_does_not_claim_stage53a_or_runtime_cron():
+def test_stage53a_approval_flow_enabled_and_self_only():
+    # Stage 5.3A is now live: SOUL describes the оyijon «ха» → approve flow and
+    # no longer forbids the tools. (fix01, 2026-07-24)
     section = _stage53()
-    assert "Stage 5.3A" in section
     assert "approve_monthly_plan" in section
+    assert "source=oyijon" in section
     assert "25/27/28/1" in section
-    assert "не реализованы" in section
+    assert "«ха»" in section
     assert "cron" in section
+    # The old "not implemented / do not call" prohibition must be gone.
+    assert "не реализованы" not in section

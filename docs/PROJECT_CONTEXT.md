@@ -38,7 +38,7 @@
 
 ## Где мы сейчас (2026-07-18)
 
-ТЗ: **v3.19**. Этапы 5.1 и 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **CLOSED / LIVE PASS** ([evidence](EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)). Repo/VPS canonical SOUL LF SHA = `0ec1eeed95ec90030f1e7e11dd88a1428076cdd44a9a8ffa93c57c4b5726012f`; optional read-only price lookup требует structured `price_basis`. Category-only = только omitted `items`; explicit empty отклоняется до DB. Отдельный `mariyam_stage53_guard` связывает lookup/save и блокирует duplicate success, private state TTL 30 минут. Identity plugin остаётся **1.0.4**, новых tools/core/backend-router нет, inventory/dispatch/discovery = **21/21/21**. Controlled deploy PASS; [Stage 5.3 live acceptance evidence](EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md); Stage 5.3A–6 — **PLANNED / NOT IMPLEMENTED**. Реальная Ойижон не подключена.
+ТЗ: **v3.19**. Этапы 5.1 и 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **CLOSED / LIVE PASS** ([evidence](EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)). Repo/VPS canonical SOUL LF SHA = `4e52ffb0115f02a4cfc28d8d29088f4e89e55f58291f3cbaeee78155feda9582`; optional read-only price lookup требует structured `price_basis`. Category-only = только omitted `items`; explicit empty отклоняется до DB. Отдельный `mariyam_stage53_guard` связывает lookup/save и блокирует duplicate success, private state TTL 30 минут. Identity plugin остаётся **1.0.4**, новых tools/core/backend-router нет, inventory/dispatch/discovery = **21/21/21**. Controlled deploy PASS; [Stage 5.3 live acceptance evidence](EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md); Stage 5.3A–6 — **PLANNED / NOT IMPLEMENTED**. Реальная Ойижон не подключена.
 
 На VPS выполнено (Этап 1, технически):
 - PostgreSQL поднят и **healthy** (контейнер `hermes_mariyam_postgres`, порт 127.0.0.1:5432, init-миграции применены).
@@ -61,7 +61,7 @@
 - **Stage 5.2: CLOSED / LIVE PASS** (v3.16) — Message 1 и Message 2 подтверждены live; report-type completion contract и category-table contract PASS; новый платный тест не выполнялся. Evidence: `EVIDENCE_STAGE_5_2_LIVE_PASS_2026-07-16.md`.
 - **Stage 5.3: CLOSED / LIVE PASS** (v3.19) — explicit `items=[]` даёт `INVALID_INPUT` без mutation; structured product-draft state и duplicate-success breaker реализованы отдельным profile plugin; profile max turns = 6. Migration 003 и controlled VPS deploy active/PASS; [live acceptance evidence](EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md).
 - **Planned:** Stage 5.3A approval cycle + cron identity gate; Stage 5.4 utility read-only; Stage 6 recurring obligations. Planned tools 21→22→25→27; current repo/VPS inventory = 21.
-- **Prompt/skill protect:** repo canonical LF SOUL assertion = `0ec1eeed95ec90030f1e7e11dd88a1428076cdd44a9a8ffa93c57c4b5726012f`; active VPS Mariyam `SKILL.md` отсутствует; skill-protect и `tool_progress` off.
+- **Prompt/skill protect:** repo canonical LF SOUL assertion = `4e52ffb0115f02a4cfc28d8d29088f4e89e55f58291f3cbaeee78155feda9582`; active VPS Mariyam `SKILL.md` отсутствует; skill-protect и `tool_progress` off.
 - Мариям = бытовой финансовый аналитик; backend считает факты, Hermes объясняет; memory ≠ источник аналитики.
 - очистка тестовых данных БД — выполнена, закрепить аудитом;
 - **Этап 2 (язык): PARTIAL 8/20, НЕ закрыт** — 8 из 20 фраз проверены (8/8 кириллица, `LATIN_LINES: []`), полный AC (20/20, 0 латиницы) не пройден; тест остановлен заказчиком, не из-за FAIL (см. `docs/TZ/EVIDENCE_STAGE_2_PARTIAL_2026-07-12.md`);
