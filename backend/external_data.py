@@ -27,7 +27,7 @@ HTTP_TIMEOUT_SECONDS = 12
 DEFAULT_CACHE_PATH = Path("/opt/hermes-mariyam/var/external-data-cache.json")
 NEWS_FEEDS = (
     ("uza", "UzA", "https://uza.uz/ru/rss"),
-    ("kun", "Kun.uz", "https://kun.uz/ru/rss"),
+    ("kun", "Kun.uz", "https://kun.uz/news/rss?lang=ru"),
 )
 
 _CACHE_LOCK = threading.Lock()

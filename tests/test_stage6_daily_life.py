@@ -135,6 +135,10 @@ def test_prayer_contract_is_tashkent_hanafi(monkeypatch):
 
 
 def test_news_uses_only_agreed_sources_and_deduplicates(monkeypatch):
+    assert external_data.NEWS_FEEDS == (
+        ("uza", "UzA", "https://uza.uz/ru/rss"),
+        ("kun", "Kun.uz", "https://kun.uz/news/rss?lang=ru"),
+    )
     uza = b"""<?xml version="1.0" encoding="UTF-8"?>
     <rss><channel><item><title>Calm local fact</title>
     <link>https://uza.uz/ru/posts/1</link><pubDate>Sun, 26 Jul 2026 08:00:00 +0500</pubDate>
