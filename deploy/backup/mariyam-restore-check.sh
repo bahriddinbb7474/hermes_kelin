@@ -40,6 +40,7 @@ SELECT json_build_object(
     'health_notes', (SELECT count(*) FROM health_notes), 'monthly_budget_items', (SELECT count(*) FROM monthly_budget_items),
     'monthly_budget_plans', (SELECT count(*) FROM monthly_budget_plans), 'monthly_plan_cycles', (SELECT count(*) FROM monthly_plan_cycles),
     'plan_notes', (SELECT count(*) FROM plan_notes), 'quran_progress', (SELECT count(*) FROM quran_progress),
+    'recurring_obligations', (SELECT count(*) FROM recurring_obligations),
     'transactions', (SELECT count(*) FROM transactions), 'usage_costs', (SELECT count(*) FROM usage_costs),
     'users', (SELECT count(*) FROM users)),
   'known_expense', (SELECT json_build_object('id', id, 'amount', amount, 'currency', currency)

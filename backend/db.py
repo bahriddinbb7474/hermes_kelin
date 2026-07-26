@@ -2,8 +2,9 @@
 Источник истины: TZ_Hermes_Mariyam_FINAL_v3_0.md, разделы 13, 15.
 Backend validates and stores already-parsed data; returns exact facts/numbers.
 """
+from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from math import isfinite
 
 from .config import TASHKENT, parse_dt
@@ -18,6 +19,9 @@ ROLES = ("oyijon", "admin")
 # Stage 5.1 — physical quantity units (ТЗ v3.7)
 CANONICAL_UNITS = ("kg", "g", "l", "ml", "pcs", "pack")
 PRICE_BASES = ("last", "average", "manual")
+OBLIGATION_TYPES = ("internet", "loan", "tax", "utility", "other")
+OBLIGATION_ACTIONS = ("upsert", "mark_paid", "disable")
+OBLIGATION_REPEAT_RULES = ("none", "monthly", "yearly", "interval_days")
 
 
 def _one_of(field: str, value, allowed: tuple[str, ...], *, allow_none: bool = False):
@@ -1390,6 +1394,379 @@ async def get_monthly_plan_cycle(pool, user_id, month):
         "proposed_at": _iso_utc(row["proposed_at"]),
         "approved_at": _iso_utc(row["approved_at"]),
         "approved_by_user_id": row["approved_by_user_id"],
+    }
+
+
+def _obligation_due_date(value) -> date:
+    if not isinstance(value, str):
+        raise ValueError("INVALID_INPUT: due_date must be YYYY-MM-DD")
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError("INVALID_INPUT: due_date must be YYYY-MM-DD") from exc
+    if parsed.isoformat() != value:
+        raise ValueError("INVALID_INPUT: due_date must be YYYY-MM-DD")
+    return parsed
+
+
+def _next_obligation_due_date(
+    current_due: date,
+    repeat_rule: str,
+    repeat_interval_days: int | None,
+    repeat_anchor_month: int,
+    repeat_anchor_day: int,
+) -> date | None:
+    """Advance one approved repeat rule while preserving calendar anchors."""
+    _one_of("repeat_rule", repeat_rule, OBLIGATION_REPEAT_RULES)
+    if repeat_rule == "none":
+        return None
+    if repeat_rule == "interval_days":
+        if (
+            isinstance(repeat_interval_days, bool)
+            or not isinstance(repeat_interval_days, int)
+            or repeat_interval_days <= 0
+        ):
+            raise ValueError(
+                "INVALID_INPUT: repeat_interval_days must be a positive integer"
+            )
+        return current_due + timedelta(days=repeat_interval_days)
+    if repeat_rule == "monthly":
+        year = current_due.year + (1 if current_due.month == 12 else 0)
+        month = 1 if current_due.month == 12 else current_due.month + 1
+        day = min(repeat_anchor_day, monthrange(year, month)[1])
+        return date(year, month, day)
+    year = current_due.year + 1
+    month = repeat_anchor_month
+    day = min(repeat_anchor_day, monthrange(year, month)[1])
+    return date(year, month, day)
+
+
+def _validate_obligation_upsert(
+    obligation_type,
+    name,
+    expected_amount_uzs,
+    due_date,
+    repeat_rule,
+    repeat_interval_days,
+    reminder_lead_days,
+):
+    _one_of("obligation_type", obligation_type, OBLIGATION_TYPES)
+    _one_of("repeat_rule", repeat_rule, OBLIGATION_REPEAT_RULES)
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("INVALID_INPUT: name must be a non-empty string")
+    try:
+        amount = Decimal(str(expected_amount_uzs))
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError("BAD_AMOUNT") from exc
+    if not amount.is_finite() or amount < 0:
+        raise ValueError("BAD_AMOUNT")
+    due = _obligation_due_date(due_date)
+    if repeat_rule == "interval_days":
+        if (
+            isinstance(repeat_interval_days, bool)
+            or not isinstance(repeat_interval_days, int)
+            or repeat_interval_days <= 0
+        ):
+            raise ValueError(
+                "INVALID_INPUT: repeat_interval_days must be a positive integer"
+            )
+    elif repeat_interval_days is not None:
+        raise ValueError(
+            "INVALID_INPUT: repeat_interval_days is only valid for interval_days"
+        )
+    if (
+        isinstance(reminder_lead_days, bool)
+        or not isinstance(reminder_lead_days, int)
+        or not 0 <= reminder_lead_days <= 365
+    ):
+        raise ValueError("INVALID_INPUT: reminder_lead_days must be 0..365")
+    return name.strip(), amount, due
+
+
+def _obligation_result(row, *, idempotent: bool, payment_recorded: bool = False):
+    return {
+        "obligation_id": row["id"],
+        "obligation_type": row["obligation_type"],
+        "name": row["name"],
+        "expected_amount_uzs": int(row["expected_amount_uzs"])
+        if Decimal(row["expected_amount_uzs"]) % 1 == 0
+        else float(row["expected_amount_uzs"]),
+        "due_date": row["due_date"].isoformat(),
+        "repeat_rule": row["repeat_rule"],
+        "repeat_interval_days": row["repeat_interval_days"],
+        "reminder_lead_days": row["reminder_lead_days"],
+        "active": row["active"],
+        "paid": row["paid"],
+        "last_paid_due_date": (
+            row["last_paid_due_date"].isoformat()
+            if row["last_paid_due_date"] is not None
+            else None
+        ),
+        "last_paid_at": _iso_utc(row["last_paid_at"]),
+        "idempotent": idempotent,
+        "payment_recorded": payment_recorded,
+    }
+
+
+_OBLIGATION_RETURNING = """
+    id, obligation_type, name, expected_amount_uzs, due_date, repeat_rule,
+    repeat_interval_days, reminder_lead_days, active, paid,
+    last_paid_due_date, last_paid_at
+"""
+
+
+async def upsert_recurring_obligation(
+    pool,
+    user_id,
+    action,
+    obligation_id=None,
+    obligation_type=None,
+    name=None,
+    expected_amount_uzs=None,
+    due_date=None,
+    repeat_rule=None,
+    repeat_interval_days=None,
+    reminder_lead_days=3,
+):
+    """Create/update, mark one due occurrence paid, or disable an obligation.
+
+    ``due_date`` is also the idempotency guard for ``mark_paid``: it must name
+    the occurrence being paid. Replaying it never advances twice.
+    """
+    _one_of("action", action, OBLIGATION_ACTIONS)
+    if isinstance(user_id, bool) or not isinstance(user_id, int) or user_id <= 0:
+        raise ValueError("INVALID_INPUT: user_id must be a positive integer")
+    if obligation_id is not None and (
+        isinstance(obligation_id, bool)
+        or not isinstance(obligation_id, int)
+        or obligation_id <= 0
+    ):
+        raise ValueError("INVALID_INPUT: obligation_id must be a positive integer")
+
+    if action == "upsert":
+        normalized_name, amount, parsed_due = _validate_obligation_upsert(
+            obligation_type,
+            name,
+            expected_amount_uzs,
+            due_date,
+            repeat_rule,
+            repeat_interval_days,
+            reminder_lead_days,
+        )
+        if obligation_id is None:
+            row = await pool.fetchrow(
+                f"""INSERT INTO recurring_obligations
+                    (user_id, obligation_type, name, expected_amount_uzs,
+                     due_date, repeat_rule, repeat_interval_days,
+                     repeat_anchor_month, repeat_anchor_day, reminder_lead_days,
+                     active, paid, updated_at)
+                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true,false,now())
+                    ON CONFLICT (user_id, obligation_type, name) DO UPDATE SET
+                      expected_amount_uzs=EXCLUDED.expected_amount_uzs,
+                      due_date=EXCLUDED.due_date,
+                      repeat_rule=EXCLUDED.repeat_rule,
+                      repeat_interval_days=EXCLUDED.repeat_interval_days,
+                      repeat_anchor_month=EXCLUDED.repeat_anchor_month,
+                      repeat_anchor_day=EXCLUDED.repeat_anchor_day,
+                      reminder_lead_days=EXCLUDED.reminder_lead_days,
+                      active=true, paid=false, updated_at=now()
+                    WHERE (
+                      recurring_obligations.expected_amount_uzs,
+                      recurring_obligations.due_date,
+                      recurring_obligations.repeat_rule,
+                      recurring_obligations.repeat_interval_days,
+                      recurring_obligations.repeat_anchor_month,
+                      recurring_obligations.repeat_anchor_day,
+                      recurring_obligations.reminder_lead_days,
+                      recurring_obligations.active,
+                      recurring_obligations.paid
+                    ) IS DISTINCT FROM (
+                      EXCLUDED.expected_amount_uzs,
+                      EXCLUDED.due_date,
+                      EXCLUDED.repeat_rule,
+                      EXCLUDED.repeat_interval_days,
+                      EXCLUDED.repeat_anchor_month,
+                      EXCLUDED.repeat_anchor_day,
+                      EXCLUDED.reminder_lead_days,
+                      true,
+                      false
+                    )
+                    RETURNING {_OBLIGATION_RETURNING}""",
+                user_id,
+                obligation_type,
+                normalized_name,
+                amount,
+                parsed_due,
+                repeat_rule,
+                repeat_interval_days,
+                parsed_due.month,
+                parsed_due.day,
+                reminder_lead_days,
+            )
+            if row is None:
+                row = await pool.fetchrow(
+                    f"""SELECT {_OBLIGATION_RETURNING}
+                        FROM recurring_obligations
+                        WHERE user_id=$1 AND obligation_type=$2 AND name=$3""",
+                    user_id,
+                    obligation_type,
+                    normalized_name,
+                )
+                if row is None:  # pragma: no cover - conflict row cannot vanish here
+                    return {"_obligation_error": "NOT_FOUND"}
+                return _obligation_result(row, idempotent=True)
+        else:
+            row = await pool.fetchrow(
+                f"""UPDATE recurring_obligations SET
+                      obligation_type=$3, name=$4, expected_amount_uzs=$5,
+                      due_date=$6, repeat_rule=$7, repeat_interval_days=$8,
+                      repeat_anchor_month=$9, repeat_anchor_day=$10,
+                      reminder_lead_days=$11, active=true, paid=false,
+                      updated_at=now()
+                    WHERE user_id=$1 AND id=$2
+                      AND (
+                        obligation_type, name, expected_amount_uzs, due_date,
+                        repeat_rule, repeat_interval_days, repeat_anchor_month,
+                        repeat_anchor_day, reminder_lead_days, active, paid
+                      ) IS DISTINCT FROM (
+                        $3, $4, $5, $6, $7, $8, $9, $10, $11, true, false
+                      )
+                    RETURNING {_OBLIGATION_RETURNING}""",
+                user_id,
+                obligation_id,
+                obligation_type,
+                normalized_name,
+                amount,
+                parsed_due,
+                repeat_rule,
+                repeat_interval_days,
+                parsed_due.month,
+                parsed_due.day,
+                reminder_lead_days,
+            )
+            if row is None:
+                row = await pool.fetchrow(
+                    f"""SELECT {_OBLIGATION_RETURNING}
+                        FROM recurring_obligations
+                        WHERE user_id=$1 AND id=$2""",
+                    user_id,
+                    obligation_id,
+                )
+                if row is None:
+                    return {"_obligation_error": "NOT_FOUND"}
+                return _obligation_result(row, idempotent=True)
+        if row is None:
+            return {"_obligation_error": "NOT_FOUND"}
+        return _obligation_result(row, idempotent=False)
+
+    if obligation_id is None:
+        raise ValueError(f"INVALID_INPUT: obligation_id is required for {action}")
+
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                f"""SELECT {_OBLIGATION_RETURNING}, repeat_anchor_month,
+                           repeat_anchor_day
+                    FROM recurring_obligations
+                    WHERE user_id=$1 AND id=$2 FOR UPDATE""",
+                user_id,
+                obligation_id,
+            )
+            if row is None:
+                return {"_obligation_error": "NOT_FOUND"}
+
+            if action == "disable":
+                if not row["active"]:
+                    return _obligation_result(row, idempotent=True)
+                updated = await conn.fetchrow(
+                    f"""UPDATE recurring_obligations
+                        SET active=false, updated_at=now()
+                        WHERE user_id=$1 AND id=$2
+                        RETURNING {_OBLIGATION_RETURNING}""",
+                    user_id,
+                    obligation_id,
+                )
+                return _obligation_result(updated, idempotent=False)
+
+            paid_due = _obligation_due_date(due_date)
+            if row["last_paid_due_date"] == paid_due:
+                return _obligation_result(
+                    row, idempotent=True, payment_recorded=True
+                )
+            if not row["active"]:
+                return {"_obligation_error": "OBLIGATION_INACTIVE"}
+            if row["due_date"] != paid_due:
+                return {"_obligation_error": "DUE_DATE_MISMATCH"}
+
+            next_due = _next_obligation_due_date(
+                row["due_date"],
+                row["repeat_rule"],
+                row["repeat_interval_days"],
+                row["repeat_anchor_month"],
+                row["repeat_anchor_day"],
+            )
+            if next_due is None:
+                updated = await conn.fetchrow(
+                    f"""UPDATE recurring_obligations
+                        SET active=false, paid=true, last_paid_due_date=$3,
+                            last_paid_at=now(), updated_at=now()
+                        WHERE user_id=$1 AND id=$2
+                        RETURNING {_OBLIGATION_RETURNING}""",
+                    user_id,
+                    obligation_id,
+                    paid_due,
+                )
+            else:
+                updated = await conn.fetchrow(
+                    f"""UPDATE recurring_obligations
+                        SET due_date=$3, paid=false, last_paid_due_date=$4,
+                            last_paid_at=now(), updated_at=now()
+                        WHERE user_id=$1 AND id=$2
+                        RETURNING {_OBLIGATION_RETURNING}""",
+                    user_id,
+                    obligation_id,
+                    next_due,
+                    paid_due,
+                )
+            return _obligation_result(
+                updated, idempotent=False, payment_recorded=True
+            )
+
+
+async def get_recurring_obligations(
+    pool,
+    user_id,
+    active_only=True,
+    due_from=None,
+    due_to=None,
+):
+    """Read user-owned obligations, optionally bounded by inclusive due dates."""
+    if not isinstance(active_only, bool):
+        raise ValueError("INVALID_INPUT: active_only must be boolean")
+    parsed_from = _obligation_due_date(due_from) if due_from is not None else None
+    parsed_to = _obligation_due_date(due_to) if due_to is not None else None
+    if parsed_from is not None and parsed_to is not None and parsed_from > parsed_to:
+        raise ValueError("INVALID_INPUT: due_from must be <= due_to")
+    rows = await pool.fetch(
+        f"""SELECT {_OBLIGATION_RETURNING}
+            FROM recurring_obligations
+            WHERE user_id=$1
+              AND ($2::boolean=false OR active)
+              AND ($3::date IS NULL OR due_date >= $3)
+              AND ($4::date IS NULL OR due_date <= $4)
+            ORDER BY due_date, id""",
+        user_id,
+        active_only,
+        parsed_from,
+        parsed_to,
+    )
+    return {
+        "active_only": active_only,
+        "due_from": parsed_from.isoformat() if parsed_from else None,
+        "due_to": parsed_to.isoformat() if parsed_to else None,
+        "obligations": [
+            _obligation_result(row, idempotent=True) for row in rows
+        ],
     }
 
 

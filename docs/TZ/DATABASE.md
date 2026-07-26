@@ -31,7 +31,13 @@ PostgreSQL хранит точные данные. Hermes memory хранит т
   `monthly_budget_items` содержит `reference_unit_price_uzs NUMERIC(14,4) NULL`, `price_basis TEXT NULL CHECK (price_basis IN ('last','average','manual'))`, `price_as_of TIMESTAMPTZ NULL`; snapshot-поля либо все `NULL`, либо все заполнены.
   История фактических цен остаётся в `transactions`; отдельную таблицу цен сейчас не создавать. `last` и weighted `average` вычисляются из подходящих transactions одного товара и одной unit. При сохранении плана фиксируется snapshot выбранной цены: новый факт покупки не меняет старый план. Если snapshot цены есть, `planned_amount_uzs` обязан точно совпадать с quantity × snapshot price; ручная сумма без snapshot остаётся допустимой.
 - Migration 004: `utility_accounts` (service, provider, masked account reference, admin-defined minimum prepaid balance, sync state) и immutable `utility_snapshots` (reading/consumption/billed/prepaid/debt/tariff/observed/source).
-- Migration 005: `recurring_obligations` (internet/loan/tax/utility/other, expected amount, due date, repeat rule, reminder lead, paid/active state).
+- Migration 005 реализована: `recurring_obligations` (user-scoped
+  internet/loan/tax/utility/other; expected amount, due date, approved repeat
+  rule, reminder lead, paid/active state и timestamps). Rules
+  `none|monthly|yearly|interval_days`; calendar anchor хранится отдельно, чтобы
+  29–31 числа детерминированно переживали короткие месяцы и конец года.
+  `last_paid_due_date` обеспечивает идемпотентный paid retry; таблица не имеет
+  FK/trigger на `transactions`.
 - Не хранить одновременно negative prepaid balance и separate debt без утверждённого provider rule; field normalization утверждается после исследования реального кабинета.
 - Utility credentials и raw account reference в PostgreSQL запрещены; хранится только masked reference и allowlisted structured data.
 

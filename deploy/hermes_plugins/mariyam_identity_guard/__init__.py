@@ -59,6 +59,11 @@ USER_SCOPED_TOOLS = frozenset(
         "approve_monthly_plan",
         "open_monthly_plan_cycle",
         "get_monthly_plan_cycle",
+        # Stage 6 recurring obligations. Both are self-only for Oyijon and use
+        # the narrow admin target allowlist below; neither grants transaction
+        # access.
+        "upsert_recurring_obligation",
+        "get_recurring_obligations",
     }
 )
 
@@ -88,6 +93,8 @@ ADMIN_CROSS_TARGET_TOOLS = frozenset(
         "get_balance_summary",
         "get_admin_report_data",
         "save_plan_note",
+        "upsert_recurring_obligation",
+        "get_recurring_obligations",
     }
 )
 

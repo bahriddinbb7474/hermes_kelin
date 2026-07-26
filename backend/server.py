@@ -216,6 +216,54 @@ async def t_get_monthly_plan_cycle(pool, a):
     return ok(**r)
 
 
+OBLIGATION_ERRORS = {
+    "NOT_FOUND": (
+        "Обязательство не найдено",
+        "Мажбурият топилмади",
+    ),
+    "OBLIGATION_INACTIVE": (
+        "Обязательство уже неактивно",
+        "Мажбурият аллақачон фаол эмас",
+    ),
+    "DUE_DATE_MISMATCH": (
+        "Дата оплачиваемого срока не совпадает с текущей",
+        "Тўланаётган муддат санаси жорий санага мос эмас",
+    ),
+}
+
+
+async def t_upsert_recurring_obligation(pool, a):
+    r = await db.upsert_recurring_obligation(
+        pool,
+        a["user_id"],
+        a["action"],
+        a.get("obligation_id"),
+        a.get("obligation_type"),
+        a.get("name"),
+        a.get("expected_amount_uzs"),
+        a.get("due_date"),
+        a.get("repeat_rule"),
+        a.get("repeat_interval_days"),
+        a.get("reminder_lead_days", 3),
+    )
+    code = r.get("_obligation_error")
+    if code:
+        ru, uz = OBLIGATION_ERRORS[code]
+        return err(code, ru, uz)
+    return ok(**r)
+
+
+async def t_get_recurring_obligations(pool, a):
+    r = await db.get_recurring_obligations(
+        pool,
+        a["user_id"],
+        a.get("active_only", True),
+        a.get("due_from"),
+        a.get("due_to"),
+    )
+    return ok(**r)
+
+
 async def t_save_quran_progress(pool, a):
     rid = await db.save_quran_progress(
         pool, a["user_id"], a.get("surah"), a.get("juz"), a.get("page"), a.get("note"))
@@ -292,6 +340,8 @@ DISPATCH = {
     "approve_monthly_plan": t_approve_monthly_plan,
     "open_monthly_plan_cycle": t_open_monthly_plan_cycle,
     "get_monthly_plan_cycle": t_get_monthly_plan_cycle,
+    "upsert_recurring_obligation": t_upsert_recurring_obligation,
+    "get_recurring_obligations": t_get_recurring_obligations,
     "save_quran_progress": t_save_quran_progress,
     "get_quran_progress": t_get_quran_progress,
     "save_health_note": t_save_health_note,
@@ -377,6 +427,32 @@ P = {
     "action": {"type": "string", "enum": list(db.CYCLE_ACTIONS)},
     "approved_by_user_id": {"type": "integer"},
     "household_size": {"type": "integer", "minimum": 1},
+    "obligation_action": {
+        "type": "string",
+        "enum": list(db.OBLIGATION_ACTIONS),
+    },
+    "obligation_id": {"type": "integer", "minimum": 1},
+    "obligation_type": {
+        "type": "string",
+        "enum": list(db.OBLIGATION_TYPES),
+    },
+    "obligation_name": {"type": "string", "minLength": 1},
+    "expected_amount_uzs": {"type": "number", "minimum": 0},
+    "due_date": {"type": "string", "format": "date"},
+    "repeat_rule": {
+        "type": "string",
+        "enum": list(db.OBLIGATION_REPEAT_RULES),
+    },
+    "repeat_interval_days": {"type": "integer", "minimum": 1},
+    "reminder_lead_days": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 365,
+        "default": 3,
+    },
+    "active_only": {"type": "boolean", "default": True},
+    "due_from": {"type": "string", "format": "date"},
+    "due_to": {"type": "string", "format": "date"},
     "surah": {"type": "string"},
     "juz": {"type": "integer"},
     "page": {"type": "integer"},
@@ -417,6 +493,14 @@ TOOLS = [
     ("approve_monthly_plan", "Утвердить месячный план (draft→approved). source=oyijon|admin|auto. Работает только до начала планового месяца (Asia/Tashkent); auto — только в 1-й день. Не читает и не меняет transactions. Идемпотентен по user/month; недопустимый переход статуса отклоняется без мутации. source=auto копирует последний approved plan, если нет draft", schema(pick("user_id", "month", "source", "approved_by_user_id", "household_size"), ["user_id", "month", "source"])),
     ("open_monthly_plan_cycle", "Узкая мутация статуса цикла плана. action=open: создать draft-строку waiting_oyijon для будущего месяца; если у пользователя нет budget-draft — backend детерминированно вычисляет и персистит его (последний approved plan + среднее за 3 месяца), draft_generated=true. action=escalate: waiting_oyijon→waiting_admin. Не трогает monthly_budget_items/transactions. Future month (Asia/Tashkent); идемпотентно, недопустимый переход отклоняется без мутации", schema(pick("user_id", "month", "action", "household_size"), ["user_id", "month", "action"])),
     ("get_monthly_plan_cycle", "Read-only статус цикла месячного плана: exists, status (draft/waiting_oyijon/waiting_admin/approved_by_oyijon/approved_by_admin/auto_approved), source, household_size, proposed_at, approved_at, approved_by_user_id. Мутаций нет. Для cron-гейтинга (27/28/1b)", schema(pick("user_id", "month"), ["user_id", "month"])),
+    ("upsert_recurring_obligation", "Создать/обновить регулярное обязательство, отметить конкретный due occurrence оплаченным или отключить. action=upsert|mark_paid|disable. Approved repeat rules: none|monthly|yearly|interval_days. mark_paid требует due_date оплачиваемого occurrence, идемпотентно вычисляет только следующую дату и никогда не создаёт expense/transaction", schema({
+        **pick("user_id"),
+        "action": P["obligation_action"],
+        **pick("obligation_id", "obligation_type"),
+        "name": P["obligation_name"],
+        **pick("expected_amount_uzs", "due_date", "repeat_rule", "repeat_interval_days", "reminder_lead_days"),
+    }, ["user_id", "action"])),
+    ("get_recurring_obligations", "Read-only active/due обязательства пользователя. Optional active_only=true и inclusive due_from/due_to; storage не scheduler", schema(pick("user_id", "active_only", "due_from", "due_to"), ["user_id"])),
     ("save_quran_progress", "Сохранить прогресс Корана", schema(pick("user_id", "surah", "juz", "page", "note"), ["user_id"])),
     ("get_quran_progress", "Последний прогресс Корана", schema(pick("user_id"), ["user_id"])),
     ("save_health_note", "Заметка о самочувствии (без диагноза)", schema(pick("user_id", "note", "severity", "source_text"), ["user_id", "note"])),

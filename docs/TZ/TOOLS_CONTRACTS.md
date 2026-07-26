@@ -1,9 +1,9 @@
 # Tools Contracts
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (полные примеры вход/выход — §15).
-Реализация: `backend/server.py` + `backend/db.py`. **Repo inventory: 24 tools (dispatch/MCP discovery = 24/24); deployed на VPS: 21.** Stage 5.3A добавляет `approve_monthly_plan`, `open_monthly_plan_cycle`, `get_monthly_plan_cycle` (репозиторий); backend deploy — imp02. Migration 003 (со схемой `monthly_plan_cycles`) уже active на VPS; guard deploy active/PASS; [Telegram live acceptance evidence](../EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md).
+Реализация: `backend/server.py` + `backend/db.py`. **Repo inventory: 26 tools (dispatch/MCP discovery = 26/26).** Stage 6 шаг 1 добавляет `upsert_recurring_obligation` и `get_recurring_obligations`; migration 005 и guard 1.3.0 входят в тот же controlled deploy.
 
-**v3.19 progression:** Stage 5.3 = 21, Stage 5.3A repo = 24 (deployed 21), Stage 5.4 = planned +3, Stage 6 = planned +2. Всё сверх repo 24 — **PLANNED / NOT IMPLEMENTED** и отсутствует в runtime discovery.
+**v3.19 progression:** Stage 5.3 = 21, Stage 5.3A = 24, Stage 6 шаг 1 = 26. Stage 5.4 utility tools остаются NO-GO/не реализованы, поэтому numbering migration 005 намеренно пропускает 004.
 
 ## Общие правила
 
@@ -122,11 +122,34 @@
 - Только structured read-only data. Payment/top-up/settings/tariff write запрещены. Stale data возвращается с last sync date.
 - `set_utility_threshold`: Oyijon self-only; admin narrow cross-target только для target из `allowed_target_user_ids` и только threshold. Portal/payment/settings/transactions этим разрешением недоступны.
 
-### Stage 6 — +2, planned 27
+### Stage 6 — recurring obligations (+2 → repo/runtime 26)
 
-- `upsert_recurring_obligation`, `get_recurring_obligations`.
-- Upsert также меняет amount/date, отмечает paid и disables; paid не создаёт expense автоматически.
-- Оба tools: Oyijon self-only; admin narrow cross-target только для target из `allowed_target_user_ids` через отдельный per-tool allowlist; права на transactions не выдаются.
+`upsert_recurring_obligation` — единственная мутация. Required: `user_id`,
+`action`. Действия:
+
+- `upsert`: также обязательны `obligation_type`, `name`,
+  `expected_amount_uzs`, `due_date`, `repeat_rule`; optional
+  `obligation_id`, `repeat_interval_days`, `reminder_lead_days` (default 3).
+  Без `obligation_id` natural key `(user_id, obligation_type, name)` делает
+  retry идемпотентным; с id изменяются сумма/дата/rule существующей строки.
+- `mark_paid`: обязательны `obligation_id` и `due_date` именно оплаченного
+  occurrence. Повтор того же вызова идемпотентен. `none` закрывает строку
+  (`paid=true`, `active=false`); recurring rule записывает
+  `last_paid_due_date/at` и открывает следующий due occurrence. Expense или
+  transaction никогда не создаётся.
+- `disable`: обязателен `obligation_id`; повторный disable идемпотентен.
+
+Approved repeat rules: `none`, `monthly`, `yearly`, `interval_days`.
+`interval_days` требует positive `repeat_interval_days`. Monthly/yearly
+сохраняют исходный calendar anchor: 31-е clamp-ится к концу короткого месяца,
+но следующий подходящий месяц снова использует 31-е; 29 февраля аналогично
+восстанавливается в leap year. Backend вычисляет только один следующий due.
+
+`get_recurring_obligations` — read-only список, required `user_id`; optional
+`active_only=true`, inclusive `due_from`/`due_to`. Оба tools user-scoped:
+Oyijon self-only; admin cross-target только для target из
+`allowed_target_user_ids` через отдельный narrow tool allowlist. Права на
+transactions не выдаются.
 
 Все будущие tools Stage 5.3A–6 user-scoped. Unknown/untrusted Telegram или cron identity → fail closed до MCP.
 
@@ -148,6 +171,8 @@
 | `approve_monthly_plan` | user_id, month, source | repo 23; deploy отдельно; не трогает transactions |
 | `open_monthly_plan_cycle` | user_id, month, action | repo 24; deploy отдельно; monthly_plan_cycles (+ сген. draft) |
 | `get_monthly_plan_cycle` | user_id, month | repo 24; read-only статус цикла |
+| `upsert_recurring_obligation` | user_id, action | action-specific fields валидируются до mutation; transactions не трогает |
+| `get_recurring_obligations` | user_id | active/due read-only список |
 | `save_quran_progress` | user_id | |
 | `get_quran_progress` | user_id | |
 | `save_health_note` | user_id, note | |
@@ -163,4 +188,6 @@
 
 - `BAD_CATEGORY`, `BAD_AMOUNT`, `INVALID_INPUT` (в т.ч. bad quantity/unit), `NOT_FOUND`, `NOT_CONFIGURED`, `UNKNOWN_TOOL`, `INTERNAL`.
 - `approve_monthly_plan` (детерминированные отказы, без мутации): `MONTH_ALREADY_STARTED`, `MONTH_NOT_STARTED`, `NO_DRAFT`, `EMPTY_DRAFT`, `NO_PLAN_SOURCE`, `INVALID_STATUS_TRANSITION`, `SELF_ONLY_VIOLATION`, `ADMIN_TARGET_REQUIRED`, `INVALID_APPROVER`.
+- `upsert_recurring_obligation`: `NOT_FOUND`, `OBLIGATION_INACTIVE`,
+  `DUE_DATE_MISMATCH`; все отказы без мутации.
 - Identity (middleware, до backend): `IDENTITY_*`.

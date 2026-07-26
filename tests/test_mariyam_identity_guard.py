@@ -247,6 +247,44 @@ def test_stage51_budget_policy_classification_is_strict():
     assert set(STAGE51_BUDGET_TOOLS).isdisjoint(guard.ADMIN_CROSS_TARGET_TOOLS)
 
 
+# ---- Stage 6 recurring obligations (plugin 1.3.0) ----
+STAGE6_OBLIGATION_TOOLS = (
+    "upsert_recurring_obligation",
+    "get_recurring_obligations",
+)
+
+
+@pytest.mark.parametrize("tool_name", STAGE6_OBLIGATION_TOOLS)
+def test_stage6_oyijon_is_forced_to_self(tool_name, resolver, fake_map):
+    _, _, calls = _call(tool_name, {"user_id": 1})
+    assert calls["n"] == 1
+    assert calls["args"]["user_id"] == 20
+
+
+@pytest.mark.parametrize("tool_name", STAGE6_OBLIGATION_TOOLS)
+def test_stage6_admin_allowed_target_passes(tool_name, resolver, fake_map):
+    _, _, calls = _call(tool_name, {"user_id": 20}, session_id="sess-admin")
+    assert calls["n"] == 1
+    assert calls["args"]["user_id"] == 20
+
+
+@pytest.mark.parametrize("tool_name", STAGE6_OBLIGATION_TOOLS)
+def test_stage6_admin_outside_target_allowlist_blocked(
+    tool_name, resolver, fake_map
+):
+    _, parsed, calls = _call(tool_name, {"user_id": 99}, session_id="sess-admin")
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_TARGET_FORBIDDEN"
+
+
+def test_stage6_policy_is_narrow_and_does_not_grant_transactions():
+    assert set(STAGE6_OBLIGATION_TOOLS) <= guard.USER_SCOPED_TOOLS
+    assert set(STAGE6_OBLIGATION_TOOLS) <= guard.ADMIN_CROSS_TARGET_TOOLS
+    assert "save_expense" not in guard.ADMIN_CROSS_TARGET_TOOLS
+    assert "update_expense" not in guard.ADMIN_CROSS_TARGET_TOOLS
+    assert "delete_expense" not in guard.ADMIN_CROSS_TARGET_TOOLS
+
+
 # ---- Fail-closed ----
 def test_missing_mapping_blocks(resolver, monkeypatch):
     monkeypatch.setattr(guard, "load_identity_map", lambda: (None, "IDENTITY_UNRESOLVED"))
