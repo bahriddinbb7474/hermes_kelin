@@ -112,6 +112,20 @@ Seed: 6 помеченных (`source_text='E2E_SEED_5_3A'`) food.bread/food.mea
   «ха» перепроверяется при здоровом провайдере, без обязательства. См. DECISIONS
   2026-07-26.
 
+## «ха»-approve — LIVE PASS (2026-07-26 12:11, после включения fallback)
+
+- Настроена fallback-цепочка (profile `config.yaml`, `fallback_providers`, тот же
+  провайдер/креды): `gpt-5.6-luna` → `gpt-5.6-terra` → `gpt-5.6-sol`.
+- Live: Luna снова ушла в таймаут (145 s), Hermes показал
+  `Switched to fallback model: gpt-5.6-luna → gpt-5.6-terra`, Terra ответила за 2–3 s.
+- Тест-Ойижон отправила одиночное «ха» → Мариям по SOUL-директиве вызвала
+  `get_monthly_plan_cycle`(август) = `waiting_oyijon` → `approve_monthly_plan(source=oyijon)`
+  → ответ кириллицей «Хўп, Ойижон. Август ойи учун режа тасдиқланди.»
+- **БД (ground truth):** `status=approved_by_oyijon`, `approved_by_user_id=20`
+  (self-only, тест-Ойижон), `approved_at=2026-07-26T07:11:10Z`, `source=calculated`.
+- Вывод: логика цикла и «ха»-approve исправны; единственной причиной прошлых
+  неудач был upstream-таймаут Luna (524). Fallback снимает эту зависимость.
+
 ## Rollback (задокументировано, не выполнялось)
 - Backend: восстановить db.py/server.py из backup, `.deployed-origin-main`
   предыдущий, restart Gateway.

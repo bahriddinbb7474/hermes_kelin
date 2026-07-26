@@ -92,6 +92,20 @@ approve не выполнился. Это сбой провайдера, не SO
 - **conversational «ха»-approve — best-effort** (tool-first директива развёрнута,
   сработает при здоровом провайдере; live не подтверждён из-за 524).
 
+## ОБНОВЛЕНИЕ 2026-07-26 12:11 — «ха»-approve LIVE PASS (после fallback)
+
+Добавлена fallback-цепочка `gpt-5.6-luna → gpt-5.6-terra → gpt-5.6-sol` (тот же
+провайдер n1n.ai, новых ключей не требуется; Hermes распознаёт Cloudflare 524 и
+переключается). Live-ретест: Luna таймаут 145 s → авто-переключение на Terra
+(2–3 s) → «ха» от тест-Ойижон → `get_monthly_plan_cycle`=waiting_oyijon →
+`approve_monthly_plan(source=oyijon)`.
+
+**БД:** `status=approved_by_oyijon`, `by=20`, `at=2026-07-26T07:11:10Z`.
+Ответ Ойижон: «Хўп, Ойижон. Август ойи учун режа тасдиқланди.» (кириллица).
+
+Вывод: SOUL-директива и цикл работали корректно; блокировал только upstream 524.
+Вариант А (auto-approve как основной) остаётся в силе, но «ха» теперь **подтверждён live**.
+
 ## Итог fix01
 - Шаги 1–3 (обёртка): **DONE / LIVE PASS** (штатный cron 25 доставил чисто).
 - SOUL 5.3A enable + tool-first «ха»-директива: развёрнуты, regression зелёный.
