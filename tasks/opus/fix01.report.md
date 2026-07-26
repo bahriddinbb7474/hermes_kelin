@@ -57,6 +57,28 @@ SOUL на VPS, вероятно, тоже потребует разрешени�
   решения по обновлению SOUL (владелец — архитектор/sol). 1a/1b как cron можно
   прогнать после снятия SOUL-противоречия (seed+cleanup).
 
+## Обновление (live, 2026-07-25/26)
+- **Обёртка исправлена и подтверждена live:** штатный scheduled job 25 сработал на
+  реальное 25-е число и доставил тест-Ойижон **чистое** сообщение без
+  `Cronjob Response…/To stop or manage` (озиқ-овқат 100 000, нон 4 000, жами
+  104 000, «ха»). Wrapper fix + scheduled-tick доставка — оба PASS в проде.
+- **SOUL 5.3A enable развёрнут:** `open/get/approve` разрешены; SHA `bbf21c87…`;
+  «ха»-guard из 3 фактов. Backend deploy backend 24 + guard 1.2.0 (см. imp02).
+- **«ха»-approve НЕ подтверждён live:** попытка «ха» (26-е) упала на upstream
+  `HTTP 524` от LLM-провайдера `api.n1n.ai`/`gpt-5.6-luna` (msgs=54, ~12.8k
+  tokens, retry `attempt 1/1`) — turn не выполнился, approve не вызывался. Это
+  внешний сбой провайдера, не код/SOUL/guard (когда провайдер был жив,
+  диалог 5.3-плана работал). Ранее bare-«ха» также ненадёжно маппился на approve
+  на уровне модели.
+- **Детерминантный путь:** auto-approve job 1a на 1-е число утверждает цикл без
+  «ха» (проверено unit-тестами; live 1a — на реальное 1-е Asia/Tashkent).
+
+## Статус fix01
+- Шаги 1–3 (обёртка): **DONE / LIVE PASS**.
+- Шаг 4 («ха»/1a/1b): «ха» блокируется нестабильностью провайдера (retry когда
+  провайдер здоров); 1a — детерминантный fallback (live только 1-го числа).
+  5.3A **не** помечаю CLOSED/LIVE PASS: conversational «ха» live не подтверждён.
+
 ## Коммиты
-Только docs/runbook (этот отчёт + cron/README + evidence). Фикс обёртки —
-runtime profile config (не в git; задокументирован).
+Docs/runbook + SOUL enable (SHA `4e52ffb0`→`bbf21c87`) с propagation и regression;
+фикс обёртки — runtime profile config (не в git; команда задокументирована).

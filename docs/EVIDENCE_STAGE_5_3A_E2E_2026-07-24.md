@@ -97,6 +97,17 @@ Seed: 6 помеченных (`source_text='E2E_SEED_5_3A'`) food.bread/food.mea
   вызывать Stage 5.3A tools). Нужен апдейт SOUL (владелец — архитектор/sol) до
   live «ха»/1a/1b и до статуса 5.3A = CLOSED / LIVE PASS.
 
+## Live scheduled 25 + «ха» (2026-07-25/26)
+- **Scheduled job 25 сработал на реальное 25-е**, доставка тест-Ойижон **чистая**
+  (без cron-обёртки): «Август ойи режаси тайёр: озиқ-овқатга 100 000 сўм, нонга
+  4 000 сўм. Жами 104 000 сўм … «ха» деб ёзинг.» → wrapper fix + scheduled delivery
+  PASS в проде.
+- SOUL 5.3A enable (SHA `bbf21c87…`, «ха»-guard 3 факта) развёрнут.
+- **«ха»-approve не подтверждён live:** «ха» (26-е) → upstream `HTTP 524`
+  (`api.n1n.ai`/`gpt-5.6-luna`, msgs=54/~12.8k, retry 1/1); turn не выполнился,
+  approve не вызывался. Внешний сбой провайдера, не код/SOUL/guard. Retry когда
+  провайдер здоров; детерминантный путь — auto-approve job 1a на 1-е число.
+
 ## Rollback (задокументировано, не выполнялось)
 - Backend: восстановить db.py/server.py из backup, `.deployed-origin-main`
   предыдущий, restart Gateway.
