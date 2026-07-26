@@ -59,8 +59,17 @@ hermes --profile mariyam_oyijon config set cron.wrap_response false
 fallback_providers:
   - {provider: custom, model: gpt-5.6-terra, base_url: https://api.n1n.ai/v1}
   - {provider: custom, model: gpt-5.6-sol,   base_url: https://api.n1n.ai/v1}
+  - {provider: openrouter, model: deepseek/deepseek-chat}   # вне n1n.ai
 ```
 
+Terra/Sol — тот же провайдер (спасают, когда перегружена только Luna). Третье
+звено `deepseek/deepseek-chat` через **OpenRouter** — независимый провайдер, на
+случай падения всего n1n.ai; `OPENROUTER_API_KEY` уже в profile `.env`.
+
+**LIVE PASS 2026-07-26:** Luna таймаут 145 s → авто-переключение на Terra (2–3 s) →
+«ха» от тест-Ойижон → `approve_monthly_plan` → `approved_by_oyijon` в БД.
+
 Проверка: `hermes --profile mariyam_oyijon fallback list`; сброс: `fallback clear`.
-**Открыто:** Terra/Sol не проходили языковой AC (узбекская кириллица/числа/тон) —
-проверить на тест-аккаунте; при падении Luna ответ Ойижон придёт от резервной модели.
+**Открыто:** Terra/Sol/DeepSeek не проходили языковой AC (узбекская кириллица /
+числа / тон) — прогнать пару фраз на тест-аккаунте; при падении Luna ответ Ойижон
+придёт от резервной модели.
