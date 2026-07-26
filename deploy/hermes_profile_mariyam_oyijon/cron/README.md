@@ -47,3 +47,20 @@ hermes --profile mariyam_oyijon config set cron.wrap_response false
 
 (пишет `cron.wrap_response: false` в profile `config.yaml`; restart Gateway).
 Проверять доставку только с этим выключенным флагом.
+
+## Fallback-модели (резерв при 524 провайдера)
+
+Провайдер `api.n1n.ai` периодически отдаёт Cloudflare **524** (таймаут 120 с) —
+ход агента падает, tool-calls не выполняются. Hermes распознаёт 524 и после
+исчерпания попыток переключается на fallback-цепочку. Настроено (profile
+`config.yaml`, top-level `fallback_providers`, тот же провайдер/креды):
+
+```yaml
+fallback_providers:
+  - {provider: custom, model: gpt-5.6-terra, base_url: https://api.n1n.ai/v1}
+  - {provider: custom, model: gpt-5.6-sol,   base_url: https://api.n1n.ai/v1}
+```
+
+Проверка: `hermes --profile mariyam_oyijon fallback list`; сброс: `fallback clear`.
+**Открыто:** Terra/Sol не проходили языковой AC (узбекская кириллица/числа/тон) —
+проверить на тест-аккаунте; при падении Luna ответ Ойижон придёт от резервной модели.
