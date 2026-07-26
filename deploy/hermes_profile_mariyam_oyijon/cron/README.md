@@ -57,19 +57,21 @@ hermes --profile mariyam_oyijon config set cron.wrap_response false
 
 ```yaml
 fallback_providers:
-  - {provider: custom, model: gpt-5.6-terra, base_url: https://api.n1n.ai/v1}
-  - {provider: custom, model: gpt-5.6-sol,   base_url: https://api.n1n.ai/v1}
-  - {provider: openrouter, model: deepseek/deepseek-chat}   # вне n1n.ai
+  - {provider: openrouter, model: deepseek/deepseek-chat}   # вне n1n.ai, дёшево
 ```
 
-Terra/Sol — тот же провайдер (спасают, когда перегружена только Luna). Третье
-звено `deepseek/deepseek-chat` через **OpenRouter** — независимый провайдер, на
-случай падения всего n1n.ai; `OPENROUTER_API_KEY` уже в profile `.env`.
+Единственное звено — `deepseek/deepseek-chat` через **OpenRouter**: независимый
+провайдер (спасает и при падении всего n1n.ai) и дешёвый.
+`OPENROUTER_API_KEY` уже в profile `.env`.
 
-**LIVE PASS 2026-07-26:** Luna таймаут 145 s → авто-переключение на Terra (2–3 s) →
-«ха» от тест-Ойижон → `approve_monthly_plan` → `approved_by_oyijon` в БД.
+**Terra/Sol сознательно НЕ используются** (решение заказчика 2026-07-26): по
+биллингу n1n.ai Terra ≈ $0.16–0.31 за запрос против ≈ $0.02 у Luna (коэффициент
+1.25 + групповой множитель) — при бюджете $10–15/мес это неприемлемо.
+
+**LIVE PASS 2026-07-26:** Luna таймаут 145 s → авто-переключение на резерв (2–3 s) →
+«ха» от тест-Ойижон → `approve_monthly_plan` → `approved_by_oyijon` в БД
+(проверялось на Terra до её удаления из цепочки).
 
 Проверка: `hermes --profile mariyam_oyijon fallback list`; сброс: `fallback clear`.
-**Открыто:** Terra/Sol/DeepSeek не проходили языковой AC (узбекская кириллица /
-числа / тон) — прогнать пару фраз на тест-аккаунте; при падении Luna ответ Ойижон
-придёт от резервной модели.
+**Открыто:** DeepSeek не проходил языковой AC (узбекская кириллица / числа / тон) —
+прогнать пару фраз на тест-аккаунте; при падении Luna ответ Ойижон придёт от него.
