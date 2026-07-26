@@ -1,0 +1,13 @@
+[Unit]
+Description=Notify admin about failed Mariyam unit %i
+After=network-online.target
+[Service]
+Type=oneshot
+User=timeagent
+Group=timeagent
+EnvironmentFile=/opt/hermes-mariyam-secrets/backup-heartbeat.env
+ExecStart=/usr/bin/python3 /opt/hermes-mariyam/deploy/backup/mariyam-heartbeat.py --failure-unit %i
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadOnlyPaths=/opt/hermes-mariyam /opt/hermes-mariyam-secrets

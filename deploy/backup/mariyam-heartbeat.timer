@@ -1,0 +1,8 @@
+[Unit]
+Description=Daily Hermes Mariyam admin heartbeat
+[Timer]
+OnCalendar=*-*-* 08:30:00 Asia/Tashkent
+Persistent=true
+RandomizedDelaySec=10m
+[Install]
+WantedBy=timers.target

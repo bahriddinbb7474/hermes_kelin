@@ -225,7 +225,10 @@ async def test_mcp_smoke(pool):
 
     for tool_name in ["backup_data", "get_backup_status"]:
         r = await call_json(tool_name, {})
-        assert r["ok"] is False and r["error_code"] == "NOT_CONFIGURED", r
+        assert r["ok"] is True and isinstance(r["last_ok"], bool), r
+        assert r["uploaded"] == r["last_ok"], r
+        if tool_name == "backup_data":
+            assert r["read_only"] is True, r
 
     await assert_error("save_expense", {"user_id": oy}, "INVALID_INPUT")
     await assert_error("save_expense", {"user_id": oy, "items": [{"amount_uzs": 1, "category_code": "bogus"}]}, "BAD_CATEGORY")

@@ -11,6 +11,7 @@ from mcp.server.stdio import stdio_server
 import mcp.types as types
 
 from . import db
+from .backup_status import read_backup_status
 from .config import get_pool
 
 app = Server("hermes-mariyam-backend")
@@ -258,19 +259,11 @@ async def t_get_admin_report_data(pool, a):
 
 
 async def t_backup_data(pool, a):
-    return err(
-        "NOT_CONFIGURED",
-        "Backup ещё не настроен (Этап 8)",
-        "Заҳира нусхаси ҳали созланмаган",
-    )
+    return {**read_backup_status(), "read_only": True}
 
 
 async def t_get_backup_status(pool, a):
-    return err(
-        "NOT_CONFIGURED",
-        "Backup ещё не настроен (Этап 8)",
-        "Заҳира нусхаси ҳали созланмаган",
-    )
+    return read_backup_status()
 
 
 async def t_get_bot_status(pool, a):
@@ -430,8 +423,8 @@ TOOLS = [
     ("save_alert_event", "Событие срочного уведомления", schema({**pick("user_id", "alert_type"), "severity": P["alert_severity"], **pick("source_text", "bot_response", "detected_by", "sent_to_admin")}, ["user_id", "alert_type", "severity", "source_text"])),
     ("save_plan_note", "План/заметка/счётчик как факт", schema(pick("user_id", "kind", "text", "value_int"), ["user_id", "text"])),
     ("get_admin_report_data", "Факты для отчёта 19:30 (прозу пишет Hermes)", schema(pick("user_id", "date"), ["user_id"])),
-    ("backup_data", "Backup: до Этапа 8 возвращает NOT_CONFIGURED", schema({})),
-    ("get_backup_status", "Статус backup: до Этапа 8 возвращает NOT_CONFIGURED", schema({})),
+    ("backup_data", "Read-only статус последнего зашифрованного backup", schema({})),
+    ("get_backup_status", "Read-only статус последнего зашифрованного backup", schema({})),
     ("get_bot_status", "Heartbeat: gateway/db/time", schema({})),
     ("log_usage_cost", "Записать оценку стоимости STT/TTS/LLM", schema(pick("provider", "service_type", "units", "estimated_cost_usd"), ["provider", "service_type", "units", "estimated_cost_usd"])),
 ]

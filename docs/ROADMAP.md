@@ -20,7 +20,7 @@
 | 5.4 | Official utility cabinets read-only, thresholds/snapshots, daily sync | ⬜ **PLANNED / NOT IMPLEMENTED**; research gate + migration 004; planned count 25 |
 | 6 | Hermes cron: reminders, recurring obligations, утро/вечер, новости, погода, намаз | ⬜ **PLANNED / NOT IMPLEMENTED**; migration 005 + 2 tools; planned final count 27; current runtime 21 |
 | 7 | Admin reports + safety: отчёт 19:30, alerts, recall 100% | ⬜ не начат — backend-tools готовы, нужен Hermes |
-| 8 | Backup/restore/monitoring | ⬜ не начат — `backup_data`/`get_backup_status` намеренно возвращают `NOT_CONFIGURED` |
+| 8 | Backup/restore/monitoring | ✅ **CLOSED / LIVE PASS (2026-07-26):** AES-256 GPG backup → Google Drive с собственным OAuth client, daily systemd timer, disposable restore-check (11 таблиц + известный расход), admin heartbeat; tools возвращают read-only фактический статус |
 
 ## Технический долг
 

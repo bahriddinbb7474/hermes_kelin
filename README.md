@@ -72,6 +72,12 @@ hermes-mariyam/
 
 **Формальный аудит и merge в `main` Этапа 1 — ВЫПОЛНЕНЫ.** VPS Phase B выполнена: Stage 5 Telegram E2E PASS. Текущий runtime после Stage 5.1 = **21 tools / plugin 1.0.4**; Stage 5.1 закрыт live acceptance.
 
+**Этап 8 (backup/restore/monitoring) — CLOSED / LIVE PASS (2026-07-26):**
+ежедневный AES-256 GPG backup PostgreSQL и canonical profile state уходит через
+`hermes_mariyam_gdrive` с собственным OAuth Client; restore в одноразовый PostgreSQL
+сверил 11 таблиц и известный расход; heartbeat доставляется только администратору.
+`backup_data`/`get_backup_status` являются read-only и возвращают фактический статус.
+
 **Этап 2 (язык, живой AC) — PARTIAL 8/20, НЕ закрыт:**
 - ✅ 8 из 20 фраз проверены (Сообщения 1–2, по 4 фразы) со второго аккаунта «Тест Ойижон»;
 - ✅ 8/8 ответов — узбекская кириллица, `LATIN_LINES: []` (STAGE2_LATIN_PASS на выборке); тон мягкий/уважительный;

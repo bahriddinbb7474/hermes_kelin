@@ -154,8 +154,8 @@
 | `save_alert_event` | user_id, alert_type, severity, source_text | |
 | `save_plan_note` | user_id, text | |
 | `get_admin_report_data` | user_id | |
-| `backup_data` | — | until Stage 8 → NOT_CONFIGURED |
-| `get_backup_status` | — | until Stage 8 → NOT_CONFIGURED |
+| `backup_data` | — | Stage 8: read-only статус последнего backup; запуск из LLM запрещён |
+| `get_backup_status` | — | Stage 8: `last_ok`, `last_backup_at`, `archive`, `uploaded`, `sha256` |
 | `get_bot_status` | — | |
 | `log_usage_cost` | provider, service_type, units, estimated_cost_usd | |
 
