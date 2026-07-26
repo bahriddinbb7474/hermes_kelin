@@ -1,4 +1,4 @@
-# Stage 5.3A production cron jobs (25 / 27 / 28 / 1a / 1b)
+# Production cron jobs — Stage 5.3A + Stage 6
 
 Canonical base prompts for the monthly plan approval cycle. Files here are the
 source of truth for each job's `prompt`; `prompt_sha256` in the private cron
@@ -33,6 +33,26 @@ mapped user. Delivery-цель отдельная от tool-identity.
 5. Offline/controlled E2E (`cron run` каждого job) + forged/unknown probe → block.
 
 Реальная Ойижон не подключена; доставка ей запрещена (CRON_AND_REMINDERS п.13).
+
+## Stage 6 daily-life jobs
+
+Согласовано заказчиком 2026-07-26: новости **UzA + Kun.uz**, утро **08:30**,
+вечер **19:30**, часовой пояс `Asia/Tashkent`.
+
+| File | Schedule | Deliver | Purpose | mapped allowed_tools |
+|---|---|---|---|---|
+| `06_morning.md` | `30 8 * * *` | тест‑Ойижон | погода, намаз, obligations, новости, одно сообщение | `get_recurring_obligations` |
+| `06_obligation_reminders.md` | `15 9 * * *` | тест‑Ойижон | заранее / due / due+1, без мутаций, максимум одно сообщение | `get_recurring_obligations` |
+| `06_evening.md` | `30 19 * * *` | тест‑Ойижон | один мягкий вопрос, только если за день данных нет | `get_admin_report_data` |
+
+Все mapped allowlists строго read-only. Внешние tools
+`get_tashkent_weather`, `get_tashkent_prayer_times`, `get_daily_news` не имеют
+`user_id` и не дают доступ к пользовательским данным. Их результат кэшируется
+backend на день; stale возвращается с честной пометкой.
+
+Пользовательский `cronjob` для фразы вроде «Эртага соат 10 да дорини эслат»
+остаётся **untrusted**: его job ID не добавляется в private mapping, prompt
+содержит только готовый текст напоминания и не вызывает tools.
 
 ## Чистая доставка (без cron-обёртки) — обязательно
 

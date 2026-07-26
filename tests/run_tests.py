@@ -188,7 +188,7 @@ async def test_mcp_smoke(pool):
     ]
     assert names == expected, names
     required_sets = [tuple(t.inputSchema.get("required", [])) for t in tools]
-    assert len(tools) == 26
+    assert len(tools) == 29
     assert all("required" in t.inputSchema for t in tools)
     assert len(set(required_sets)) > 10, required_sets
 

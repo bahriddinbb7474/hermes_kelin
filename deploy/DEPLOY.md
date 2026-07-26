@@ -342,3 +342,32 @@ SOUL SHA `5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`
 - Любой scheduler/router/intent-classifier/LLM-orchestrator в backend.
 
 Hermes/Mariyam использует только свои ресурсы: `name: hermes-mariyam`, контейнеры `hermes_mariyam_*`, сеть `hermes_mariyam_net`, volume `hermes_mariyam_pg_data`, localhost-порт `${BACKEND_HOST_PORT}`.
+
+## Stage 6 daily-life controlled deploy
+
+1. До замены файлов сохранить private backup backend, profile SOUL,
+   `cron/jobs.json` и cron identity mapping; записать rollback path.
+2. Добавить `OPENWEATHER_API_KEY` только в
+   `/opt/hermes-mariyam-secrets/backend.env` (mode 0600). Значение не печатать.
+   Aladhan key не требует.
+3. Установить `backend/external_data.py`, `backend/server.py`, canonical SOUL и
+   три `cron/06_*.md`; cache path =
+   `/opt/hermes-mariyam/var/external-data-cache.json`.
+4. Создать три jobs штатным Hermes cron:
+   `30 8 * * *` morning, `15 9 * * *` obligation reminders,
+   `30 19 * * *` evening, timezone profile = Asia/Tashkent.
+5. В private cron mapping добавить exact fingerprints:
+   morning → только `get_recurring_obligations`; reminder → только
+   `get_recurring_obligations`; evening → только `get_admin_report_data`.
+   Mapping atomic, owner service user, mode 0600. External tools не
+   user-scoped и в mapping не входят.
+6. Compile, restart только `hermes-gateway-mariyam_oyijon.service`; проверить
+   **29/29/29**, health, guard 1.3.0, `cron.wrap_response=false`.
+7. Controlled manual runs + минимум один штатный tick только на временный
+   test-user. One-shot probe не добавлять в mapping; prompt — готовый текст,
+   tools = 0. После evidence удалить probe job/session/output и test obligation.
+
+Rollback: pause/remove только три Stage 6 jobs, атомарно вернуть предыдущий
+private mapping и `cron/jobs.json`, восстановить backend/SOUL из backup,
+удалить cache-файл (он содержит только публичные facts), restart только
+Mariyam Gateway. Migration 005 и существующие пять Stage 5.3A jobs не менять.

@@ -91,7 +91,7 @@ async def _upsert(
 @pytest.mark.asyncio
 async def test_inventory_dispatch_and_schemas_are_26():
     tools = await server.list_tools()
-    assert len(tools) == len(server.TOOLS) == len(server.DISPATCH) == 26
+    assert len(tools) == len(server.TOOLS) == len(server.DISPATCH) == 29
     schemas = {tool.name: tool.inputSchema for tool in tools}
     assert schemas["upsert_recurring_obligation"]["required"] == [
         "user_id",

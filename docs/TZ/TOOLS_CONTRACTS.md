@@ -1,9 +1,13 @@
 # Tools Contracts
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (полные примеры вход/выход — §15).
-Реализация: `backend/server.py` + `backend/db.py`. **Repo inventory: 26 tools (dispatch/MCP discovery = 26/26).** Stage 6 шаг 1 добавляет `upsert_recurring_obligation` и `get_recurring_obligations`; migration 005 и guard 1.3.0 входят в тот же controlled deploy.
+Реализация: `backend/server.py` + `backend/db.py` + `backend/external_data.py`.
+**Repo inventory: 29 tools (dispatch/MCP discovery = 29/29).** Stage 6 шаг 2
+добавляет три read-only external-data tool с суточным файловым кэшем.
 
-**v3.19 progression:** Stage 5.3 = 21, Stage 5.3A = 24, Stage 6 шаг 1 = 26. Stage 5.4 utility tools остаются NO-GO/не реализованы, поэтому numbering migration 005 намеренно пропускает 004.
+**Progression:** Stage 5.3 = 21, Stage 5.3A = 24, Stage 6 шаг 1 = 26,
+Stage 6 шаг 2 = 29. Stage 5.4 utility tools остаются NO-GO/не реализованы,
+поэтому numbering migration 005 намеренно пропускает 004.
 
 ## Общие правила
 
@@ -26,7 +30,7 @@
 - Новые user-scoped tools Этапа 5.1 (`set_monthly_budget`, `get_monthly_budget_status`) — **тоже** под guard (self-only для oyijon).
 - Malformed/unknown → fail-closed `IDENTITY_*`.
 
-## Базовые 19 tools (в составе текущего inventory 21)
+## Базовые 19 tools (в составе текущего inventory 29)
 
 - `ensure_user`, `save_expense`, `save_income`, `update_expense`, `update_last_expense`, `delete_expense`, `delete_last_expense`, `get_expense_report`, `get_balance_summary`, `save_quran_progress`, `get_quran_progress`, `save_health_note`, `save_alert_event`, `save_plan_note`, `get_admin_report_data`, `backup_data`, `get_backup_status`, `get_bot_status`, `log_usage_cost`.
 
@@ -151,7 +155,26 @@ Oyijon self-only; admin cross-target только для target из
 `allowed_target_user_ids` через отдельный narrow tool allowlist. Права на
 transactions не выдаются.
 
-Все будущие tools Stage 5.3A–6 user-scoped. Unknown/untrusted Telegram или cron identity → fail closed до MCP.
+### Stage 6 — daily-life external facts (+3 → repo 29)
+
+- `get_tashkent_weather()` — OpenWeather current facts для Ташкента. API key
+  читается только из `OPENWEATHER_API_KEY`; в output/URL ключ не возвращается.
+- `get_tashkent_prayer_times()` — Aladhan timings для Ташкента с
+  `school=1` (Hanafi), calculation method 3.
+- `get_daily_news()` — заголовки только согласованных источников **UzA +
+  Kun.uz**, с URL/датой/источником. Backend не пишет дайджест и не выбирает
+  смысл; Hermes выбирает 3–5 спокойных пунктов и пересказывает кириллицей.
+
+У всех трёх input schema пустая: они не принимают `user_id`, не читают
+пользовательские таблицы и ничего не мутируют. Кэш — один JSON-файл
+`MARIYAM_EXTERNAL_CACHE_FILE`, freshness = текущий календарный день
+Asia/Tashkent. При отказе upstream возвращается предыдущая запись с
+`cache.stale=true` и честной пометкой; если кэша нет —
+`EXTERNAL_DATA_UNAVAILABLE`, без выдуманных значений.
+
+Все user-scoped tools Stage 5.3A–6 проходят identity guard. Unknown/untrusted
+Telegram или cron identity → fail closed до MCP. Три external-data tools не
+имеют user scope и не дают доступа к данным пользователя.
 
 ## Обязательные поля (required) по tools
 
@@ -173,6 +196,9 @@ transactions не выдаются.
 | `get_monthly_plan_cycle` | user_id, month | repo 24; read-only статус цикла |
 | `upsert_recurring_obligation` | user_id, action | action-specific fields валидируются до mutation; transactions не трогает |
 | `get_recurring_obligations` | user_id | active/due read-only список |
+| `get_tashkent_weather` | — | read-only OpenWeather, daily cache |
+| `get_tashkent_prayer_times` | — | read-only Aladhan Hanafi, daily cache |
+| `get_daily_news` | — | read-only UzA + Kun.uz candidates, daily cache |
 | `save_quran_progress` | user_id | |
 | `get_quran_progress` | user_id | |
 | `save_health_note` | user_id, note | |

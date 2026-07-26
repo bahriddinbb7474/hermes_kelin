@@ -6,11 +6,11 @@ import json
 import os
 from contextlib import asynccontextmanager
 
+from mcp import types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-import mcp.types as types
 
-from . import db
+from . import db, external_data
 from .backup_status import read_backup_status
 from .config import get_pool
 
@@ -325,6 +325,18 @@ async def t_log_usage_cost(pool, a):
     return ok()
 
 
+async def t_get_tashkent_weather(_pool, _a):
+    return await external_data.get_tashkent_weather()
+
+
+async def t_get_tashkent_prayer_times(_pool, _a):
+    return await external_data.get_tashkent_prayer_times()
+
+
+async def t_get_daily_news(_pool, _a):
+    return await external_data.get_daily_news()
+
+
 DISPATCH = {
     "ensure_user": t_ensure_user,
     "save_expense": t_save_expense,
@@ -352,6 +364,9 @@ DISPATCH = {
     "get_backup_status": t_get_backup_status,
     "get_bot_status": t_get_bot_status,
     "log_usage_cost": t_log_usage_cost,
+    "get_tashkent_weather": t_get_tashkent_weather,
+    "get_tashkent_prayer_times": t_get_tashkent_prayer_times,
+    "get_daily_news": t_get_daily_news,
 }
 
 
@@ -511,6 +526,9 @@ TOOLS = [
     ("get_backup_status", "Read-only статус последнего зашифрованного backup", schema({})),
     ("get_bot_status", "Heartbeat: gateway/db/time", schema({})),
     ("log_usage_cost", "Записать оценку стоимости STT/TTS/LLM", schema(pick("provider", "service_type", "units", "estimated_cost_usd"), ["provider", "service_type", "units", "estimated_cost_usd"])),
+    ("get_tashkent_weather", "Read-only факты погоды Ташкента из OpenWeather с суточным кэшем и честной stale-пометкой", schema({})),
+    ("get_tashkent_prayer_times", "Read-only времена намаза Ташкента из Aladhan (Hanafi) с суточным кэшем и честной stale-пометкой", schema({})),
+    ("get_daily_news", "Read-only заголовки согласованных источников UzA + Kun.uz с суточным кэшем; выбрать 3–5 спокойных пунктов должен Hermes", schema({})),
 ]
 REQUIRED_BY_TOOL = {name: tool_schema.get("required", []) for name, _desc, tool_schema in TOOLS}
 
