@@ -25,4 +25,4 @@
 - Reboot was not repeated because the shared VPS reboot window was not separately
   approved; existing Gateway linger/reboot acceptance remains documented.
 
-Commit hash and push status are recorded after the final commit.
+Implementation commit: `7647ec2` (`feat: Stage 8 encrypted backup, restore check, heartbeat`).
