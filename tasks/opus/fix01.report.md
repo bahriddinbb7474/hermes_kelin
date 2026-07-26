@@ -79,6 +79,26 @@ SOUL на VPS, вероятно, тоже потребует разрешени�
   провайдер здоров); 1a — детерминантный fallback (live только 1-го числа).
   5.3A **не** помечаю CLOSED/LIVE PASS: conversational «ха» live не подтверждён.
 
+## Финал (2026-07-26) — вариант А
+
+Последняя попытка «ха» (tool-first SOUL, SHA `ba51bee5…`) снова упёрлась в
+upstream `HTTP 524` от провайдера (`api.n1n.ai`/`gpt-5.6-luna`, 120s timeout,
+msgs≈54): «ха» **получено и обработано**, модель вызвана, но провайдер не ответил →
+approve не выполнился. Это сбой провайдера, не SOUL/tool/guard.
+
+По решению заказчика (see DECISIONS 2026-07-26): дальнейшие prompt-итерации
+прекращены; принят **вариант А**:
+- **auto-approve (cron 1a, 1-е число) — основной детерминантный путь** (unit-tested);
+- **conversational «ха»-approve — best-effort** (tool-first директива развёрнута,
+  сработает при здоровом провайдере; live не подтверждён из-за 524).
+
+## Итог fix01
+- Шаги 1–3 (обёртка): **DONE / LIVE PASS** (штатный cron 25 доставил чисто).
+- SOUL 5.3A enable + tool-first «ха»-директива: развёрнуты, regression зелёный.
+- Шаг 4: «ха» live не подтверждён (провайдер 524) → best-effort; 1a — основной путь.
+- 5.3A: `CLOSED / LIVE PASS` не проставлен (нужно живое «ха» или live auto-approve 1-го).
+
 ## Коммиты
-Docs/runbook + SOUL enable (SHA `4e52ffb0`→`bbf21c87`) с propagation и regression;
-фикс обёртки — runtime profile config (не в git; команда задокументирована).
+Wrapper docs/runbook; SOUL enable + tool-first «ха» (SHA
+`0ec1eeed`→`4e52ffb0`→`bbf21c87`→`ba51bee5`) с propagation и regression; DECISIONS
+2026-07-26. Фикс обёртки — runtime profile config (не в git; команда задокументирована).

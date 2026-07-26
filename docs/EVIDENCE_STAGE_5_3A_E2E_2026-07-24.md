@@ -103,10 +103,14 @@ Seed: 6 помеченных (`source_text='E2E_SEED_5_3A'`) food.bread/food.mea
   4 000 сўм. Жами 104 000 сўм … «ха» деб ёзинг.» → wrapper fix + scheduled delivery
   PASS в проде.
 - SOUL 5.3A enable (SHA `bbf21c87…`, «ха»-guard 3 факта) развёрнут.
-- **«ха»-approve не подтверждён live:** «ха» (26-е) → upstream `HTTP 524`
-  (`api.n1n.ai`/`gpt-5.6-luna`, msgs=54/~12.8k, retry 1/1); turn не выполнился,
-  approve не вызывался. Внешний сбой провайдера, не код/SOUL/guard. Retry когда
-  провайдер здоров; детерминантный путь — auto-approve job 1a на 1-е число.
+- **«ха»-approve не подтверждён live (best-effort, решение 2026-07-26):**
+  несколько ретестов «ха» — либо модель не вызывала approve на bare «ха», либо
+  turn падал на upstream `HTTP 524` (`api.n1n.ai`/`gpt-5.6-luna`, 120s timeout,
+  msgs≈54). Последняя SOUL-директива tool-first (SHA `ba51bee5…`) развёрнута, но
+  проверить не удалось — провайдер снова 524. Дальнейшие prompt-итерации
+  прекращены. **Основной путь — auto-approve (cron 1a, 1-е число), unit-tested.**
+  «ха» перепроверяется при здоровом провайдере, без обязательства. См. DECISIONS
+  2026-07-26.
 
 ## Rollback (задокументировано, не выполнялось)
 - Backend: восстановить db.py/server.py из backup, `.deployed-origin-main`

@@ -344,3 +344,24 @@ Stage 5.3 остаётся **PLANNED / NOT IMPLEMENTED**, расширяет с�
   27 → read-only (+ `get_monthly_plan_cycle`); 28 → read-only +
   `open_monthly_plan_cycle` + `get_monthly_plan_cycle`; 1a → read-only +
   `approve_monthly_plan`; 1b → read-only (+ `get_monthly_plan_cycle`).
+
+## Решение заказчика (2026-07-26) — «ха»-approve = best-effort, auto-approve основной
+
+- **Детерминантный путь утверждения плана — auto-approve (cron job 1a, 1-е число,
+  `source=auto`)**, без участия Ойижон; проверен unit-тестами, сработает на
+  реальное 1-е Asia/Tashkent. Это основной, гарантированный механизм.
+- **Conversational «ха»-approve — best-effort.** SOUL (SHA `ba51bee5…`) содержит
+  строгую tool-first директиву: на любое короткое согласие Ойижон Мариям сначала
+  вызывает `get_monthly_plan_cycle`(след. месяц); если `waiting_oyijon` —
+  `approve_monthly_plan(source=oyijon)`, иначе отвечает по контексту.
+- **Live не подтверждён и признан best-effort:** все ретесты «ха» упирались в
+  upstream `HTTP 524` от LLM-провайдера (`api.n1n.ai`/`gpt-5.6-luna`, 120s
+  Cloudflare timeout; усугублялось длинным контекстом сессии, msgs≈54). Ранее
+  bare-«ха» также ненадёжно маппился на approve на уровне модели. Дальнейшие
+  prompt-итерации прекращены по решению заказчика; «ха» перепроверяется, когда
+  провайдер стабилен, без обязательства.
+- **Статус Stage 5.3A:** backend (24 tools) + guard 1.2.0 + cron 25/27/28 +
+  чистая доставка (`cron.wrap_response=false`) + auto-approve — реализованы и
+  проверены (offline + live 25/27/28). Conversational «ха» — deployed best-effort.
+  Полный `CLOSED / LIVE PASS` не проставляется до живого подтверждения «ха»
+  и/или live auto-approve 1-го числа.
