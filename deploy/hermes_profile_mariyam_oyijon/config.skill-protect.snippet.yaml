@@ -42,8 +42,9 @@ agent:
     - code_execution
 
 plugins:
-  # Alphabetical profile discovery loads identity first; the permanent runtime
-  # integration test asserts the exact middleware order.
+  # Explicit order keeps identity binding before behavior-changing tool guards.
+  # Health also registers pre_gateway_dispatch for deterministic alerts.
   enabled:
     - mariyam_identity_guard
+    - mariyam_health_guard
     - mariyam_stage53_guard

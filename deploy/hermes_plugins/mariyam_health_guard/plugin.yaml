@@ -1,0 +1,10 @@
+name: mariyam_health_guard
+version: "1.0.0"
+description: >-
+  Deterministic Stage 7 health-alert guard. Detects the narrow approved Uzbek
+  Cyrillic urgent-phrase patterns before LLM dispatch, independently notifies
+  the configured admin through the active Telegram adapter, persists an
+  alert_event through the profile writer, and deduplicates gateway replays.
+  Also observes successful LLM save_alert_event calls and supplies the separate
+  admin-delivery path for semantic alerts outside the keyword set.
+author: Hermes/Mariyam

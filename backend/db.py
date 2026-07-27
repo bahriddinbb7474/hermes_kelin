@@ -1817,6 +1817,14 @@ async def save_plan_note(pool, user_id, kind, text, value_int):
 async def admin_report_data(pool, user_id, date_str):
     report_date = date_str or datetime.now(TASHKENT).date().isoformat()
     start, end = _day_bounds(report_date)
+    report_day = date.fromisoformat(report_date)
+    month_start_t = datetime(
+        report_day.year, report_day.month, 1, tzinfo=TASHKENT
+    )
+    month_end_t = _shift_month(month_start_t, 1)
+    month_start = month_start_t.astimezone(timezone.utc)
+    month_end = month_end_t.astimezone(timezone.utc)
+    month_date = month_start_t.date()
     exp_total = await pool.fetchval(
         "SELECT COALESCE(SUM(amount),0) FROM transactions "
         "WHERE user_id=$1 AND type='expense' AND occurred_at >= $2 AND occurred_at < $3",
@@ -1833,15 +1841,63 @@ async def admin_report_data(pool, user_id, date_str):
            GROUP BY t.category_code, ec.name_uz, cat_root.name_uz ORDER BY sum_uzs DESC""",
         user_id, start, end,
     )
+    month_exp_total = await pool.fetchval(
+        "SELECT COALESCE(SUM(amount),0) FROM transactions "
+        "WHERE user_id=$1 AND type='expense' "
+        "AND occurred_at >= $2 AND occurred_at < $3",
+        user_id, month_start, month_end,
+    )
+    month_inc_total = await pool.fetchval(
+        "SELECT COALESCE(SUM(amount),0) FROM transactions "
+        "WHERE user_id=$1 AND type='income' "
+        "AND occurred_at >= $2 AND occurred_at < $3",
+        user_id, month_start, month_end,
+    )
+    month_by_cat = await pool.fetch(
+        """SELECT t.category_code AS category_code,
+                  COALESCE(ec.name_uz, cat_root.name_uz) AS name_uz,
+                  SUM(t.amount) AS sum_uzs
+           FROM transactions t
+           LEFT JOIN expense_categories ec ON ec.code = t.category_code
+           LEFT JOIN expense_categories cat_root
+             ON cat_root.code = split_part(t.category_code, '.', 1)
+           WHERE t.user_id=$1 AND t.type='expense'
+             AND t.occurred_at >= $2 AND t.occurred_at < $3
+           GROUP BY t.category_code, ec.name_uz, cat_root.name_uz
+           ORDER BY sum_uzs DESC""",
+        user_id, month_start, month_end,
+    )
     health = await pool.fetch(
-        "SELECT note, severity FROM health_notes WHERE user_id=$1 "
-        "AND created_at >= $2 AND created_at < $3 ORDER BY created_at DESC",
+        """SELECT severity, COUNT(*)::int AS count
+           FROM health_notes WHERE user_id=$1
+             AND created_at >= $2 AND created_at < $3
+           GROUP BY severity ORDER BY severity""",
         user_id, start, end,
     )
     alerts = await pool.fetch(
-        "SELECT alert_type, severity FROM alert_events WHERE user_id=$1 "
-        "AND created_at >= $2 AND created_at < $3 ORDER BY created_at DESC",
+        """SELECT alert_type, severity, detected_by, sent_to_admin, created_at
+           FROM alert_events WHERE user_id=$1
+             AND created_at >= $2 AND created_at < $3
+           ORDER BY created_at DESC""",
         user_id, start, end,
+    )
+    cycle = await pool.fetchrow(
+        """SELECT status, source, household_size
+           FROM monthly_plan_cycles WHERE user_id=$1 AND month=$2""",
+        user_id, month_date,
+    )
+    planned_total = await pool.fetchval(
+        """SELECT COALESCE(SUM(planned_amount_uzs), 0)
+           FROM monthly_budget_plans WHERE user_id=$1 AND month=$2""",
+        user_id, month_date,
+    )
+    due_to = report_day + timedelta(days=7)
+    obligations = await pool.fetch(
+        """SELECT obligation_type, name, expected_amount_uzs, due_date
+           FROM recurring_obligations
+           WHERE user_id=$1 AND active AND NOT paid AND due_date <= $2
+           ORDER BY due_date, id""",
+        user_id, due_to,
     )
     quran = await pool.fetchval(
         "SELECT 1 FROM quran_progress WHERE user_id=$1 AND updated_at >= $2 AND updated_at < $3",
@@ -1854,15 +1910,59 @@ async def admin_report_data(pool, user_id, date_str):
     )
     return {
         "date": report_date,
+        "month": month_date.isoformat(),
         "expense_total_uzs": int(exp_total),
         "expense_by_category": [
             {"category_code": r["category_code"], "name_uz": r["name_uz"],
              "sum_uzs": int(r["sum_uzs"])} for r in by_cat
         ],
-        "health_notes": [{"note": r["note"], "severity": r["severity"]} for r in health],
-        "alerts": [{"alert_type": r["alert_type"], "severity": r["severity"]} for r in alerts],
+        "month_expense_total_uzs": int(month_exp_total),
+        "month_expense_by_category": [
+            {"category_code": r["category_code"], "name_uz": r["name_uz"],
+             "sum_uzs": int(r["sum_uzs"])} for r in month_by_cat
+        ],
+        "health_summary": [
+            {"severity": r["severity"], "count": int(r["count"])}
+            for r in health
+        ],
+        # Backward-compatible presence check for the Stage 6 evening job.
+        # Raw health-note text is intentionally not exposed to admin reports.
+        "health_notes": [
+            {"severity": r["severity"], "count": int(r["count"])}
+            for r in health
+        ],
+        "alerts": [
+            {
+                "alert_type": r["alert_type"],
+                "severity": r["severity"],
+                "detected_by": r["detected_by"],
+                "sent_to_admin": bool(r["sent_to_admin"]),
+                "created_at": _iso_utc(r["created_at"]),
+            }
+            for r in alerts
+        ],
         "quran_updated": bool(quran),
         "income_total_uzs": int(inc_total),
+        "month_income_total_uzs": int(month_inc_total),
+        "plan": {
+            "status": cycle["status"] if cycle else None,
+            "source": cycle["source"] if cycle else None,
+            "household_size": cycle["household_size"] if cycle else None,
+            "planned_total_uzs": int(planned_total),
+            "actual_total_uzs": int(month_exp_total),
+            "remaining_uzs": int(planned_total) - int(month_exp_total),
+        },
+        "due_obligations": [
+            {
+                "obligation_type": r["obligation_type"],
+                "name": r["name"],
+                "expected_amount_uzs": int(r["expected_amount_uzs"]),
+                "due_date": r["due_date"].isoformat(),
+                "overdue": r["due_date"] < report_day,
+            }
+            for r in obligations
+        ],
+        "due_obligations_through": due_to.isoformat(),
     }
 
 

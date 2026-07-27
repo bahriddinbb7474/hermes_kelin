@@ -371,3 +371,31 @@ Rollback: pause/remove только три Stage 6 jobs, атомарно вер
 private mapping и `cron/jobs.json`, восстановить backend/SOUL из backup,
 удалить cache-файл (он содержит только публичные facts), restart только
 Mariyam Gateway. Migration 005 и существующие пять Stage 5.3A jobs не менять.
+
+## Stage 7 admin report + health alerts controlled deploy
+
+1. Сохранить private backup: backend `db.py`, profile SOUL/config/plugins,
+   `cron/jobs.json`, cron identity mapping и production DB dump. Не печатать
+   mapping/Telegram IDs/health text.
+2. Установить `mariyam_health_guard` в profile plugins и
+   `stage7_record_keyword_alert.py` в profile `scripts/`; script и plugin
+   принадлежат service user, не symlink. Добавить в private service env только
+   non-secret absolute paths:
+   `MARIYAM_BACKEND_ROOT=/opt/hermes-mariyam`,
+   `MARIYAM_HEALTH_ALERT_PYTHON=/opt/hermes-mariyam/.venv/bin/python`,
+   `MARIYAM_HEALTH_ALERT_SCRIPT=<profile>/scripts/stage7_record_keyword_alert.py`.
+3. Merge profile config: enabled plugins =
+   identity guard → health guard → Stage 5.3 guard. Hermes core не менять.
+4. Установить backend `db.py`, SOUL и `cron/07_admin_report.md`. Создать один
+   trusted job `30 19 * * *`, delivery = test-admin, mapped actor =
+   test-Oyijon, allowed tools = только `get_admin_report_data`.
+5. Атомарно обновить mapping (0600) exact prompt/fingerprint, compile и
+   перезапустить только `hermes-gateway-mariyam_oyijon.service`.
+6. Проверить 29/29/29, health, plugin registrations, dataset recall=100%,
+   SQL/report equality. Live: manual admin report + 2–3 alert-фразы только с
+   test-Oyijon; подтвердить мягкий ответ, отдельный admin message и
+   `alert_events`, затем удалить только test rows/sessions.
+
+Rollback: pause/remove только Stage 7 admin job; вернуть сохранённые mapping,
+jobs/backend/SOUL/config/plugins/env; удалить private health-guard state и
+writer только если они созданы этим deploy; restart только Mariyam Gateway.

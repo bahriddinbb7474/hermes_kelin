@@ -1,4 +1,4 @@
-# Production cron jobs — Stage 5.3A + Stage 6
+# Production cron jobs — Stage 5.3A + Stage 6 + Stage 7
 
 Canonical base prompts for the monthly plan approval cycle. Files here are the
 source of truth for each job's `prompt`; `prompt_sha256` in the private cron
@@ -44,6 +44,7 @@ mapped user. Delivery-цель отдельная от tool-identity.
 | `06_morning.md` | `30 8 * * *` | тест‑Ойижон | погода, намаз, obligations, новости, одно сообщение | `get_recurring_obligations` |
 | `06_obligation_reminders.md` | `15 9 * * *` | тест‑Ойижон | заранее / due / due+1, без мутаций, максимум одно сообщение | `get_recurring_obligations` |
 | `06_evening.md` | `30 19 * * *` | тест‑Ойижон | один мягкий вопрос, только если за день данных нет | `get_admin_report_data` |
+| `07_admin_report.md` | `30 19 * * *` | тест‑админ | фактический отчёт день/месяц/план/обязательства/alerts, без health-текстов | `get_admin_report_data` |
 
 Все mapped allowlists строго read-only. Внешние tools
 `get_tashkent_weather`, `get_tashkent_prayer_times`, `get_daily_news` не имеют

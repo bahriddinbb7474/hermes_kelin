@@ -1,0 +1,67 @@
+{
+  "positive": [
+    {"trigger": "heart_pain", "text": "Юрагим оғрияпти."},
+    {"trigger": "heart_pain", "text": "Юрагим қаттиқ оғрияпти."},
+    {"trigger": "heart_pain", "text": "Юрагим кечадан бери оғрияпти."},
+    {"trigger": "heart_pain", "text": "Юрак томоним оғрияпти."},
+    {"trigger": "heart_pain", "text": "Юрагим яна оғриб қолди."},
+
+    {"trigger": "chest_pain", "text": "Кўкрагим оғрияпти."},
+    {"trigger": "chest_pain", "text": "Кўкрагим қаттиқ оғрияпти."},
+    {"trigger": "chest_pain", "text": "Кўксим оғрияпти."},
+    {"trigger": "chest_pain", "text": "Кўкрак томоним оғрияпти."},
+    {"trigger": "chest_pain", "text": "Кўкрагим бирдан оғриб қолди."},
+
+    {"trigger": "breathing_difficulty", "text": "Нафас олиш қийин."},
+    {"trigger": "breathing_difficulty", "text": "Нафас олишим қийин бўляпти."},
+    {"trigger": "breathing_difficulty", "text": "Нафас олиш оғир бўлиб қолди."},
+    {"trigger": "breathing_difficulty", "text": "Нафасим қисиляпти."},
+    {"trigger": "breathing_difficulty", "text": "Ҳаво етмаяпти, зўрға нафас оляпман."},
+
+    {"trigger": "dizziness", "text": "Бошим айланяпти."},
+    {"trigger": "dizziness", "text": "Бошим қаттиқ айланяпти."},
+    {"trigger": "dizziness", "text": "Бошим айланиб кетяпти."},
+    {"trigger": "dizziness", "text": "Ўрнимдан турсам бошим айланяпти."},
+    {"trigger": "dizziness", "text": "Бугундан бери бошим айланяпти."},
+
+    {"trigger": "feeling_very_bad", "text": "Ёмон бўляпман."},
+    {"trigger": "feeling_very_bad", "text": "Жуда ёмон бўляпман."},
+    {"trigger": "feeling_very_bad", "text": "Аҳволим ёмон бўляпти."},
+    {"trigger": "feeling_very_bad", "text": "Ўзимни ёмон ҳис қиляпман."},
+    {"trigger": "feeling_very_bad", "text": "Тобим қочиб, ёмон бўлиб кетяпман."},
+
+    {"trigger": "fainting", "text": "Ҳушим кетяпти."},
+    {"trigger": "fainting", "text": "Ҳушим кетиб қоляпти."},
+    {"trigger": "fainting", "text": "Ҳушимни йўқотяпман."},
+    {"trigger": "fainting", "text": "Ҳушдан кетяпман."},
+    {"trigger": "fainting", "text": "Ҳушим кетай деб қолди."},
+
+    {"trigger": "high_blood_pressure", "text": "Қон босимим жуда баланд."},
+    {"trigger": "high_blood_pressure", "text": "Қон босимим кўтарилиб кетди."},
+    {"trigger": "high_blood_pressure", "text": "Қон босимим жуда юқори чиқди."},
+    {"trigger": "high_blood_pressure", "text": "Босимим қаттиқ кўтариляпти."},
+    {"trigger": "high_blood_pressure", "text": "Босимим жуда баланд чиқди."}
+  ],
+  "negative": [
+    "Об-ҳаво ёмон экан.",
+    "Менга ёрдам беринг, харажат ёзинг.",
+    "Оёғим бироз дард қиляпти.",
+    "Қўшним бемор бўлиб қолди.",
+    "Бугун температура юқори экан.",
+    "Кўкрак гўшти олдим.",
+    "Чуқур нафас олиш машқи фойдали.",
+    "Қон босимим бугун яхши.",
+    "Босим ҳақида мақола ўқидим.",
+    "Юрак шаклидаги совға олдим.",
+    "Кайфиятим ёмон эди, ҳозир яхшиман.",
+    "Бошимга рўмол олдим.",
+    "Уйда ҳаво етмайдигандай дим.",
+    "Ҳушёр бўлиб юринг.",
+    "Кўкрак қафаси расмини кўрдим.",
+    "Нафас машқини ўрганяпман.",
+    "Қон босими аппаратини сотиб олдик.",
+    "Ёрдам сўраш ёмон эмас.",
+    "Температурани ёзиб қўйинг.",
+    "Беморга дори олиб бордим."
+  ]
+}

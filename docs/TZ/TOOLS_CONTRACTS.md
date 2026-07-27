@@ -204,7 +204,7 @@ Telegram или cron identity → fail closed до MCP. Три external-data too
 | `save_health_note` | user_id, note | |
 | `save_alert_event` | user_id, alert_type, severity, source_text | |
 | `save_plan_note` | user_id, text | |
-| `get_admin_report_data` | user_id | |
+| `get_admin_report_data` | user_id | day/month totals by category, plan status/totals, due obligations, alert metadata and health severity counts; raw health/source/bot text excluded |
 | `backup_data` | — | Stage 8: read-only статус последнего backup; запуск из LLM запрещён |
 | `get_backup_status` | — | Stage 8: `last_ok`, `last_backup_at`, `archive`, `uploaded`, `sha256` |
 | `get_bot_status` | — | |

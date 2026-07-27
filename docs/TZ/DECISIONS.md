@@ -368,3 +368,25 @@ Stage 5.3 остаётся **PLANNED / NOT IMPLEMENTED**, расширяет с�
   проверены (offline + live 25/27/28). Conversational «ха» — deployed best-effort.
   Полный `CLOSED / LIVE PASS` не проставляется до живого подтверждения «ха»
   и/или live auto-approve 1-го числа.
+
+## Решение реализации (2026-07-27) — Stage 7 health guard
+
+- Keyword-предохранитель живёт в отдельном profile plugin
+  `mariyam_health_guard`, а не в backend и не в Hermes core. Используется
+  штатный Hermes hook `pre_gateway_dispatch`, поэтому узкая проверка §10.2
+  выполняется до LLM и продолжает работать при provider error/сломавшемся
+  ответе модели.
+- Guard принимает только Telegram sender с ролью `oyijon` из существующего
+  private identity mapping 0600. Неизвестный sender/admin/другая платформа не
+  создают alert. Повтор одного Telegram message id атомарно подавляется private
+  SQLite claim в profile.
+- Немедленная доставка админу идёт отдельно через активный Telegram adapter.
+  Сохранение выполняет узкий profile writer через существующую backend-функцию
+  `save_alert_event`; backend остаётся storage-only и не классифицирует входной
+  текст.
+- Для семантического LLM-alert вне keyword-набора middleware наблюдает успешный
+  `save_alert_event(sent_to_admin=true)` и запускает тот же независимый
+  admin-delivery path.
+- Admin report не получает `health_notes.note`, `source_text` или
+  `bot_response`: только агрегат severity/count и allowlisted alert metadata.
+  Это снижает риск вывода интимных подробностей в ежедневном отчёте.
