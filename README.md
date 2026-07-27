@@ -54,7 +54,17 @@ hermes-mariyam/
 
 Настроить Hermes profile `mariyam_oyijon`, Telegram allowlist, skill личности Мариям, память, сквозной STT-тест на реальном голосе (TTS отложен — ТЗ v3.2, ответы только текстом), маленький MCP backend с PostgreSQL для точных данных, бухгалтерию с исправлением/удалением, Hermes cron для напоминаний и отчётов, safety alerts, backup/restore и мониторинг.
 
-## Текущее состояние (2026-07-26)
+## Текущее состояние (2026-07-28)
+
+**Stage 7 — CLOSED / LIVE PASS на тестовых identity (2026-07-28):**
+ежедневный tool-only отчёт test-admin в 19:30 активен, production
+inventory/dispatch/discovery = **29/29/29**, cron/mapping = **9/9**.
+Keyword guard **1.0.0** показал recall **100%** на 35/35 health-фразах и
+0/20 ложных срабатываний на curated negatives. Manual report доставлен
+test-admin и совпал с независимым SQL; Telegram smoke 3/3 дал мягкие ответы,
+отдельную admin-доставку и ровно три `alert_events`. Тестовые DB/dedupe записи
+удалены. Реальные аккаунты не подключались.
+[Evidence](docs/EVIDENCE_STAGE_7_2026-07-28.md).
 
 **Stage 6, шаг 2 — CLOSED / LIVE PASS на test-user (2026-07-27):** production
 inventory/dispatch/discovery = **29/29/29**, health PASS; OpenWeather,

@@ -19,7 +19,7 @@
 | 5.3A | Approval cycle 25/27/28/1, `approve_monthly_plan`, deterministic cron identity | 🟡 **PARTIAL**: identity plugin **1.1.0** deployed (offline/live fail-closed probes + Telegram regression PASS); ✅ **CLOSED / LIVE PASS (2026-07-26).** Live: backend 24/24/24 + guard (unbound-окно закрыто); 5 cron jobs active + private mapping 0600; offline security gates PASS; cron 25/27/28 PASS; чистая доставка без cron-обёртки (`cron.wrap_response=false`, подтверждено штатным запуском 25-го); **«ха»-approve → `approved_by_oyijon`**; 1a/1b — детерминированные отказы и admin-fallback с нулевой мутацией; fallback-модель (deepseek/openrouter) при 524 провайдера. Остаточное: фактический `auto_approved` возможен только 1-го числа (unit-tested, границы live-проверены). Evidence `EVIDENCE_STAGE_5_3A_E2E_2026-07-24.md` |
 | 5.4 | Official utility cabinets read-only, thresholds/snapshots, daily sync | ⬜ **PLANNED / NOT IMPLEMENTED**; research gate + migration 004; planned count 25 |
 | 6 | Hermes cron: reminders, recurring obligations, утро/вечер, новости, погода, намаз | ✅ **CLOSED / LIVE PASS на test-user (2026-07-27):** inventory **29/29/29**, health PASS; OpenWeather + Aladhan/Hanafi + UzA/Kun + cache 0600 PASS. Post-fix normal ticks 08:30/09:15/19:30 completed `ok`; manual morning digest и healthy-provider one-shot на 22:45 доставлены в Telegram; cleanup и private mapping 8/8 PASS. Pre-handover reliability: добавить +15-minute watchdog и provider-independent no-agent one-shot path, потому что Hermes provider fallback есть, но cron-level retry отсутствует. Evidence `EVIDENCE_STAGE_6_CRON_2026-07-26.md`. |
-| 7 | Admin reports + safety: отчёт 19:30, alerts, recall 100% | ⬜ не начат — backend-tools готовы, нужен Hermes |
+| 7 | Admin reports + safety: отчёт 19:30, alerts, recall 100% | ✅ **CLOSED / LIVE PASS на тестовых identity (2026-07-28):** tool-only report `30 19 * * *` доставлен test-admin и сверен с SQL; health guard 1.0.0, dataset 35 positives/20 negatives, recall 100%, curated precision 100%; Telegram smoke 3/3, admin delivery/DB record 3/3, cleanup PASS; 29/29/29, jobs/mapping 9/9, gateway/PostgreSQL/Time-Agent healthy/running. Реальные аккаунты не подключались. Evidence `EVIDENCE_STAGE_7_2026-07-28.md`. |
 | 8 | Backup/restore/monitoring | ✅ **CLOSED / LIVE PASS (2026-07-26):** AES-256 GPG backup → Google Drive с собственным OAuth client, daily systemd timer, disposable restore-check (11 таблиц + известный расход), admin heartbeat; tools возвращают read-only фактический статус |
 
 ## Технический долг
@@ -34,6 +34,12 @@
   repo содержит migration 005, tools 25–29 и canonical jobs
   morning/obligations/evening. Migration 004/utility connector остаётся NO-GO.
   Live deploy/acceptance шага 2 фиксируется отдельным evidence.
+- **Stage 7:** health-alert keyword path не зависит от LLM-провайдера:
+  pre-dispatch guard отдельно доставляет test-admin и пишет `alert_events`;
+  admin report использует только allowlisted данные `get_admin_report_data`.
+  Отдельный входящий on-demand запрос из Telegram UI test-admin не повторялся,
+  поскольку в доступной Web-сессии был только test-Oyijon; тот же report tool
+  path, cron trust и фактическая доставка test-admin проверены.
 - **Skill-protect:** active 4/4; постоянные SHA/contract tests остаются обязательными.
 - **Тихая блокировка unauthorized решена в ТЗ v3.5** — `PASS_SECURITY` / `ACCEPTED_SILENT_DENIAL` (решение заказчика 2026-07-12, ТЗ §0.5); отдельный gateway-fork не требуется; аудит и merge `d24d01c` в `main` **ВЫПОЛНЕНЫ** (через `dd9261e`).
 
