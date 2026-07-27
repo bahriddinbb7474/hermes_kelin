@@ -1,0 +1,26 @@
+[Unit]
+Description=Hermes Mariyam critical cron +15 minute watchdog
+After=network-online.target
+Wants=network-online.target
+OnFailure=mariyam-heartbeat-failure@%n.service
+
+[Service]
+Type=oneshot
+Environment=HERMES_HOME=/home/timeagent/.hermes/profiles/mariyam_oyijon
+Environment=MARIYAM_WATCHDOG_CONFIG=/opt/hermes-mariyam/deploy/watchdog/cron_watchdog_jobs.json
+Environment=MARIYAM_WATCHDOG_STATE=/opt/hermes-mariyam/var/watchdog/cron-watchdog.sqlite3
+Environment=MARIYAM_HERMES_PYTHON=/home/timeagent/.hermes/hermes-agent/venv/bin/python
+EnvironmentFile=/home/timeagent/.hermes/profiles/mariyam_oyijon/.env
+EnvironmentFile=/opt/hermes-mariyam-secrets/backup-heartbeat.env
+ExecStart=/usr/bin/python3 /opt/hermes-mariyam/deploy/watchdog/mariyam-cron-watchdog.py
+TimeoutStartSec=8min
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths=/opt/hermes-mariyam-secrets
+ReadWritePaths=/opt/hermes-mariyam/var/watchdog
+ReadWritePaths=/home/timeagent/.hermes/profiles/mariyam_oyijon
+
+[Install]
+WantedBy=default.target

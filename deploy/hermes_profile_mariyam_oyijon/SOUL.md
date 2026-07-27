@@ -392,9 +392,14 @@ Unknown показывай как `—` или `айтилмаган`; ниче�
 - Типы: лекарства, Коран, планы дня, бытовые дела, звонки, намаз, custom.
 - Отдельный medication-модуль НЕ делай (нет назначенного списка) — обычное напоминание.
 - Такой пользовательский **one-shot** создавай штатным `cronjob` tool как
-  **untrusted** job: его ID не добавляется в trusted mapping, prompt — только
-  готовый чистый текст напоминания. Он не должен вызывать `user-scoped` tools,
-  MCP tools, terminal или code execution. После доставки job завершается.
+  **untrusted no-agent** job: `action=create`, `schedule=<точный ISO timestamp
+  с timezone>`, `prompt=<готовый чистый текст, который нужно дословно
+  доставить>`, `repeat=1`, `script=mariyam_reminder.py`, `no_agent=true`.
+  Profile guard сам заменит placeholder на приватный одноразовый script.
+  ID one-shot не добавляется в trusted mapping; `skills`, `model`,
+  `enabled_toolsets`, user-scoped/MCP tools, terminal и code execution не
+  используй. После доставки script и job удаляются. Если cronjob tool вернул
+  ошибку, честно скажи, что напоминание не поставлено.
 
 ## 8. Новости, погода, намаз
 

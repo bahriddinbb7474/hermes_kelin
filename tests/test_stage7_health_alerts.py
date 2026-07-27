@@ -171,8 +171,9 @@ def test_profile_enables_guard_in_safe_order_and_soul_hides_marker():
     text = CONFIG.read_text(encoding="utf-8")
     identity = text.index("- mariyam_identity_guard")
     health = text.index("- mariyam_health_guard")
+    reliability = text.index("- mariyam_cron_reliability")
     stage53 = text.index("- mariyam_stage53_guard")
-    assert identity < health < stage53
+    assert identity < health < reliability < stage53
     soul = SOUL.read_text(encoding="utf-8")
     assert "MARIYAM_HEALTH_GUARD_RECORDED" in soul
     assert "НЕ вызывай `save_alert_event` повторно" in soul

@@ -390,3 +390,23 @@ Stage 5.3 остаётся **PLANNED / NOT IMPLEMENTED**, расширяет с�
 - Admin report не получает `health_notes.note`, `source_text` или
   `bot_response`: только агрегат severity/count и allowlisted alert metadata.
   Это снижает риск вывода интимных подробностей в ежедневном отчёте.
+
+## Решение реализации (2026-07-28) — pre-handover cron reliability
+
+- Hermes recurring cron остаётся at-most-once и не получает изменения core.
+  Отдельный systemd watchdog через +15 минут проверяет delivery state и cron
+  output восьми критичных jobs, затем делает максимум один штатный `cron run`.
+- Private SQLite claim `(job_id, expected_at)` запрещает повторный retry.
+  Неоднозначный state после возможной доставки не повторяется, чтобы не
+  дублировать сообщение Ойижон: вместо этого отправляется direct admin alert.
+  Сбой retry и interrupted claim также эскалируются test-admin через Telegram
+  Bot API/секреты существующего Stage 8 heartbeat, без LLM.
+- Trusted recurring jobs не меняются и обязаны оставаться mapped с
+  `script=null`, `no_agent=false`. Watchdog fail-closed сверяет exact name,
+  schedule, mapping и форму job до запуска.
+- Future ISO one-shot от mapped Oyijon переводится узким profile middleware в
+  untrusted private script, `repeat=1`, `deliver=origin`, `no_agent=true`.
+  Готовый текст фиксируется при создании и в срок доставляется без LLM.
+  Admin/recurring/non-Oyijon jobs middleware не переписывает.
+- Реальные аккаунты не подключаются; deploy/E2E выполняется только на
+  test-Oyijon и единственном test-admin до отдельного handover-разрешения.

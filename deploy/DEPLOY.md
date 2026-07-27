@@ -399,3 +399,37 @@ Mariyam Gateway. Migration 005 и существующие пять Stage 5.3A j
 Rollback: pause/remove только Stage 7 admin job; вернуть сохранённые mapping,
 jobs/backend/SOUL/config/plugins/env; удалить private health-guard state и
 writer только если они созданы этим deploy; restart только Mariyam Gateway.
+
+## Cron reliability watchdog + no-agent one-shot controlled deploy
+
+1. До изменения сохранить private backup profile SOUL/config/plugins,
+   `cron/jobs.json`, cron identity mapping и текущих systemd units. Записать
+   active commit marker; секреты и Telegram IDs не выводить.
+2. Установить `deploy/hermes_plugins/mariyam_cron_reliability/` в profile
+   `plugins/`, canonical SOUL и merge config order:
+   identity → health → cron reliability → Stage 5.3. Не заменять `.env`.
+3. Установить `deploy/watchdog/` в `/opt/hermes-mariyam/deploy/watchdog/`.
+   Создать `/opt/hermes-mariyam/var/watchdog` owner `timeagent`, mode 0700.
+   Установить user units `mariyam-cron-watchdog.service/.timer` и
+   `mariyam-heartbeat-failure@.service` в
+   `~/.config/systemd/user/`, выполнить `systemctl --user daemon-reload`,
+   enable/start timer. Existing linger обеспечивает работу после logout/reboot;
+   watchdog state создаётся mode 0600.
+4. Перезапустить только user-unit
+   `hermes-gateway-mariyam_oyijon.service`. Backend/PostgreSQL/migrations и
+   Hermes core не менять.
+5. Проверить plugin registration, timer active, watchdog service PASS,
+   29/29/29, health, cron/mapping 9/9 и exact восемь watched jobs.
+   Для всех trusted jobs подтвердить `script=null`, `no_agent=false`.
+6. E2E только на test identities: safe simulated failed state →
+   один retry/delivery; forced retry failure → один direct test-admin alert;
+   healthy state → silence. Создать будущий one-shot из Telegram test-Oyijon,
+   подтвердить `no_agent=true`, timely exact delivery без нового LLM-run и
+   удалить test job/session/output/scripts/state.
+
+Rollback: `systemctl --user disable --now` и удалить только watchdog
+timer/service/failure unit, вернуть profile
+SOUL/config/plugin из private backup, удалить только imp08 watchdog state и
+оставшиеся imp08 test artifacts, restart только Mariyam Gateway. Production
+trusted jobs/mapping, backend, migration 005, PostgreSQL и Stage 8 heartbeat не
+изменять.

@@ -52,8 +52,30 @@ mapped user. Delivery-цель отдельная от tool-identity.
 backend на день; stale возвращается с честной пометкой.
 
 Пользовательский `cronjob` для фразы вроде «Эртага соат 10 да дорини эслат»
-остаётся **untrusted**: его job ID не добавляется в private mapping, prompt
-содержит только готовый текст напоминания и не вызывает tools.
+остаётся **untrusted**: его job ID не добавляется в private mapping. Profile
+plugin `mariyam_cron_reliability` заменяет будущий ISO one-shot от mapped
+test/Oyijon на private script с `no_agent=true`, `repeat=1`, `deliver=origin`.
+Script печатает уже готовый текст дословно и сам удаляется; при наступлении
+срока LLM/provider не вызывается. Recurring/admin jobs и все trusted identity
+jobs не переписываются; у trusted jobs по-прежнему `script=null`,
+`no_agent=false`.
+
+## +15-minute watchdog
+
+System timer `mariyam-cron-watchdog.timer` проверяет раз в пять минут восемь
+критичных recurring jobs: цикл 25/27/28/1a/1b, morning, obligations и admin
+report. После 15-минутного grace он требует одновременно:
+
+- успешный `last_run_at`/`last_status` без `last_delivery_error`;
+- новый cron output;
+- exact schedule, enabled state, trusted mapping и запрет script/no-agent.
+
+При доказанном failed/missing tick выполняется ровно один штатный `cron run`.
+Claim хранится в private SQLite, поэтому следующий timer tick не создаёт
+дубликат. Повторный сбой или неоднозначное состояние (output уже есть, но
+delivery state не зафиксирован) отправляет test-admin прямой Telegram alert
+механизмом Stage 8; LLM не участвует. Interrupted claim не повторяет user
+delivery и через 10 минут эскалируется админу.
 
 ## Чистая доставка (без cron-обёртки) — обязательно
 

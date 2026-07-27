@@ -47,4 +47,5 @@ plugins:
   enabled:
     - mariyam_identity_guard
     - mariyam_health_guard
+    - mariyam_cron_reliability
     - mariyam_stage53_guard
