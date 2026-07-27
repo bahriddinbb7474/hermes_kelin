@@ -1,6 +1,6 @@
 # imp06 report — Stage 6 cron daily life
 
-Result: **PARTIAL / deployed** on 2026-07-26.
+Result: **CLOSED / LIVE PASS on the approved test identity** on 2026-07-27.
 
 Implemented and pushed:
 
@@ -35,15 +35,23 @@ Verification:
 - OpenWeather retry on 2026-07-27 PASS with fresh Tashkent data; key remains
   only in matching private 0600 env files;
 - Telegram creation/confirmation and untrusted one-shot security PASS;
-- due-now one-shot delivery FAIL because the model provider returned HTTP 524;
+- historical due-now one-shot delivery FAIL because the model provider returned
+  HTTP 524;
 - first scheduled evening tick ran, exposed a trailing-newline prompt-binding
   mismatch, and failed closed; job prompts/fingerprints were normalized and
   final `resolve_cron_actor` probe PASS;
 - post-fix scheduled morning 08:30, obligation 09:15 and evening 19:30 ticks on
   2026-07-27 all completed `ok`, with non-empty outputs, no blocked markers and
   trust resolve PASS;
-- manual sensitive digest replay was not authorized by the safety gate;
-- exact test one-shot jobs/sessions/outputs cleaned.
+- explicitly authorized production morning replay delivered a clean live
+  Telegram digest with fresh weather/prayer/news data and no runtime markers;
+- healthy-provider one-shot retry delivered at the requested 22:45 Tashkent
+  time; exact test job/session/lock/output cleanup PASS;
+- installed Hermes has one primary provider attempt plus configured fallback,
+  but no cron-level retry: a failed recurring occurrence advances to its next
+  schedule and a failed one-shot is consumed. Deterministic +15-minute
+  watchdogs and a no-agent one-shot dispatcher are recorded as pre-handover
+  reliability work.
 
 Full masked evidence and rollback details:
 `docs/EVIDENCE_STAGE_6_CRON_2026-07-26.md`.

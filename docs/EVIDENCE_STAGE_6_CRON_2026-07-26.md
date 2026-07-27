@@ -1,6 +1,6 @@
 # Stage 6 cron — live evidence, 2026-07-26
 
-Status: **PARTIAL / LIVE DEPLOYED**.
+Status: **CLOSED / LIVE PASS on the approved test Oyijon identity**.
 
 ## Scope and deployed state
 
@@ -64,10 +64,11 @@ On 2026-07-27 all three normal post-fix ticks completed successfully:
 - evening 19:30: status `ok`, non-empty output, no guard/runtime marker,
   trust resolve PASS.
 
-A manual production Telegram replay was not performed: the safety gate rejected
-sending an unreviewed admin/obligation payload to a recipient. Local-only model
-replays were also rejected because they would disclose the mapped user's data
-to the external model provider. No workaround was attempted.
+After explicit approval on 2026-07-27, the exact production morning job was run
+manually for the test Oyijon identity. It delivered one Telegram digest at
+22:35 Tashkent time: fresh Tashkent weather, all five prayer times, four UzA
+news items and the honest empty-obligations result. The output contained 1,415
+Cyrillic characters, was non-empty, and had no blocked/runtime/technical marker.
 
 ## Telegram one-shot smoke
 
@@ -76,24 +77,53 @@ to the external model provider. No workaround was attempted.
   created exactly one `once` job for 10:00 the next day.
 - The job was untrusted: mapping=false, repeat=1, no script, no user-scoped or
   terminal/tool instructions.
-- A safe due-now smoke,
-  `Бугун соат 19:42 да «IMP06 синови» деб эслат.`, was confirmed and created
-  as an equivalent untrusted one-shot.
-- The scheduler invoked it on time and removed it after the single attempt, but
-  the model provider returned HTTP 524 after its 120-second timeout. Therefore
-  no Telegram reminder arrived; timely delivery is **FAIL**.
-- Both test one-shot jobs, exact cron sessions and outputs were removed.
-  Production returned to 8 jobs / 8 mapping entries. No test obligation was
-  created.
+- The first safe due-now smoke at 19:42 was invoked on time and consumed, but
+  the model provider returned HTTP 524 after its 120-second timeout. No reminder
+  arrived in that historical attempt.
+- The authorized retry used
+  `Бугун, 27 июль 2026, Тошкент вақти билан соат 22:45 да
+  «IMP06 retry синови» деб эслат.` The bot confirmed the date/time, created
+  exactly one unmapped `once` job with repeat 1 and no script/tool instructions,
+  and delivered at 22:45:
+  `Ойижон, “IMP06 retry синови”ни унутманг.`
+- The successful one-shot was consumed as designed. Its exact cron session,
+  compression lock and output directory were removed. Production returned to
+  **8 jobs / 8 mapping entries**. No test obligation was created.
 
-## Residual work before CLOSED
+## HTTP 524 and cron retry semantics
 
-1. Obtain explicit approval for a payload-reviewed manual digest/reminder run,
-   or use a synthetic user with no real obligation/report data.
-2. Repeat the safe due-now one-shot when the model provider is healthy and
-   confirm actual Telegram arrival.
+Read-only inspection of the installed Hermes runtime and active profile found:
+
+- `agent.api_max_retries=1`, which means one call to the primary provider, not
+  one retry after the first call;
+- a configured OpenRouter `deepseek/deepseek-chat` fallback, and live journal
+  evidence that Hermes switches to it after a retryable primary-provider 524;
+- no cron-level retry. For a recurring job Hermes advances `next_run` before
+  execution. If primary and fallback both fail, that occurrence is not retried
+  and the job waits for its next normal schedule;
+- an agent failure is converted to a sanitized failure message for delivery.
+  If Telegram delivery also fails, Hermes records `last_delivery_error`, but
+  the recipient can receive nothing;
+- finite one-shots are claimed before execution and removed after their single
+  attempt, including an unsuccessful attempt. A provider outage can therefore
+  consume a reminder permanently.
+
+Minimal pre-handover protection proposed, but not deployed in this acceptance:
+
+1. Add deterministic watchdog ticks at 08:45, 09:30 and 19:45. Each checks the
+   exact primary job's status for the current occurrence, exits silently through
+   `{"wakeAgent": false}` after success, and triggers the exact primary job once
+   after failure/missing completion.
+2. Send an admin alert if that single recovery attempt also fails.
+3. Move user one-shot reminders to a deterministic no-agent dispatcher/queue so
+   delivery of stored reminder text does not require an LLM provider.
+
+Increasing `api_max_retries` alone is not the preferred protection: each 524 can
+consume the full 120-second provider timeout, while it still does not repair the
+at-most-once cron/one-shot semantics.
 
 Rollback is available from the backup directory above; restore the saved
 backend/profile/cron/mapping files and DB dump as applicable, then restart only
-the Mariyam gateway. Stage 6 must remain **PARTIAL** until both residual
-items pass.
+the Mariyam gateway. Stage 6 acceptance is closed on the approved test identity;
+the retry watchdog and provider-independent one-shot path remain a pre-handover
+reliability item before connecting the real Oyijon.
