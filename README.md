@@ -57,12 +57,11 @@ hermes-mariyam/
 ## Текущее состояние (2026-07-26)
 
 **Stage 6, шаг 2 — PARTIAL / LIVE DEPLOYED (2026-07-26):** production
-inventory/dispatch/discovery = **29/29/29**, health PASS; Aladhan/Hanafi,
-UzA + Kun.uz и cache 0600 PASS. Jobs 08:30/09:15/19:30 active, private
-mapping = 8/8, post-fix cron trust resolve PASS. До CLOSED остаются:
-добавить OpenWeather key только в private secrets; получить post-fix
-scheduled Telegram tick; повторить one-shot delivery после provider HTTP
-524; провести явно одобренный manual replay без раскрытия чувствительного
+inventory/dispatch/discovery = **29/29/29**, health PASS; OpenWeather,
+Aladhan/Hanafi, UzA + Kun.uz и cache 0600 PASS. Post-fix scheduled jobs
+08:30/09:15/19:30 завершились `ok`, private mapping = 8/8, cron trust resolve
+PASS. До CLOSED остаются: повторить one-shot delivery после provider HTTP 524
+и провести явно одобренный manual replay без раскрытия чувствительного
 payload. [Evidence](docs/EVIDENCE_STAGE_6_CRON_2026-07-26.md).
 
 ТЗ: **v3.19**. Stage 5.1 и Stage 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **CLOSED / LIVE PASS** ([evidence](docs/EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)). `items` omitted остаётся category-only совместимостью; explicit empty/null/non-array `items` детерминированно отклоняется до DB mutation. Новый отдельный profile plugin `mariyam_stage53_guard` связывает structured price lookup с product save и блокирует повтор идентичного mutating call после success или неизвестного outcome. Identity plugin **1.3.0 развёрнут на VPS**; Hermes core не менялся. Profile отключает `skills`, `terminal`, `code_execution` и ограничивает turn шестью model iterations. Текущий repo canonical SOUL LF SHA `07f658f19990c69e7b948a94f906627137ee835e0d95db6e8fedc1396058489f`. Migration 003/005 active на VPS; [Telegram E2E Stage 5.3](docs/EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md). **Stage 5.3A: в repo реализованы три user-scoped tools — `approve_monthly_plan` (draft→approved/auto_approved), `open_monthly_plan_cycle` (создание draft `waiting_oyijon`/escalate `waiting_admin`, с детерминированной auto-генерацией draft) и `get_monthly_plan_cycle` (read-only статус цикла для cron-гейтинга). На момент закрытия 5.3A repo/VPS tool count = 24 (24/24/24).** Transactions не читаются на запись и не меняются. **Stage 5.3A = CLOSED / LIVE PASS (2026-07-26):** 5 production cron jobs (25, 27, 28, 1a, 1b) active с private mapping 0600; live подтверждены cron 25/27/28, чистая доставка без cron-обёртки, «ха»-approve → `approved_by_oyijon`, отказы 1a и admin-fallback 1b без мутаций, offline security gates; настроен fallback на `deepseek/deepseek-chat` (OpenRouter) при 524 основного провайдера. Фактический `auto_approved` возможен только 1-го числа (unit-tested). Реальная Ойижон не подключена — доставка на тест-аккаунты.

@@ -32,10 +32,10 @@ Status: **PARTIAL / LIVE DEPLOYED**.
   container running.
 - Aladhan/Hanafi: PASS, fresh cache, all five prayer times present.
 - News: PASS, fresh cache, 12 candidates, UzA + Kun.uz, no source errors.
-- Cache: PASS, mode 0600, two daily entries.
-- OpenWeather: honest `EXTERNAL_DATA_UNAVAILABLE`; no key exists in either
-  private production environment. No weather value was invented and no secret
-  was added to git.
+- Cache after the 2026-07-27 retry: PASS, mode 0600, three daily entries.
+- OpenWeather retry on 2026-07-27: PASS through the production MCP, fresh
+  Tashkent data (`stale=false`). The same active key is present only in the two
+  private 0600 production env files; its value was not logged or added to git.
 - Deployed backend/SOUL hashes: PASS.
 - Private cron mapping: mode 0600, **8 entries / 8 jobs**.
 
@@ -54,6 +54,15 @@ The three new job prompts were normalized in place, their private fingerprints
 were recomputed, and a second private rollback snapshot was retained. Final
 read-only trust probe: fingerprint PASS, prompt hash PASS, prompt binding PASS,
 `resolve_cron_actor` PASS.
+
+On 2026-07-27 all three normal post-fix ticks completed successfully:
+
+- morning 08:30: status `ok`, non-empty output, no guard/runtime marker,
+  trust resolve PASS;
+- obligation reminders 09:15: status `ok`, non-empty output, no guard/runtime
+  marker, trust resolve PASS;
+- evening 19:30: status `ok`, non-empty output, no guard/runtime marker,
+  trust resolve PASS.
 
 A manual production Telegram replay was not performed: the safety gate rejected
 sending an unreviewed admin/obligation payload to a recipient. Local-only model
@@ -79,15 +88,12 @@ to the external model provider. No workaround was attempted.
 
 ## Residual work before CLOSED
 
-1. Add `OPENWEATHER_API_KEY` to private VPS secrets and rerun the weather and
-   morning-digest checks.
-2. Obtain explicit approval for a payload-reviewed manual digest/reminder run,
+1. Obtain explicit approval for a payload-reviewed manual digest/reminder run,
    or use a synthetic user with no real obligation/report data.
-3. Observe a post-fix normal scheduled digest tick with an allowed tool call.
-4. Repeat the safe due-now one-shot when the model provider is healthy and
+2. Repeat the safe due-now one-shot when the model provider is healthy and
    confirm actual Telegram arrival.
 
 Rollback is available from the backup directory above; restore the saved
 backend/profile/cron/mapping files and DB dump as applicable, then restart only
-the Mariyam gateway. Stage 6 must remain **PARTIAL** until all four residual
+the Mariyam gateway. Stage 6 must remain **PARTIAL** until both residual
 items pass.

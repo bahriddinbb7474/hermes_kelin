@@ -32,12 +32,16 @@ Verification:
 - local suite: 271 passed, 86 skipped;
 - production backend/MCP: 29/29/29, health gateway+DB PASS;
 - prayer/news/cache/hashes/services PASS;
-- weather honestly unavailable because the private OpenWeather key is absent;
+- OpenWeather retry on 2026-07-27 PASS with fresh Tashkent data; key remains
+  only in matching private 0600 env files;
 - Telegram creation/confirmation and untrusted one-shot security PASS;
 - due-now one-shot delivery FAIL because the model provider returned HTTP 524;
 - first scheduled evening tick ran, exposed a trailing-newline prompt-binding
   mismatch, and failed closed; job prompts/fingerprints were normalized and
   final `resolve_cron_actor` probe PASS;
+- post-fix scheduled morning 08:30, obligation 09:15 and evening 19:30 ticks on
+  2026-07-27 all completed `ok`, with non-empty outputs, no blocked markers and
+  trust resolve PASS;
 - manual sensitive digest replay was not authorized by the safety gate;
 - exact test one-shot jobs/sessions/outputs cleaned.
 
