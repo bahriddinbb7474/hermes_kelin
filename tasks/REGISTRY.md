@@ -13,3 +13,10 @@
 | fix01-opus | Opus | Убрать cron-обёртку из доставки Ойижон + добить «ха»/1a/1b E2E | done | PASS; 5.3A = PARTIAL до live «ха» или auto-approve 1 авг |
 | imp01-terra | Terra | Stage 8: backup+restore-проверка, автозапуск, heartbeat | done | LIVE PASS |
 | imp03-opus | Opus | Tool open_monthly_plan_cycle (вариант A), count 23 | done | PASS |
+| imp04-sol | Sol | Gate 5.4: исследование кабинета электрики (без кода) | done | PASS; вердикт NO-GO до разрешения HET + проверки с реальным аккаунтом |
+| imp05-sol | Sol | Stage 6 шаг 1: migration 005 + obligations tools 26 + guard 1.3.0 + deploy | done | PASS, live deploy подтверждён |
+| imp06-sol | Sol | Stage 6 шаг 2: cron-быт (утро/вечер, новости, погода, намаз, напоминания) | done | PASS, Stage 6 CLOSED live на test-user |
+| imp07-sol | Sol | Stage 7: отчёт админу 19:30 + health-alerts recall 100% | done | PASS, CLOSED live; on-demand с admin-аккаунта — проверить заказчику |
+| imp08-sol | Sol | Cron watchdog +15 мин и no-agent one-shot (pre-handover reliability) | done | PASS, CLOSED live |
+| imp04-opus | Opus | Аудит токенов + личность «живая келин», SOUL v2 (2 фазы, STOP на утверждении) | фаза 1 done, STOP | — (ждёт утверждения заказчика) |
+| — | Sol | Языковой + голосовой тест (после восстановления лимитов) | запланирована | — |
