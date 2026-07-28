@@ -18,8 +18,8 @@ def test_identity_sentinel_and_ensure_user_policy_preserved():
     compact = text.replace(" ", "")
     assert "user_id:0" in compact
     assert "Не вызывай `ensure_user` в обычных сообщениях" in text
-    identity = text.split("## 1.1.", 1)[1].split("## 2.", 1)[0]
-    assert "Trusted binding" in identity
+    identity = text.split("## 4. Идентичность", 1)[1].split("## 5.", 1)[0]
+    assert "mariyam_identity_guard" in identity
     assert "display_name" in identity
     assert "Запрещено" in identity
     assert "Guard **перезапишет**" in identity
@@ -58,7 +58,6 @@ def test_required_quantity_normalization_examples_exist():
         ("500 грамм пишлоқ", "quantity=500", "unit=g"),
         ("3 литр ёғ", "quantity=3", "unit=l"),
         ("6 та тухум", "quantity=6", "unit=pcs"),
-        ("10 кило картошка 70 минг", "quantity=10", "unit=kg"),
     )
     for phrase, quantity, unit in expected:
         assert phrase in text
@@ -73,7 +72,7 @@ def test_expense_analytics_tool_contract():
     assert "`trend_months=3`" in text
     assert "максимум 12" in text
     assert "`monthly_series`" in text
-    assert "суммы и количества бери только из tool" in text
+    assert "суммы и количества только из tool result" in text
 
 
 def test_monthly_budget_tools_and_negative_remaining_contract():
@@ -99,18 +98,18 @@ def test_user_facing_units_are_cyrillic_and_technical_traces_forbidden():
     for unit in ("кг", "г", "л", "мл", "та", "қадоқ"):
         assert unit in text
     assert "дона" not in text
-    assert "только узбекская кириллица" in text
-    assert "Не показывай Ойижон JSON" in compact
+    assert "только узбекский, кириллица" in text
+    assert "не показывай JSON" in compact
     assert "tool names" in text
-    assert "технические сообщения/traces" in text
+    assert "технические сообщения и traces" in text
 
 
 def test_stage51_examples_and_report_decisions_exist_without_conflict():
     text = _text()
     for phrase in (
-        "10 кило картошка 70 минг",
-        "Кейинги ой озиқ-овқатга 1,5 миллион режа қўйинг",
         "GENERAL_FAMILY_REPORT",
+        "CATEGORY_DETAIL",
         "COMPARE_OR_TREND",
+        "SET_MONTHLY_BUDGET",
     ):
         assert phrase in text

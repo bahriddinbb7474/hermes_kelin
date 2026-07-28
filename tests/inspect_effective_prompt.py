@@ -21,21 +21,19 @@ DECISION_TABLE_MARKER = "GENERAL_FAMILY_REPORT"
 AUTO_DETAIL_BAN = "Товарные строки автоматически не показывай"
 CATEGORY_SUMMARY_HEADER = "Харажат гуруҳи | Режа | Сарфлангани | Қолгани"
 PRODUCT_TABLE_HEADER = "Маҳсулот | Миқдор | Сарфлангани"
-CATEGORY_TABLE_ONLY = "summary категории выводи только отдельной Markdown-таблицей"
-BULLET_SUMMARY_BAN = "Маркированный список вместо summary-таблицы запрещён"
-SUMMARY_BEFORE_PRODUCTS = (
-    "Сразу после summary-таблицы выведи таблицу фактических товаров"
-)
+CATEGORY_TABLE_ONLY = "Summary категории выводи только"
+BULLET_SUMMARY_BAN = "маркированный список вместо"
+SUMMARY_BEFORE_PRODUCTS = "Сразу после summary-таблицы выведи таблицу фактических"
 COMPLETION_NOT_TOTAL_DRIVEN = "Наличие `Жами` никогда не определяет"
 CATEGORY_COMPLETION = "После таблиц завершить ответ"
-CATEGORY_NO_GENERAL_PHRASE = "Финальную фразу общего отчёта не писать"
-STAGE53_HEADING = "Stage 5.3 — продуктовый месячный план"
+CATEGORY_NO_GENERAL_PHRASE = "финальную фразу общего отчёта не писать"
+STAGE53_HEADING = "5.3. Месячный план по продуктам"
 STAGE53_PRODUCT_HEADER = (
     "Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма"
 )
 ONE_QUESTION = "бир хабарда фақат битта савол"
 DRAFT_CONFIRMATION = "не вызывай `set_monthly_budget`"
-NUTRITION_LIMIT = "максимум один web search на plan cycle"
+PERSONA_ONE_QUESTION = "Один вопрос в сообщении"
 OLD_FIVE_COLUMN = (
     "Маҳсулот | Режа миқдор | Режа сўм | "
     "Сарфланган миқдор | Сарфланган сўм | Қолди сўм"
@@ -75,13 +73,13 @@ def main() -> None:
         "markers": {
             "identity_sentinel": full.count("user_id: 0"),
             "language_contract": full.count("только узбекский, кириллица"),
-            "medical_contract": full.count("## 9. Медицинская безопасность"),
+            "medical_contract": full.count("## 10. Медицинская безопасность"),
             "decision_table": full.count(DECISION_TABLE_MARKER),
             "monthly_budget_tool": full.count("get_monthly_budget_status"),
             "final_phrase": full.count(FINAL_PHRASE),
             "pcs_to_ta": full.count("pcs → та"),
             "auto_detail_ban": full.count(AUTO_DETAIL_BAN),
-            "stage52_product_plan_ban": full.count("Product plan не показывай"),
+            "stage52_product_plan_ban": full.count("product plan не показывай"),
             "category_summary_header": full.count(CATEGORY_SUMMARY_HEADER),
             "product_table_header": full.count(PRODUCT_TABLE_HEADER),
             "category_table_only": full.count(CATEGORY_TABLE_ONLY),
@@ -94,9 +92,10 @@ def main() -> None:
             "stage53_product_header": full.count(STAGE53_PRODUCT_HEADER),
             "stage53_one_question": full.count(ONE_QUESTION),
             "stage53_draft_confirmation": full.count(DRAFT_CONFIRMATION),
-            "stage53_nutrition_limit": full.count(NUTRITION_LIMIT),
+            "persona_one_question": full.count(PERSONA_ONE_QUESTION),
             "stage53_price_lookup": full.count("price_lookup_items"),
             "stage53_execute_code_ban": full.count("execute_code"),
+            "persona_rules": full.count("## 2. Как ты разговариваешь"),
         },
         "forbidden": {
             "dona": "дона" in full,

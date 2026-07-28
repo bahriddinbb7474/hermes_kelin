@@ -33,13 +33,28 @@ agent:
   # a turn even if the model ignores DUPLICATE_SUCCESS_BLOCKED.
   max_turns: 6
   # Disable skill management and all command-execution surfaces for Mariyam only.
-  # SOUL.md remains in the system prompt; MCP/browser/cron/memory stay available.
+  # SOUL.md remains in the system prompt; MCP/cron/memory stay available.
   # Hermes v0.18.2 does not place execute_code in "terminal": both supported
   # toolsets must be disabled to remove terminal/process/execute_code.
+  #
+  # Token audit 2026-07-28 (docs/AUDIT_TOKENS_PERSONA_2026-07.md): the toolsets
+  # below cost 7 255 o200k tokens in EVERY request and are never used by any
+  # ТЗ scenario — Mariyam has no browser, no filesystem, no sub-agents and no
+  # TTS (voice output disabled by the customer). Keep `cronjob` (reminders,
+  # SOUL §9) and `memory` (preferences) enabled.
   disabled_toolsets:
     - skills
     - terminal
     - code_execution
+    - browser
+    - file
+    - delegation
+    - session_search
+    - image_gen
+    - vision
+    - tts
+    - todo
+    - clarify
 
 plugins:
   # Explicit order keeps identity binding before behavior-changing tool guards.

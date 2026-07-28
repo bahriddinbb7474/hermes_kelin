@@ -398,7 +398,9 @@ def test_soul_requires_no_agent_one_shot_contract():
     assert "**untrusted no-agent**" in text
     assert "`script=mariyam_reminder.py`" in text
     assert "`no_agent=true`" in text
-    assert "ID one-shot не добавляется в trusted mapping" in text
+    # SOUL v2 (imp04): trusted-mapping isolation остаётся за profile guard,
+    # промпту достаточно запрета передавать привилегированные поля.
+    assert "user-scoped и MCP tools в такой job не передавай" in text
 
 
 def test_manifest_and_systemd_hardening_contracts():

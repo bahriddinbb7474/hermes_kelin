@@ -1,4 +1,11 @@
-"""Permanent canonical SOUL contract for Stage 5.3 product planning."""
+"""Permanent canonical SOUL contract for Stage 5.3 product planning.
+
+SOUL v2 (imp04, 2026-07-28): раздел сжат — подробный сценарий цикла живёт в
+cron-промптах 25/27/28/1a, а в SOUL остались правила, которые ломались в живых
+прогонах: один вопрос за сообщение, цены только из read-only lookup, никакого
+`set_monthly_budget` до подтверждения, точные имена полей, трёхколоночный отчёт
+и flow короткого «ха» → `approve_monthly_plan`.
+"""
 from pathlib import Path
 
 PROMPT = (
@@ -7,7 +14,7 @@ PROMPT = (
     / "hermes_profile_mariyam_oyijon"
     / "SOUL.md"
 )
-STAGE53_HEADING = "### 3.3. Stage 5.3 — продуктовый месячный план"
+STAGE53_HEADING = "### 5.3. Месячный план по продуктам"
 CATEGORY_HEADER = "Харажат гуруҳи | Режа | Сарфлангани | Қолгани"
 PRODUCT_HEADER = "Маҳсулот | Режа: миқдор / сумма | Амалда: миқдор / сумма"
 OLD_FIVE_COLUMN = (
@@ -23,7 +30,7 @@ def _text() -> str:
 def _stage53() -> str:
     text = _text()
     assert text.count(STAGE53_HEADING) == 1
-    return text.split(STAGE53_HEADING, 1)[1].split("\n### 3.4.", 1)[0]
+    return text.split(STAGE53_HEADING, 1)[1].split("\n### 5.4.", 1)[0]
 
 
 def test_stage52_decision_table_and_completion_contract_remain_present():
@@ -43,15 +50,14 @@ def test_stage52_decision_table_and_completion_contract_remain_present():
 
 
 def test_dialog_is_strictly_sequential_and_draft_first():
+    text = _text()
     section = _stage53()
-    assert "бир хабарда фақат битта савол" in section
-    assert "повторно не спрашивай" in section
-    assert "Если quantity неизвестно, задай один уточняющий" in section
-    assert "draft" in section
-    assert "явного подтверждения" in section
+    # Правило «один вопрос» стало общим правилом тона (§2) и действует всегда.
+    assert "бир хабарда фақат битта савол" in text
+    assert "по одному вопросу за\nсообщение" in section
+    assert "уже сказанное не\nпереспрашивай" in section
     assert "не вызывай `set_monthly_budget`" in section
-    assert "исправленный draft" in section
-    assert "снова получи подтверждение" in section
+    assert "До явного\nподтверждения draft" in section
 
 
 def test_price_choice_requires_read_only_lookup_before_draft():
@@ -62,93 +68,83 @@ def test_price_choice_requires_read_only_lookup_before_draft():
     assert "user_id: 0" in section
     assert "month" in section
     assert "item_name_normalized" in section
-    assert "unit" in section
-    assert section.index(lookup) < section.index("полный draft")
-    assert "Draft формируй только из результата этого tool" in section
-    assert "lookup вернул `null`" in section
-    assert "один вопрос о manual price" in section
-    assert "не сохраняй plan" in section
+    assert "price_basis: last|average" in section
+    assert "Цены бери только из" in section
+    assert "вернулся `null` — задай один вопрос про цену и не сохраняй" in section
 
 
 def test_confirmed_product_payload_uses_exact_contract_fields_and_never_drops_items():
     section = _stage53()
-    required_fields = (
-        '"item_name_normalized": "кир совуни"',
-        '"item_name_display": "Кир совуни"',
-        '"planned_quantity": 5',
-        '"unit": "pcs"',
-        '"planned_amount_uzs": 60000',
-        '"reference_unit_price_uzs": 12000',
-        '"price_basis": "last"',
-        '"price_as_of":',
-    )
-    assert all(field in section for field in required_fields)
-    assert "никогда не заменяй подтверждённые товары на `items: []`" in section
-    assert "не сохраняй category-only plan" in section
-    assert "ровно один вызов `set_monthly_budget`" in section
-    assert "сразу прекрати tool loop" in section
+    for field in (
+        "`item_name_normalized`",
+        "`item_name_display`",
+        "`planned_quantity`",
+        "`unit`",
+        "`planned_amount_uzs`",
+        "`reference_unit_price_uzs`",
+        "`price_basis`",
+        "`price_as_of`",
+    ):
+        assert field in section
+    assert "aliases `item_name`, `quantity`, `price_uzs`\nзапрещены" in section
+    assert "`items: []` запрещён" in section
+    assert "ровно один вызов" in section
+    assert "повторный mutating call после успешного save\nзапрещён" in section
 
 
 def test_oyijon_output_contract_forbids_ascii_letters():
     text = _text()
     assert "ASCII letters `[A-Za-z]`" in text
-    assert "ответ Ойижон считается ошибочным" in text
+    assert "ответ ошибочный" in text
 
 
 def test_financial_flow_forbids_terminal_and_execute_code():
     section = _stage53()
-    for marker in ("execute_code", "terminal", "shell", "Python"):
+    assert "Арифметику считает backend" in section
+    for marker in ("execute_code", "terminal", "калькулятор"):
         assert marker in section
-    assert "запрещено" in section
-    assert "quantity × confirmed reference price" in section
-    assert "command approval" in section
+    assert "запрещены" in section
 
 
 def test_stage53_dialog_has_required_sequential_fields():
     section = _stage53()
     required = (
-        "На какой месяц",
-        "На сколько членов семьи",
-        "Какая группа расходов",
-        "Какие продукты уже есть дома",
-        "Какие продукты нужны семье",
-        "Для одного продукта за сообщение уточняй только его количество",
-        "Сначала уточни бюджет",
-        "полный draft",
+        "месяц",
+        "сколько человек в семье",
+        "группа",
+        "что есть дома",
+        "что нужно",
+        "количество по одному продукту",
+        "бюджет",
+        "способ цены",
     )
     positions = [section.index(marker) for marker in required]
     assert positions == sorted(positions)
-    assert "Только после ответа отдельным сообщением уточни способ цены" in section
-    assert "последнюю, средневзвешенную или вручную названную" in section
 
 
-def test_nutrition_search_and_medical_limits_are_explicit():
-    section = _stage53()
-    assert "Web search выполняй только если нужны практические рекомендации" in section
-    assert "максимум один web search на plan cycle" in section
-    assert "cache 30 дней" in section
-    for source in ("WHO", "FAO", "официальный Минздрав Узбекистана"):
-        assert source in section
-    assert "источник и дату" in section
-    assert "диагноз" in section
-    assert "лечебную диету" in section
-    assert "лекарств" in section
-    assert "универсальную обязательную норму мяса" in section
-    assert "Если интернет недоступен или надёжного источника нет" in section
-    assert "согласовать рацион с врачом" in section
+def test_dead_nutrition_web_search_directive_is_gone():
+    # imp04: web_search не сконфигурирован в профиле — обещать поиск нельзя.
+    text = _text()
+    for dead in (
+        "Nutrition search",
+        "максимум один web search на plan cycle",
+        "cache 30 дней",
+        "WHO",
+        "FAO",
+    ):
+        assert dead not in text
+    # Медицинские ограничения остаются, но живут в разделе безопасности.
+    assert "## 10. Медицинская безопасность" in text
+    assert "не назначать" in text or "менять или отменять лекарства" in text
 
 
 def test_stage53_detailed_report_uses_exact_three_column_table():
     section = _stage53()
     assert "get_monthly_budget_status(include_items=true)" in section
-    assert section.index(CATEGORY_HEADER) < section.index(PRODUCT_HEADER)
-    assert f"| {PRODUCT_HEADER} |" in section
-    assert "|---|---:|---:|" in section
+    assert f"`{PRODUCT_HEADER}`" in section
+    assert "summary-таблица групп" in section
+    assert section.index("summary-таблица групп") < section.index(PRODUCT_HEADER)
     assert OLD_FIVE_COLUMN not in section
-    assert "отдельную товарную колонку `Қолгани`" in section
-    assert "не добавляй" in section
-    assert "Маҳсулот | Миқдор | Сарфлангани" in section
-    assert "только Stage 5.2" in section
 
 
 def test_stage53_unknown_values_units_and_no_technical_fields():
@@ -156,9 +152,7 @@ def test_stage53_unknown_values_units_and_no_technical_fields():
     section = _stage53()
     assert "`—`" in section
     assert "`айтилмаган`" in section
-    assert "не угадывай количество" in section
-    assert "не угадывай цену" in section
-    assert "разные единицы не смешивай" in section
+    assert "ничего не угадывай" in section
     for mapping in (
         "kg → кг",
         "g → г",
@@ -173,13 +167,14 @@ def test_stage53_unknown_values_units_and_no_technical_fields():
 
 
 def test_stage53a_approval_flow_enabled_and_self_only():
-    # Stage 5.3A is now live: SOUL describes the оyijon «ха» → approve flow and
-    # no longer forbids the tools. (fix01, 2026-07-24)
+    # Stage 5.3A: «ха» → сначала get_monthly_plan_cycle, потом approve.
     section = _stage53()
+    assert "get_monthly_plan_cycle" in section
     assert "approve_monthly_plan" in section
     assert "source=oyijon" in section
-    assert "25/27/28/1" in section
+    assert "25 — черновик" in section
     assert "«ха»" in section
     assert "cron" in section
-    # The old "not implemented / do not call" prohibition must be gone.
+    assert "сначала инструмент, потом интерпретация" in section
+    assert "waiting_oyijon" in section
     assert "не реализованы" not in section

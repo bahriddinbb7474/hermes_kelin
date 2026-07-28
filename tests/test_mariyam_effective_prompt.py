@@ -101,6 +101,15 @@ def test_profile_config_uses_supported_prompt_path_not_noop_enabled_key():
         "skills",
         "terminal",
         "code_execution",
+        "browser",
+        "file",
+        "delegation",
+        "session_search",
+        "image_gen",
+        "vision",
+        "tts",
+        "todo",
+        "clarify",
     ]
     assert config["display"]["tool_progress"] is False
 
@@ -133,7 +142,8 @@ def test_effective_telegram_prompt_contains_full_untruncated_contract(tmp_path):
     assert markers["stage53_product_header"] == 1
     assert markers["stage53_one_question"] == 1
     assert markers["stage53_draft_confirmation"] == 1
-    assert markers["stage53_nutrition_limit"] == 1
+    assert markers["persona_one_question"] == 1
+    assert markers["persona_rules"] == 1
     assert markers["stage53_price_lookup"] >= 1
     assert markers["stage53_execute_code_ban"] >= 1
     assert not any(result["forbidden"].values())
@@ -146,13 +156,37 @@ def test_effective_mariyam_tools_exclude_execution_but_preserve_other_surfaces(
     available = set(result["available_tool_names"])
     removed = set(result["removed_tool_names"])
     assert result["disabled_toolsets"] == [
+        "browser",
+        "clarify",
         "code_execution",
+        "delegation",
+        "file",
+        "image_gen",
+        "session_search",
         "skills",
         "terminal",
+        "todo",
+        "tts",
+        "vision",
     ]
     assert {"terminal", "process", "execute_code"} <= removed
     assert not ({"terminal", "process", "execute_code"} & available)
-    assert not ({"browser_navigate", "cronjob", "memory"} & removed)
+    # Token audit 2026-07-28: unused surfaces cost 7 255 tokens per request.
+    assert {
+        "browser_navigate",
+        "read_file",
+        "write_file",
+        "patch",
+        "search_files",
+        "delegate_task",
+        "session_search",
+        "image_generate",
+        "vision_analyze",
+        "text_to_speech",
+        "todo",
+        "clarify",
+    } <= removed
+    assert not ({"cronjob", "memory"} & removed)
     assert "memory" in available
     assert not ({name for name, _desc, _schema in server.TOOLS} & removed)
     assert len(server.TOOLS) == len(server.DISPATCH) == 29

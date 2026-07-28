@@ -141,6 +141,7 @@ def test_news_uses_only_agreed_sources_and_deduplicates(monkeypatch):
     )
     uza = b"""<?xml version="1.0" encoding="UTF-8"?>
     <rss><channel><item><title>Calm local fact</title>
+    <description>&lt;p&gt;Detail   sentence.&lt;/p&gt;</description>
     <link>https://uza.uz/ru/posts/1</link><pubDate>Sun, 26 Jul 2026 08:00:00 +0500</pubDate>
     </item></channel></rss>"""
     kun = b"""<?xml version="1.0" encoding="UTF-8"?>
@@ -161,6 +162,10 @@ def test_news_uses_only_agreed_sources_and_deduplicates(monkeypatch):
     ]
     assert {item["source"] for item in value["candidates"]} == {"UzA", "Kun.uz"}
     assert value["source_errors"] == []
+    # Stage 6.1: описание нужно, чтобы Мариям могла предложить «батафсил айтайми?»
+    assert value["candidates"][0]["summary_ru"] == "Detail sentence."
+    assert value["candidates"][1]["summary_ru"] == ""
+    assert "summary_ru" in value["selection_note"]
 
 
 def test_daily_life_cron_prompts_are_narrow_read_only_and_cyrillic():

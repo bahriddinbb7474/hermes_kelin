@@ -1,4 +1,9 @@
-"""Permanent text-level contract for Mariyam Stage 5.2 decision table."""
+"""Permanent text-level contract for Mariyam Stage 5.2 report decisions.
+
+SOUL v2 (imp04, 2026-07-28) сжал промпт: таблица решений стала четырьмя
+блоками `**…**`, но сами правила (какой tool, какие заголовки таблиц, где
+дословная финальная фраза) остались теми же — их ломали живые баги 5.2.
+"""
 
 from pathlib import Path
 
@@ -9,21 +14,27 @@ PROMPT = (
     / "hermes_profile_mariyam_oyijon"
     / "SOUL.md"
 )
-HEADING = "### 3.2. Таблица решений по отчётам — единственный контракт"
+HEADING = "### 5.2. Отчёты — контракт формата"
 FINAL_PHRASE = (
     "Ойижон, хоҳласангиз, бирор харажат гуруҳини батафсилроқ кўриб "
     "чиқамиз. Маълумотлар тайёр."
 )
+SUMMARY_TABLE = "Харажат гуруҳи | Режа | Сарфлангани | Қолгани"
+ITEMS_TABLE = "Маҳсулот | Миқдор | Сарфлангани"
 
 
 def _section() -> str:
     text = PROMPT.read_text(encoding="utf-8")
     assert text.count(HEADING) == 1
-    return text.split(HEADING, 1)[1].split("\n### 3.3.", 1)[0]
+    return text.split(HEADING, 1)[1].split("\n### 5.3.", 1)[0]
 
 
-def _decision_row(marker: str) -> str:
-    return next(line for line in _section().splitlines() if f"`{marker}`" in line)
+def _decision_block(marker: str) -> str:
+    """One `**…**` block of the decision list, without the following blocks."""
+    section = _section()
+    assert section.count(f"`{marker}`") == 1
+    tail = section.split(f"`{marker}`", 1)[1]
+    return tail.split("\n\n**", 1)[0]
 
 
 def test_report_decision_table_has_all_supported_intents_and_tools():
@@ -35,14 +46,14 @@ def test_report_decision_table_has_all_supported_intents_and_tools():
         "SET_MONTHLY_BUDGET",
     ):
         assert section.count(marker) == 1
-    assert "Только `get_monthly_budget_status`" in section
+    assert "только\n`get_monthly_budget_status`" in section
     assert "`get_expense_report`" in section
     assert "`set_monthly_budget`" in section
 
 
 def test_general_report_has_plan_spent_remaining_and_no_automatic_items():
     section = _section()
-    assert "Харажат гуруҳи | Режа | Сарфлангани | Қолгани" in section
+    assert SUMMARY_TABLE in section
     assert "Товарные строки автоматически не показывай" in section
     assert "только после" in section.lower()
     assert section.count(FINAL_PHRASE) == 1
@@ -50,52 +61,48 @@ def test_general_report_has_plan_spent_remaining_and_no_automatic_items():
 
 def test_report_completion_depends_on_report_type_not_total_row():
     section = _section()
-    general_row = _decision_row("GENERAL_FAMILY_REPORT")
-    category_row = _decision_row("CATEGORY_DETAIL")
+    general_block = _decision_block("GENERAL_FAMILY_REPORT")
+    category_block = _decision_block("CATEGORY_DETAIL")
 
-    assert "можно `Жами`" in general_row
-    assert "завершить дословной фразой ниже" in general_row
-    assert "можно `Жами`" in category_row
-    assert "После таблиц завершить ответ" in category_row
-    assert "Финальную фразу общего отчёта не писать" in category_row
-    assert "вопросов не задавать" in category_row
+    assert "можно `Жами`" in general_block
+    assert "завершить дословной фразой ниже" in general_block
+    assert "можно `Жами`" in category_block
+    assert "После таблиц завершить ответ" in category_block
+    assert "финальную фразу общего отчёта не писать" in category_block
+    assert "вопросов не задавать" in category_block
     assert "Наличие `Жами` никогда не определяет" in section
 
 
 def test_general_final_phrase_is_not_a_category_detail_suffix():
     section = _section()
-    category_row = _decision_row("CATEGORY_DETAIL")
+    category_block = _decision_block("CATEGORY_DETAIL")
 
     assert section.count(FINAL_PHRASE) == 1
-    assert FINAL_PHRASE not in category_row
+    assert FINAL_PHRASE not in category_block
     assert "Общий отчёт всегда заверши дословно" in section
 
 
 def test_category_detail_has_summary_before_actual_items():
-    section = _section()
-    summary = "Харажат гуруҳи | Режа | Сарфлангани | Қолгани"
-    items = "Маҳсулот | Миқдор | Сарфлангани"
-    category_row = next(
-        line for line in section.splitlines() if "`CATEGORY_DETAIL`" in line
-    )
-    assert category_row.index(summary) < category_row.index(items)
-    assert "summary категории выводи только отдельной Markdown-таблицей" in category_row
-    assert "минимум одной строкой выбранной категории" in category_row
-    assert "Маркированный список вместо summary-таблицы запрещён" in category_row
+    category_block = _decision_block("CATEGORY_DETAIL")
+    assert category_block.index(SUMMARY_TABLE) < category_block.index(ITEMS_TABLE)
     assert (
-        "Сразу после summary-таблицы выведи таблицу фактических товаров"
-        in category_row
+        "Summary категории выводи только\nотдельной Markdown-таблицей"
+        in category_block
     )
-    assert "quantity только из tool result, иначе `—`" in category_row
-    assert "только её фактические `by_item`" in section
+    assert "минимум с одной строкой выбранной категории" in category_block
+    assert "маркированный список вместо\nsummary-таблицы запрещён" in category_block
+    assert (
+        "Сразу после summary-таблицы выведи таблицу фактических\nтоваров"
+        in category_block
+    )
+    assert "quantity только из tool result, иначе\n`—`" in category_block
+    assert "только её фактические `by_item`" in category_block
 
 
 def test_category_detail_has_one_short_two_table_example():
     section = _section()
     example = section.split("Короткий правильный пример подробного отчёта:", 1)[1]
-    summary = "Харажат гуруҳи | Режа | Сарфлангани | Қолгани"
-    items = "Маҳсулот | Миқдор | Сарфлангани"
-    assert example.index(summary) < example.index(items)
+    assert example.index(SUMMARY_TABLE) < example.index(ITEMS_TABLE)
     assert "| Озиқ-овқат | 500 000 сўм | 221 000 сўм | 279 000 сўм |" in example
     assert "| Тухум | 12 та | 36 000 сўм |" in example
 
@@ -113,8 +120,8 @@ def test_units_are_global_ta_only_and_stage52_detail_stays_actual_only():
     text = PROMPT.read_text(encoding="utf-8")
     assert text.count("pcs → та") == 1
     assert "дона" not in text
-    assert "Product plan не показывай" in _section()
-    assert "Stage 5.3 — продуктовый месячный план" in text
+    assert "product plan не показывай" in _section()
+    assert "### 5.3. Месячный план по продуктам" in text
 
 
 def test_old_conflicting_report_instructions_are_absent():

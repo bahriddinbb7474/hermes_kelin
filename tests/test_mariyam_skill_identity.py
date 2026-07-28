@@ -22,7 +22,7 @@ def skill_text() -> str:
 
 
 def test_skill_has_identity_section_1_1(skill_text):
-    assert "## 1.1. Идентичность пользователя" in skill_text
+    assert "## 4. Идентичность пользователя" in skill_text
 
 
 def test_skill_missing_origin_does_not_forbid_tool_call(skill_text):

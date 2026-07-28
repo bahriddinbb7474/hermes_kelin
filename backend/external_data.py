@@ -232,6 +232,12 @@ def _text(element, child_name: str) -> str:
     return (child.text or "").strip() if child is not None else ""
 
 
+def _plain_text(raw: str) -> str:
+    """RSS descriptions carry HTML; store readable plain text only."""
+    without_tags = re.sub(r"<[^>]+>", " ", unescape(raw or ""))
+    return re.sub(r"\s+", " ", without_tags).strip()
+
+
 def _parse_feed(payload: bytes, source_key: str, source_name: str) -> list[dict]:
     try:
         root = ElementTree.fromstring(payload)
@@ -267,11 +273,19 @@ def _parse_feed(payload: bytes, source_key: str, source_name: str) -> list[dict]
                     ).astimezone(timezone.utc).isoformat()
                 except (TypeError, ValueError):
                     published_at = None
+        summary = _plain_text(
+            _text(item, "description")
+            or _text(item, "{*}summary")
+            or _text(item, "{*}content")
+        )
         parsed.append(
             {
                 "source_key": source_key,
                 "source": source_name,
                 "title_ru": title[:500],
+                # Stage 6.1: без текста новости Hermes не может предложить
+                # «батафсил айтайми?» — отдаём короткое описание из RSS.
+                "summary_ru": summary[:600],
                 "url": link,
                 "published_at": published_at,
             }
@@ -301,11 +315,13 @@ def _fetch_news() -> dict:
         unique.append(item)
     return {
         "agreed_sources": ["UzA", "Kun.uz"],
-        "candidates": unique[:12],
+        "candidates": unique[:20],
         "source_errors": source_errors,
         "selection_note": (
-            "Hermes must choose 3–5 calm Uzbekistan items, paraphrase them in "
-            "Uzbek Cyrillic, and keep source attribution. Do not invent facts."
+            "Hermes must choose 2–5 calm Uzbekistan items close to Oyijon's "
+            "life, paraphrase them in Uzbek Cyrillic with Cyrillic source "
+            "names, offer details from summary_ru only on request, and never "
+            "invent facts."
         ),
     }
 

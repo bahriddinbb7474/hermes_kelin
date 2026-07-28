@@ -1197,10 +1197,10 @@ async def test_stage53_extends_two_schemas_without_new_tools():
     set_description = next(
         tool.description for tool in tools if tool.name == "set_monthly_budget"
     )
-    assert "item_name_display" in set_description
-    assert "planned_quantity" in set_description
-    assert "reference_unit_price_uzs" in set_description
+    # imp04: точные имена полей живут в схеме (проверено выше) и в SOUL §5.3 —
+    # в description они дублировались и стоили токенов в каждом запросе.
     assert "explicit items=[] всегда INVALID_INPUT" in set_description
+    assert len(set_description) < 200
     assert "set_monthly_budget" in GUARD.read_text(encoding="utf-8")
     assert "get_monthly_budget_status" in GUARD.read_text(encoding="utf-8")
 
