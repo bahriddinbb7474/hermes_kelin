@@ -18,5 +18,5 @@
 | imp06-sol | Sol | Stage 6 шаг 2: cron-быт (утро/вечер, новости, погода, намаз, напоминания) | done | PASS, Stage 6 CLOSED live на test-user |
 | imp07-sol | Sol | Stage 7: отчёт админу 19:30 + health-alerts recall 100% | done | PASS, CLOSED live; on-demand с admin-аккаунта — проверить заказчику |
 | imp08-sol | Sol | Cron watchdog +15 мин и no-agent one-shot (pre-handover reliability) | done | PASS, CLOSED live |
-| imp04-opus | Opus | Аудит токенов + личность «живая келин», SOUL v2 (2 фазы, STOP на утверждении) | фаза 1 done, STOP | — (ждёт утверждения заказчика) |
+| imp04-opus | Opus | Аудит токенов + личность «живая келин», SOUL v2 (2 фазы) | фаза 1 PASS; фаза 2 код+тесты done, деплой ждёт разрешения | −45 % токенов, 290 tests pass; live acceptance не выполнен |
 | — | Sol | Языковой + голосовой тест (после восстановления лимитов) | запланирована | — |
