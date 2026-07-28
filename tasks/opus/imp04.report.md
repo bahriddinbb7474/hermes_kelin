@@ -155,3 +155,35 @@ deepseek отложен до исчерпания бонусов.
 - live acceptance по чек-листу §6 evidence (утренний cron 08:30, вечерний 19:30,
   расход, отчёты, напоминание, health-фраза);
 - замер «после» по `state.db` — первая сессия появится на утреннем cron.
+
+## Коммиты и изменённые файлы
+
+| Коммит | Что |
+|---|---|
+| `17dcc52` | фаза 1: `docs/AUDIT_TOKENS_PERSONA_2026-07.md`, задача, отчёт, REGISTRY |
+| `fa3484e` | фаза 2 код: SOUL v2, cron-промпты, toolsets, backend, тесты |
+| `28c8795` | evidence + deploy-инструменты |
+| `49d0a38` | факт деплоя и проверка, правильная точка отката |
+
+Изменённый рабочий код и промпты (`fa3484e`):
+
+- `deploy/hermes_profile_mariyam_oyijon/SOUL.md` — v2, 8 244 → 4 801 ток.;
+- `deploy/hermes_profile_mariyam_oyijon/config.skill-protect.snippet.yaml` —
+  +9 disabled_toolsets;
+- `deploy/hermes_profile_mariyam_oyijon/cron/06_morning.md`, `06_evening.md`,
+  `25_draft.md`, `27_reminder.md` — новый тон;
+- `backend/external_data.py` — `summary_ru` из RSS, 20 кандидатов;
+- `backend/server.py` — сокращены описания 6 tools (состав 29 не менялся);
+- тесты: `inspect_effective_prompt.py`, `test_mariyam_effective_prompt.py`,
+  `test_mariyam_skill_stage51/52.py`, `test_mariyam_soul_stage53.py`,
+  `test_mariyam_skill_identity.py`, `test_mariyam_skill_protection.py`,
+  `test_cron_reliability.py`, `test_stage6_daily_life.py`,
+  `test_stage53_product_plans.py`.
+
+Deploy-инструменты (`28c8795`): `deploy/imp04_deploy.sh`,
+`imp04_patch_config.py`, `imp04_job_id.py`, `imp04_refresh_cron_fingerprints.py`.
+
+Результаты проверок: `pytest tests/` — **290 passed, 87 skipped**;
+offline preflight на VPS (0 API calls) — SOUL v2 в промпте, инструментов у
+inspection-агента 1 вместо 12; после деплоя — sha SOUL совпадает с git,
+gateway active, fingerprints пересчитаны.
