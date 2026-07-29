@@ -49,14 +49,17 @@ KEYWORD_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "chest_pain",
         re.compile(
-            r"\b(?:кўкрагим|кўксим|кўкрак\s+томоним)"
-            r"(?:\s+\S+){0,3}\s+оғри"
+            # OpenAI STT consistently renders the synthetic Khorezm-accented
+            # ``ko'kragim`` as ``какрагим``/``кокрагим``. Keep the expansion
+            # narrow: the same token must still be followed by an оғр root.
+            r"\b(?:кўкрагим|какрагим|кокрагим|кўксим|кўкрак\s+томоним)"
+            r"(?:\s+\S+){0,3}\s+оғр"
         ),
     ),
     (
         "breathing_difficulty",
         re.compile(
-            r"\b(?:нафас\s+ол(?:иш(?:им)?\s+(?:қийин|оғир)|олма)"
+            r"\b(?:нафас\s+ол(?:иш(?:им)?\s+(?:қийин|қийн|оғир)|олма)"
             r"|нафасим\s+қис|ҳаво\s+етмаяп|зўрға\s+нафас\s+ол)"
         ),
     ),

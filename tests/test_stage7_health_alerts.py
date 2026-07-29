@@ -60,6 +60,21 @@ def test_keyword_dataset_precision_has_no_negative_false_alerts():
     assert false_positives == []
 
 
+def test_keyword_layer_accepts_narrow_openai_stt_chest_variants():
+    assert guard.detect_health_keyword("Какрагим оғрияпт.") == "chest_pain"
+    assert guard.detect_health_keyword("Какрагим оғряпт.") == "chest_pain"
+    assert guard.detect_health_keyword("Кокрагим қаттиқ оғрияпти.") == "chest_pain"
+    assert guard.detect_health_keyword("Какрагим яхши.") is None
+
+
+def test_keyword_layer_accepts_narrow_openai_stt_breathing_variant():
+    assert (
+        guard.detect_health_keyword("Нафас олишим қийн.")
+        == "breathing_difficulty"
+    )
+    assert guard.detect_health_keyword("Нафас олишим яхши.") is None
+
+
 def test_guard_rejects_untrusted_sender_before_dispatch(tmp_path, monkeypatch):
     mapping = tmp_path / "identity.json"
     mapping.write_text(

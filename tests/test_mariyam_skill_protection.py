@@ -40,7 +40,7 @@ GUARD_INIT = (
 )
 # Canonical Git/deploy bytes after CRLF -> LF normalization.
 EXPECTED_SOUL_SHA256 = (
-    "3ab6c3c0ce0810ae7838164f02d776c6b9bc2e52744d80e887b2d282f74972ef"
+    "e3cd3d8ac922badeed07522fc228844bf3d9fcc213f394332da4c97c1db4e7b7"
 )
 PROFILE_SCOPED_DIR = "hermes_profile_mariyam_oyijon"
 SELF_IMPROVEMENT_MARKERS = (

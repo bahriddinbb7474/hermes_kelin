@@ -410,3 +410,26 @@ Stage 5.3 остаётся **PLANNED / NOT IMPLEMENTED**, расширяет с�
   Admin/recurring/non-Oyijon jobs middleware не переписывает.
 - Реальные аккаунты не подключаются; deploy/E2E выполняется только на
   test-Oyijon и единственном test-admin до отдельного handover-разрешения.
+
+## Решение заказчика и реализации (2026-07-29) — OpenAI STT
+
+- Заказчик выбрал OpenAI API и разместил ключ только в private `.env` на VPS.
+  Секрет запрещено писать в git, profile config, transcript audit и evidence.
+- Сравнение `whisper-1`, `gpt-4o-transcribe`,
+  `gpt-4o-mini-transcribe` выполнено на одинаковых 15 real + 20 expense proxy
+  + 7 medical proxy. Победитель — `gpt-4o-transcribe`: лучший medical recall
+  при приемлемых цене и latency.
+- Production использует profile-specific command provider
+  `mariyam_openai_fallback`: сначала OpenAI `gpt-4o-transcribe`, при любой
+  недоступности API — локальный faster-whisper `base`. Forced-failure smoke
+  подтвердил fallback с непустым transcript.
+- OpenAI API не принимает `uz` в поле `language`; Uzbek Cyrillic, числа,
+  household vocabulary и medical roots задаются нейтральным transcription
+  prompt, без подстановки ожидаемой суммы.
+- Финальный AC: medical keyword 7/7; строгий voice→DB 18/20 (90%); сумма
+  19/20 (95%). При сомнении в сумме SOUL по-прежнему требует переспросить.
+- `регулярно` / `каждый месяц` маршрутизируется в
+  `upsert_recurring_obligation`, не в новый Hermes cron. Controlled proof:
+  одна monthly row, zero unexpected cron jobs, transactions unchanged.
+- Cost projection записан через `log_usage_cost`: предположение 20
+  voice/день, 96.3286 audio min/month, около USD 0.667/month.

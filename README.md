@@ -54,7 +54,18 @@ hermes-mariyam/
 
 Настроить Hermes profile `mariyam_oyijon`, Telegram allowlist, skill личности Мариям, память, сквозной STT-тест на реальном голосе (TTS отложен — ТЗ v3.2, ответы только текстом), маленький MCP backend с PostgreSQL для точных данных, бухгалтерию с исправлением/удалением, Hermes cron для напоминаний и отчётов, safety alerts, backup/restore и мониторинг.
 
-## Текущее состояние (2026-07-28)
+## Текущее состояние (2026-07-29)
+
+**Финальная приёмка imp09 — технические AC PASS, scheduled evidence pending:**
+язык 19/19; полный offline regression 298 passed; reboot/autostart/backup/
+heartbeat/watchdog PASS. OpenAI `gpt-4o-transcribe` выбран после сравнения
+трёх моделей на 15 real + 20 expense + 7 medical; medical 7/7, строгий
+voice→DB 18/20 (90%), суммы 19/20 (95%). Production использует private API
+key и local faster-whisper fallback; cost projection при 20 voice/день —
+около USD 0.667/мес. Prompt `регулярно` пишет
+`recurring_obligations`, а не создаёт отдельный cron. Остались только первые
+штатные сообщения после финального SOUL: 08:30 и 19:30 Asia/Tashkent.
+[Evidence](docs/EVIDENCE_FINAL_ACCEPTANCE_2026-07-29.md).
 
 **Pre-handover cron reliability — CLOSED / LIVE PASS на test identities
 (2026-07-28):** user-systemd watchdog каждые 5 минут проверяет восемь критичных
@@ -87,7 +98,7 @@ reliability gap закрыт imp08: active +15-minute watchdog и provider-indep
 no-agent one-shot path прошли controlled live E2E на test identities.
 [Evidence](docs/EVIDENCE_STAGE_6_CRON_2026-07-26.md).
 
-ТЗ: **v3.19**. Stage 5.1 и Stage 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **CLOSED / LIVE PASS** ([evidence](docs/EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)). `items` omitted остаётся category-only совместимостью; explicit empty/null/non-array `items` детерминированно отклоняется до DB mutation. Новый отдельный profile plugin `mariyam_stage53_guard` связывает structured price lookup с product save и блокирует повтор идентичного mutating call после success или неизвестного outcome. Identity plugin **1.3.0 развёрнут на VPS**; Hermes core не менялся. Profile отключает `skills`, `terminal`, `code_execution` и ограничивает turn шестью model iterations. Текущий repo/VPS canonical SOUL LF SHA `999b657165f3557fe8d76d473c88d94fda543fdcefe37fbb05d15c6542831b60`. Migration 003/005 active на VPS; [Telegram E2E Stage 5.3](docs/EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md). **Stage 5.3A: в repo реализованы три user-scoped tools — `approve_monthly_plan` (draft→approved/auto_approved), `open_monthly_plan_cycle` (создание draft `waiting_oyijon`/escalate `waiting_admin`, с детерминированной auto-генерацией draft) и `get_monthly_plan_cycle` (read-only статус цикла для cron-гейтинга). На момент закрытия 5.3A repo/VPS tool count = 24 (24/24/24).** Transactions не читаются на запись и не меняются. **Stage 5.3A = CLOSED / LIVE PASS (2026-07-26):** 5 production cron jobs (25, 27, 28, 1a, 1b) active с private mapping 0600; live подтверждены cron 25/27/28, чистая доставка без cron-обёртки (`cron.wrap_response=false`, подтверждено штатным запуском 25-го); **«ха»-approve → `approved_by_oyijon`**; 1a/1b — детерминированные отказы и admin-fallback с нулевой мутацией; fallback-модель (deepseek/openrouter) при 524 провайдера. Фактический `auto_approved` возможен только 1-го числа (unit-tested). Реальная Ойижон не подключена — доставка на тест-аккаунты.
+ТЗ: **v3.19**. Stage 5.1 и Stage 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **CLOSED / LIVE PASS** ([evidence](docs/EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)). `items` omitted остаётся category-only совместимостью; explicit empty/null/non-array `items` детерминированно отклоняется до DB mutation. Новый отдельный profile plugin `mariyam_stage53_guard` связывает structured price lookup с product save и блокирует повтор идентичного mutating call после success или неизвестного outcome. Identity plugin **1.3.0 развёрнут на VPS**; Hermes core не менялся. Profile отключает `skills`, `terminal`, `code_execution` и ограничивает turn шестью model iterations. Текущий repo/VPS canonical SOUL LF SHA `e3cd3d8ac922badeed07522fc228844bf3d9fcc213f394332da4c97c1db4e7b7`. Migration 003/005 active на VPS; [Telegram E2E Stage 5.3](docs/EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md). **Stage 5.3A: в repo реализованы три user-scoped tools — `approve_monthly_plan` (draft→approved/auto_approved), `open_monthly_plan_cycle` (создание draft `waiting_oyijon`/escalate `waiting_admin`, с детерминированной auto-генерацией draft) и `get_monthly_plan_cycle` (read-only статус цикла для cron-гейтинга). На момент закрытия 5.3A repo/VPS tool count = 24 (24/24/24).** Transactions не читаются на запись и не меняются. **Stage 5.3A = CLOSED / LIVE PASS (2026-07-26):** 5 production cron jobs (25, 27, 28, 1a, 1b) active с private mapping 0600; live подтверждены cron 25/27/28, чистая доставка без cron-обёртки (`cron.wrap_response=false`, подтверждено штатным запуском 25-го); **«ха»-approve → `approved_by_oyijon`**; 1a/1b — детерминированные отказы и admin-fallback с нулевой мутацией; fallback-модель (deepseek/openrouter) при 524 провайдера. Фактический `auto_approved` возможен только 1-го числа (unit-tested). Реальная Ойижон не подключена — доставка на тест-аккаунты.
 
 Этап 1 (VPS + Hermes + Telegram) — **закрыт по решению заказчика (2026-07-12, ТЗ v3.5)**:
 - ✅ PostgreSQL healthy (порт 127.0.0.1:5432, init-миграции применены);
