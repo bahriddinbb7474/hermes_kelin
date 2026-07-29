@@ -1,7 +1,7 @@
 # imp09 — report
 
-Status: **DONE — technical acceptance passed; the time-gated 08:30 and 19:30
-scheduled-tick evidence remains an explicit follow-up**.
+Status: **DONE — technical acceptance and the 08:30 scheduled tick passed;
+only the time-gated 19:30 evidence remains an explicit follow-up**.
 
 Completed:
 
@@ -29,18 +29,20 @@ Completed:
 - full offline regression: 298 passed, 87 skipped;
 - post-deploy runtime: tools 29/29/29, health true, gateway active with zero
   restarts, PostgreSQL healthy with zero restarts;
+- first post-final-SOUL morning job ran at 08:30, completed `ok`, had no
+  execution/delivery error and required no watchdog retry; the post-tick
+  29/29/29/29 and clean-DB health gate passed;
 - test mutations and temporary trusted jobs were removed; DB returned to
   transactions 9, cycles 1, obligations/health/Quran/alerts 0.
 
 Time-gated follow-up (not claimed as passed in this report):
 
-1. verify the first scheduled morning message after the final SOUL deploy at
-   08:30 Asia/Tashkent;
-2. verify the first scheduled evening message at 19:30 Asia/Tashkent.
+1. verify the first scheduled evening message at 19:30 Asia/Tashkent.
 
 The implementation, technical gates, evidence, cleanup and repository handoff
-were completed now at the user's explicit request; the two future ticks were
-not accelerated or represented as successful.
+were completed at the user's explicit request. The morning tick is now
+verified; the future evening tick was not accelerated or represented as
+successful.
 
 No real accounts were connected. Raw real-voice transcripts, Telegram IDs,
 credentials and private mappings are absent from git and evidence.

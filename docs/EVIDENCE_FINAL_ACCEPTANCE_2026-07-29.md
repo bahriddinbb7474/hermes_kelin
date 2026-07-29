@@ -3,9 +3,9 @@
 Task: `tasks/sol/imp09.md`. Acceptance started on 2026-07-28 and spans
 the first post-deploy scheduled ticks on 2026-07-29 (Asia/Tashkent).
 
-Status: **TECHNICAL ACCEPTANCE PASS / scheduled ticks pending**. Language, deterministic
-safety, voice→DB, recurring-obligation and reboot/autostart gates passed.
-The first post-final-SOUL morning/evening ticks are recorded after they occur.
+Status: **TECHNICAL ACCEPTANCE + 08:30 TICK PASS / 19:30 pending**. Language,
+deterministic safety, voice→DB, recurring-obligation, reboot/autostart and the
+first post-final-SOUL morning tick passed.
 
 No real Oyijon identity was connected. Live messages, mutations and alerts
 used only the private test-Oyijon/test-admin mapping. Telegram IDs, session
@@ -76,8 +76,19 @@ Functional findings that are not language failures:
 
 The two scheduled SOUL v2 checks must use ticks after the 22:46 deployment:
 
-- 08:30 on 2026-07-29: **PENDING**;
+- 08:30 on 2026-07-29: **PASS** — run at `08:30:58 +05`, status `ok`,
+  session end reason `cron_complete`, `last_error=null` and
+  `last_delivery_error=null`;
 - 19:30 on 2026-07-29: **PENDING**.
+
+The morning watchdog observations contained zero error/retry markers, so the
+primary run succeeded without a watchdog retry. At `08:42 +05` the follow-up
+health gate remained clean: inventory/dispatch/discovery/unique
+`29/29/29/29`, Gateway active with `NRestarts=0`, PostgreSQL healthy with
+restart count `0`, Time-Agent running with restart count `0`, and the
+watchdog timer active. Aggregate DB counts remained at the clean baseline:
+transactions `9`, monthly plan cycles `1`, recurring obligations `0`,
+health notes `0`, Quran progress `0`, alert events `0`.
 
 The 08:30/19:30 messages visible earlier on 2026-07-28 predated the SOUL v2
 deployment and are intentionally not counted as v2 live evidence.
@@ -212,16 +223,17 @@ the privileged reboot interactively; no sudo credential was shared.
   `heartbeat_delivery=ok` to the only test-admin.
 
 Reboot/autostart/heartbeat: **PASS**. The first post-reboot 08:30 cron and
-watchdog observation remains pending; the 19:30 SOUL v2 tick is also pending.
+watchdog observation passed; only the 19:30 SOUL v2 tick remains pending.
 
 ## 7. Acceptance decision
 
 **IMPLEMENTATION AND TECHNICAL ACCEPTANCE CLOSED.** At the user's explicit
-request the imp09 changes are committed and pushed before the future scheduled
-ticks. The 08:30 and 19:30 observations remain a clearly separated follow-up;
-they are not claimed as passed here.
+request the imp09 changes were initially committed and pushed before the
+future scheduled ticks. The 08:30 observation is now verified and recorded;
+the 19:30 observation remains a clearly separated follow-up and is not claimed
+as passed here.
 
 1. voice→correct DB is 18/20: PASS;
 2. recurring obligation routing: PASS;
 3. reboot/autostart/heartbeat: PASS;
-4. first post-final-SOUL morning and evening messages: PENDING.
+4. first post-final-SOUL morning message: PASS; evening message: PENDING.

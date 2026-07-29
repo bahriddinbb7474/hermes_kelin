@@ -56,15 +56,16 @@ hermes-mariyam/
 
 ## Текущее состояние (2026-07-29)
 
-**Финальная приёмка imp09 — технические AC PASS, scheduled evidence pending:**
+**Финальная приёмка imp09 — технические AC и штатный 08:30 PASS; 19:30 pending:**
 язык 19/19; полный offline regression 298 passed; reboot/autostart/backup/
 heartbeat/watchdog PASS. OpenAI `gpt-4o-transcribe` выбран после сравнения
 трёх моделей на 15 real + 20 expense + 7 medical; medical 7/7, строгий
 voice→DB 18/20 (90%), суммы 19/20 (95%). Production использует private API
 key и local faster-whisper fallback; cost projection при 20 voice/день —
 около USD 0.667/мес. Prompt `регулярно` пишет
-`recurring_obligations`, а не создаёт отдельный cron. Остались только первые
-штатные сообщения после финального SOUL: 08:30 и 19:30 Asia/Tashkent.
+`recurring_obligations`, а не создаёт отдельный cron. Первый штатный утренний
+тик после финального SOUL прошёл `ok` без retry; остался вечерний тик 19:30
+Asia/Tashkent.
 [Evidence](docs/EVIDENCE_FINAL_ACCEPTANCE_2026-07-29.md).
 
 **Pre-handover cron reliability — CLOSED / LIVE PASS на test identities
