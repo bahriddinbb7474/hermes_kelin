@@ -32,12 +32,14 @@ async def test_inventory_dispatch_and_discovery_are_29():
         "get_daily_news",
     ]
     schemas = {tool.name: tool.inputSchema for tool in tools}
-    for name in names[-3:]:
+    for name in names[-3:-1]:
         assert schemas[name] == {
             "type": "object",
             "properties": {},
             "required": [],
         }
+    assert set(schemas["get_daily_news"]["properties"]) == {"topic", "sources"}
+    assert schemas["get_daily_news"]["required"] == []
 
 
 @pytest.mark.asyncio
@@ -134,33 +136,45 @@ def test_prayer_contract_is_tashkent_hanafi(monkeypatch):
     assert value["asr"] == "17:23"
 
 
-def test_news_uses_only_agreed_sources_and_deduplicates(monkeypatch):
-    assert external_data.NEWS_FEEDS == (
-        ("uza", "UzA", "https://uza.uz/ru/rss"),
-        ("kun", "Kun.uz", "https://kun.uz/news/rss?lang=ru"),
-    )
-    uza = b"""<?xml version="1.0" encoding="UTF-8"?>
+def test_news_uses_configured_sources_without_uza_and_deduplicates(monkeypatch):
+    config = external_data._load_news_config()
+    assert set(config["default_sources"]) == {
+        "kun",
+        "un_news_ru",
+        "dw_ru",
+        "euronews_ru",
+    }
+    assert all("uza.uz" not in item["url"] for item in config["sources"])
+    first = b"""<?xml version="1.0" encoding="UTF-8"?>
     <rss><channel><item><title>Calm local fact</title>
     <description>&lt;p&gt;Detail   sentence.&lt;/p&gt;</description>
-    <link>https://uza.uz/ru/posts/1</link><pubDate>Sun, 26 Jul 2026 08:00:00 +0500</pubDate>
+    <link>https://kun.uz/ru/posts/1</link><pubDate>Sun, 26 Jul 2026 08:00:00 +0500</pubDate>
     </item></channel></rss>"""
-    kun = b"""<?xml version="1.0" encoding="UTF-8"?>
+    other = b"""<?xml version="1.0" encoding="UTF-8"?>
     <rss><channel>
     <item><title>Calm local fact</title><link>https://kun.uz/ru/news/1</link></item>
     <item><title>Second local fact</title><link>https://kun.uz/ru/news/2</link></item>
     </channel></rss>"""
 
     def fake_get(url):
-        return uza if "uza.uz" in url else kun
+        return first if "kun.uz" in url else other
 
     monkeypatch.setattr(external_data, "_http_get", fake_get)
     value = external_data._fetch_news()
-    assert value["agreed_sources"] == ["UzA", "Kun.uz"]
+    assert value["agreed_sources"] == [
+        "Кун.уз",
+        "Новости ООН",
+        "Дойче Велле",
+        "Евроньюс",
+    ]
     assert [item["title_ru"] for item in value["candidates"]] == [
         "Calm local fact",
         "Second local fact",
     ]
-    assert {item["source"] for item in value["candidates"]} == {"UzA", "Kun.uz"}
+    assert {item["source"] for item in value["candidates"]} == {
+        "Кун.уз",
+        "Новости ООН",
+    }
     assert value["source_errors"] == []
     # Stage 6.1: описание нужно, чтобы Мариям могла предложить «батафсил айтайми?»
     assert value["candidates"][0]["summary_ru"] == "Detail sentence."
@@ -168,12 +182,28 @@ def test_news_uses_only_agreed_sources_and_deduplicates(monkeypatch):
     assert "summary_ru" in value["selection_note"]
 
 
+def test_news_rdf_and_middle_east_topic_filter(monkeypatch):
+    rdf = """<?xml version="1.0" encoding="UTF-8"?>
+    <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+             xmlns="http://purl.org/rss/1.0/">
+      <item><title>Иран ва АҚШ музокаралари</title>
+        <link>https://example.test/iran</link></item>
+      <item><title>Европада об-ҳаво</title>
+        <link>https://example.test/weather</link></item>
+    </rdf:RDF>""".encode("utf-8")
+    monkeypatch.setattr(external_data, "_http_get", lambda _url: rdf)
+    value = external_data._fetch_news(["dw_ru"], "middle_east")
+    assert value["selected_sources"] == ["dw_ru"]
+    assert value["selected_topic"] == "middle_east"
+    assert [item["title_ru"] for item in value["candidates"]] == [
+        "Иран ва АҚШ музокаралари"
+    ]
+
+
 def test_daily_life_cron_prompts_are_narrow_read_only_and_cyrillic():
     expected = {
         "06_morning.md": (
             "get_tashkent_weather",
-            "get_tashkent_prayer_times",
-            "get_recurring_obligations",
             "get_daily_news",
         ),
         "06_evening.md": ("get_admin_report_data",),
@@ -192,8 +222,14 @@ def test_daily_life_cron_prompts_are_narrow_read_only_and_cyrillic():
             assert tool in text
         for tool in forbidden:
             assert tool not in text
-        assert "user_id=0" in text
+        if filename != "06_morning.md":
+            assert "user_id=0" in text
         assert "битта" in text.casefold()
+    morning = (CRON / "06_morning.md").read_text(encoding="utf-8")
+    assert "соат 08:00" in morning
+    assert "get_tashkent_prayer_times" not in morning
+    assert "get_recurring_obligations" not in morning
+    assert "1–2 та" in morning
 
 
 def test_one_shot_contract_is_untrusted_plain_text():

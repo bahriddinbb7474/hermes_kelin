@@ -433,3 +433,32 @@ SOUL/config/plugin из private backup, удалить только imp08 watchd
 оставшиеся imp08 test artifacts, restart только Mariyam Gateway. Production
 trusted jobs/mapping, backend, migration 005, PostgreSQL и Stage 8 heartbeat не
 изменять.
+
+## fix02: day rhythm controlled deploy
+
+До deploy обязателен approval заказчика на два примера каждого prayer-slot и
+точный список RSS. После approval bundle загружается в `/tmp/fix02`; скрипт
+работает от `timeagent`:
+
+```bash
+bash /tmp/fix02/deploy/fix02_deploy.sh
+bash /tmp/fix02/deploy/fix02_deploy.sh --apply
+```
+
+Apply создаёт private backup, останавливает только Mariyam Gateway, ставит
+backend news-config, cron reliability 1.1.0, day-rhythm helper/systemd units,
+меняет morning schedule/prompt и evening prompt, затем пересобирает private
+trusted fingerprints до запуска Gateway. Prayer scheduler создаёт только
+finite `no_agent=true` jobs для единственного Oyijon из private mapping.
+
+Rollback указывается строкой из apply:
+
+```bash
+bash /tmp/fix02/deploy/fix02_deploy.sh --rollback \
+  /home/timeagent/fix02-backup-YYYYMMDD_HHMMSS
+```
+
+После apply проверить: plugin order identity → health → cron reliability →
+Stage 5.3; backend `29/29/29`; morning exact `0 8 * * *`; watchdog exact;
+prayer timer active; шесть daily finite jobs без LLM; quiet-state 0600;
+health-alert не подавляется; rollback backup остаётся private.

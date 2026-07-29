@@ -36,12 +36,13 @@ mapped user. Delivery-цель отдельная от tool-identity.
 
 ## Stage 6 daily-life jobs
 
-Согласовано заказчиком 2026-07-26: новости **UzA + Kun.uz**, утро **08:30**,
-вечер **19:30**, часовой пояс `Asia/Tashkent`.
+Согласовано заказчиком 2026-07-29: Kun.uz остаётся, УзА удалён; мировые
+RSS и темы задаются `backend/news_sources.json`. Утро **08:00**, вечер
+**19:30**, часовой пояс `Asia/Tashkent`.
 
 | File | Schedule | Deliver | Purpose | mapped allowed_tools |
 |---|---|---|---|---|
-| `06_morning.md` | `30 8 * * *` | тест‑Ойижон | погода, намаз, obligations, новости, одно сообщение | `get_recurring_obligations` |
+| `06_morning.md` | `0 8 * * *` | тест‑Ойижон | приветствие, заботливая погода, 1–2 разговорные новости | внешние read-only tools без user scope |
 | `06_obligation_reminders.md` | `15 9 * * *` | тест‑Ойижон | заранее / due / due+1, без мутаций, максимум одно сообщение | `get_recurring_obligations` |
 | `06_evening.md` | `30 19 * * *` | тест‑Ойижон | один мягкий вопрос, только если за день данных нет | `get_admin_report_data` |
 | `07_admin_report.md` | `30 19 * * *` | тест‑админ | фактический отчёт день/месяц/план/обязательства/alerts, без health-текстов | `get_admin_report_data` |
@@ -50,6 +51,17 @@ mapped user. Delivery-цель отдельная от tool-identity.
 `get_tashkent_weather`, `get_tashkent_prayer_times`, `get_daily_news` не имеют
 `user_id` и не дают доступ к пользовательским данным. Их результат кэшируется
 backend на день; stale возвращается с честной пометкой.
+
+Отдельный user-systemd timer `mariyam-prayer-scheduler.timer` после полуночи
+получает свежий Aladhan-кэш и создаёт шесть finite one-shot: список времён в
+07:45 и пять напоминаний за 10 минут до намаза. Все они `no_agent=true`,
+печатают утверждённый кириллический шаблон и не добавляют LLM-вызовов.
+Ротация зависит от даты и не повторяет вчерашний вариант того же слота.
+
+Фразы «сплю»/«ухлаяпман» включают тишину до 08:00, «Қуръон ўқияпман» — на
+90 минут. В сами окна намаза (20 минут от начала) non-critical delivery
+пропускается без отложенного дубля. No-agent script выдаёт пустой stdout, а
+LLM cron получает штатный `[SILENT]`; health-alert админу проходит независимо.
 
 Пользовательский `cronjob` для фразы вроде «Эртага соат 10 да дорини эслат»
 остаётся **untrusted**: его job ID не добавляется в private mapping. Profile

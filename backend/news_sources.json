@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "default_sources": [
+    "kun",
+    "un_news_ru",
+    "dw_ru",
+    "euronews_ru"
+  ],
+  "default_topic": "daily",
+  "sources": [
+    {
+      "key": "kun",
+      "name": "Кун.уз",
+      "url": "https://kun.uz/news/rss?lang=ru",
+      "enabled": true
+    },
+    {
+      "key": "un_news_ru",
+      "name": "Новости ООН",
+      "url": "https://news.un.org/feed/subscribe/ru/news/all/rss.xml",
+      "enabled": true
+    },
+    {
+      "key": "dw_ru",
+      "name": "Дойче Велле",
+      "url": "https://rss.dw.com/rdf/rss-ru-all",
+      "enabled": true
+    },
+    {
+      "key": "euronews_ru",
+      "name": "Евроньюс",
+      "url": "https://ru.euronews.com/rss?format=mrss&level=theme&name=news",
+      "enabled": true
+    }
+  ],
+  "topics": {
+    "daily": {
+      "name": "Кунлик сара хабарлар",
+      "keywords": []
+    },
+    "uzbekistan": {
+      "name": "Ўзбекистон",
+      "keywords": [
+        "ўзбекистон",
+        "узбекистан",
+        "тошкент",
+        "ташкент"
+      ]
+    },
+    "world": {
+      "name": "Дунё",
+      "keywords": []
+    },
+    "middle_east": {
+      "name": "Яқин Шарқ",
+      "keywords": [
+        "ближний восток",
+        "сша",
+        "иран",
+        "израил",
+        "палестин",
+        "газа",
+        "тегеран",
+        "вашингтон"
+      ]
+    }
+  }
+}

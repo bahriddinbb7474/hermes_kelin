@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import copy
+import importlib.util
 import json
 import os
 import re
 import secrets
 import sqlite3
 import stat
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,6 +26,17 @@ BLOCKED_MESSAGE_MARKERS = (
     "`",
 )
 CYRILLIC_RE = re.compile(r"[А-Яа-яЁёЎўҚқҒғҲҳ]")
+QUIET_CRON_NAMES = (
+    "mariyam_daily_morning",
+    "mariyam_obligation_reminders",
+    "mariyam_daily_evening",
+    "mariyam_plan_25_draft",
+    "mariyam_plan_27_reminder",
+    "mariyam_plan_01a_auto",
+)
+SILENT_MARKER = "[SILENT]"
+_DAY_RHYTHM = None
+_DAY_RHYTHM_PATH = None
 
 
 def _safe_error(code: str) -> str:
@@ -95,6 +108,49 @@ def _trusted_oyijon(session_id: object) -> bool:
     )
 
 
+def _day_rhythm():
+    global _DAY_RHYTHM, _DAY_RHYTHM_PATH
+    home = _home()
+    path = home / "scripts/day_rhythm/mariyam_day_rhythm.py" if home else None
+    if path is None:
+        return None
+    if _DAY_RHYTHM is not None and _DAY_RHYTHM_PATH == path:
+        return _DAY_RHYTHM
+    try:
+        info = os.lstat(path)
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+            return None
+        spec = importlib.util.spec_from_file_location(
+            "mariyam_profile_day_rhythm", path
+        )
+        if spec is None or spec.loader is None:
+            return None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        _DAY_RHYTHM = module
+        _DAY_RHYTHM_PATH = path
+        return module
+    except Exception:
+        return None
+
+
+def _cron_session_title(session_id: object) -> str | None:
+    home = _home()
+    if home is None or not isinstance(session_id, str) or not session_id:
+        return None
+    try:
+        with sqlite3.connect(home / "state.db") as connection:
+            row = connection.execute(
+                "SELECT source, title FROM sessions WHERE id=?", (session_id,)
+            ).fetchone()
+        if not row or row[0] != "cron" or not isinstance(row[1], str):
+            return None
+        return row[1]
+    except (OSError, sqlite3.Error):
+        return None
+
+
 def _is_one_shot(schedule: object) -> bool:
     if not isinstance(schedule, str) or not schedule.strip():
         return False
@@ -145,13 +201,23 @@ def _create_reminder_script(message: str) -> tuple[str, Path]:
     path = scripts / relative
     literal = json.dumps(message, ensure_ascii=True)
     content = (
+        "import sys\n"
         "from pathlib import Path\n"
+        "_SELF = Path(__file__).resolve()\n"
+        "sys.path.insert(0, str(_SELF.parents[1]))\n"
         f"_MESSAGE = {literal}\n"
-        "print(_MESSAGE, flush=True)\n"
         "try:\n"
-        "    Path(__file__).unlink()\n"
-        "except OSError:\n"
-        "    pass\n"
+        "    try:\n"
+        "        from day_rhythm.mariyam_day_rhythm import emit_noncritical\n"
+        "    except Exception:\n"
+        "        emit_noncritical = None\n"
+        "    if emit_noncritical is not None:\n"
+        "        emit_noncritical(_MESSAGE)\n"
+        "finally:\n"
+        "    try:\n"
+        "        _SELF.unlink()\n"
+        "    except OSError:\n"
+        "        pass\n"
     ).encode("ascii")
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     if hasattr(os, "O_NOFOLLOW"):
@@ -237,5 +303,36 @@ def on_tool_execution_middleware(**kwargs):
     return result
 
 
+def on_pre_gateway_dispatch(**kwargs):
+    event = kwargs.get("event")
+    rhythm = _day_rhythm()
+    if rhythm is None:
+        return None
+    try:
+        kind = rhythm.activate_quiet(getattr(event, "text", None))
+    except Exception:
+        return None
+    if kind is not None:
+        return {"action": "skip", "reason": f"quiet_{kind}"}
+    return None
+
+
+def on_transform_llm_output(**kwargs):
+    title = _cron_session_title(kwargs.get("session_id"))
+    if title is None or not any(title.startswith(name) for name in QUIET_CRON_NAMES):
+        return None
+    rhythm = _day_rhythm()
+    if rhythm is None:
+        return None
+    try:
+        if not rhythm.should_deliver_noncritical():
+            return SILENT_MARKER
+    except Exception:
+        return None
+    return None
+
+
 def register(ctx) -> None:  # pragma: no cover - exercised by Hermes loader
     ctx.register_middleware("tool_execution", on_tool_execution_middleware)
+    ctx.register_hook("pre_gateway_dispatch", on_pre_gateway_dispatch)
+    ctx.register_hook("transform_llm_output", on_transform_llm_output)

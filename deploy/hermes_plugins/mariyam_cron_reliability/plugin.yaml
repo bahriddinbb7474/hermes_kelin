@@ -1,7 +1,8 @@
 name: mariyam_cron_reliability
-version: "1.0.0"
+version: "1.1.0"
 description: >-
   Converts trusted Oyijon Telegram one-shot reminders into private, ephemeral
-  no-agent scripts whose stdout is delivered verbatim by Hermes cron. Recurring
-  and trusted identity jobs are never rewritten.
+  no-agent scripts whose stdout is delivered verbatim by Hermes cron. It also
+  records deterministic sleep/Quran quiet windows and suppresses non-critical
+  proactive delivery while health alerts remain independent.
 author: Hermes/Mariyam

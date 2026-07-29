@@ -20,3 +20,4 @@
 | imp08-sol | Sol | Cron watchdog +15 мин и no-agent one-shot (pre-handover reliability) | done | PASS, CLOSED live |
 | imp04-opus | Opus | Аудит токенов + личность «живая келин», SOUL v2 (2 фазы) | фаза 1 PASS; фаза 2 код+тесты done, деплой ждёт разрешения | −45 % токенов, 290 tests pass; live acceptance не выполнен |
 | imp09-sol | Sol | Финальная приёмка: язык, voice ≥90%, safety, SOUL v2 live, reboot | done; evening follow-up pending | PASS technical + 08:30; 19:30 pending |
+| fix02-sol | Sol | Ритм дня: намаз-чекины no-agent, разбитое утро, новости, тихие окна | done, CLOSED live на test-user | 306 passed, 87 skipped; morning + 2 prayer slots + quiet PASS |

@@ -333,8 +333,11 @@ async def t_get_tashkent_prayer_times(_pool, _a):
     return await external_data.get_tashkent_prayer_times()
 
 
-async def t_get_daily_news(_pool, _a):
-    return await external_data.get_daily_news()
+async def t_get_daily_news(_pool, a):
+    return await external_data.get_daily_news(
+        topic=a.get("topic"),
+        sources=a.get("sources"),
+    )
 
 
 DISPATCH = {
@@ -528,7 +531,28 @@ TOOLS = [
     ("log_usage_cost", "Записать оценку стоимости STT/TTS/LLM", schema(pick("provider", "service_type", "units", "estimated_cost_usd"), ["provider", "service_type", "units", "estimated_cost_usd"])),
     ("get_tashkent_weather", "Read-only факты погоды Ташкента из OpenWeather с суточным кэшем и честной stale-пометкой", schema({})),
     ("get_tashkent_prayer_times", "Read-only времена намаза Ташкента из Aladhan (Hanafi) с суточным кэшем и честной stale-пометкой", schema({})),
-    ("get_daily_news", "Read-only заголовки согласованных источников UzA + Kun.uz с суточным кэшем; выбрать 3–5 спокойных пунктов должен Hermes", schema({})),
+    (
+        "get_daily_news",
+        "Read-only новости из согласованного config; topic/sources можно переключать просьбой в чате, факты и summary кэшируются на день",
+        schema(
+            {
+                "topic": {
+                    "type": "string",
+                    "enum": ["daily", "uzbekistan", "world", "middle_east"],
+                },
+                "sources": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["kun", "un_news_ru", "dw_ru", "euronews_ru"],
+                    },
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "uniqueItems": True,
+                },
+            }
+        ),
+    ),
 ]
 REQUIRED_BY_TOOL = {name: tool_schema.get("required", []) for name, _desc, tool_schema in TOOLS}
 

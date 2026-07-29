@@ -1,0 +1,13 @@
+[Unit]
+Description=Prepare Mariyam prayer-care reminders every Tashkent day
+
+[Timer]
+OnCalendar=*-*-* 00:20:00 Asia/Tashkent
+OnBootSec=2min
+Persistent=true
+AccuracySec=20s
+RandomizedDelaySec=20s
+Unit=mariyam-prayer-scheduler.service
+
+[Install]
+WantedBy=timers.target

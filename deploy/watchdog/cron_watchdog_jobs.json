@@ -6,7 +6,7 @@
     {"name": "mariyam_plan_28_escalate", "schedule": "0 9 28 * *", "grace_minutes": 15, "max_lateness_minutes": 360},
     {"name": "mariyam_plan_01a_auto", "schedule": "0 8 1 * *", "grace_minutes": 15, "max_lateness_minutes": 360},
     {"name": "mariyam_plan_01b_fallback", "schedule": "10 8 1 * *", "grace_minutes": 15, "max_lateness_minutes": 360},
-    {"name": "mariyam_daily_morning", "schedule": "30 8 * * *", "grace_minutes": 15, "max_lateness_minutes": 360},
+    {"name": "mariyam_daily_morning", "schedule": "0 8 * * *", "grace_minutes": 15, "max_lateness_minutes": 360},
     {"name": "mariyam_obligation_reminders", "schedule": "15 9 * * *", "grace_minutes": 15, "max_lateness_minutes": 360},
     {"name": "mariyam_admin_report_1930", "schedule": "30 19 * * *", "grace_minutes": 15, "max_lateness_minutes": 360}
   ]

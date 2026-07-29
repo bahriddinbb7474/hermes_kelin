@@ -1,0 +1,27 @@
+[Unit]
+Description=Create Mariyam prayer-care no-agent one-shots
+After=network-online.target
+Wants=network-online.target
+OnFailure=mariyam-heartbeat-failure@%n.service
+
+[Service]
+Type=oneshot
+Environment=HERMES_HOME=/home/timeagent/.hermes/profiles/mariyam_oyijon
+Environment=MARIYAM_IDENTITY_MAP_FILE=/opt/hermes-mariyam-secrets/identity-map.json
+Environment=MARIYAM_HERMES_PYTHON=/home/timeagent/.hermes/hermes-agent/venv/bin/python
+Environment=MARIYAM_EXTERNAL_CACHE_FILE=/opt/hermes-mariyam/var/external-data-cache.json
+Environment=PYTHONPATH=/opt/hermes-mariyam
+EnvironmentFile=/home/timeagent/.hermes/profiles/mariyam_oyijon/.env
+WorkingDirectory=/opt/hermes-mariyam
+ExecStart=/opt/hermes-mariyam/.venv/bin/python /opt/hermes-mariyam/deploy/day_rhythm/mariyam-prayer-scheduler.py
+TimeoutStartSec=3min
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths=/opt/hermes-mariyam-secrets
+ReadWritePaths=/opt/hermes-mariyam/var
+ReadWritePaths=/home/timeagent/.hermes/profiles/mariyam_oyijon
+
+[Install]
+WantedBy=default.target

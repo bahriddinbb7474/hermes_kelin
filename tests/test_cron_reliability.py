@@ -109,7 +109,7 @@ def test_successful_tick_is_silent_and_never_retried(tmp_path):
     home = tmp_path / "profile"
     expected = datetime(2026, 7, 28, 8, 30, tzinfo=watchdog.TASHKENT)
     now = expected + timedelta(minutes=15)
-    spec = watchdog.JobSpec("morning", "30 8 * * *", 15, 360)
+    spec = watchdog.JobSpec("morning", "0 8 * * *", 15, 360)
     job = _job("a" * 12, spec.name, spec.schedule, expected.isoformat(), "ok")
     _write_jobs(home, [job])
     _output(home, job["id"], timestamp=expected + timedelta(minutes=1))
@@ -357,6 +357,13 @@ def test_oyijon_one_shot_becomes_private_no_agent_script(
     assert captured["attach_to_session"] is False
     assert "model" not in captured
     script = home / "scripts" / captured["script"]
+    helper_dir = home / "scripts" / "day_rhythm"
+    helper_dir.mkdir(parents=True)
+    (helper_dir / "__init__.py").write_text("", encoding="utf-8")
+    (helper_dir / "mariyam_day_rhythm.py").write_text(
+        "def emit_noncritical(message):\n    print(message, flush=True)\n",
+        encoding="utf-8",
+    )
     assert script.is_file()
     if os.name == "posix":
         assert stat.S_IMODE(script.stat().st_mode) == 0o600
@@ -422,7 +429,7 @@ def test_manifest_and_systemd_hardening_contracts():
         / "deploy/hermes_profile_mariyam_oyijon"
         / "config.skill-protect.snippet.yaml"
     ).read_text(encoding="utf-8")
-    assert 'version: "1.0.0"' in manifest
+    assert 'version: "1.1.0"' in manifest
     assert "NoNewPrivileges=yes" in service
     assert "ProtectSystem=strict" in service
     assert "ReadWritePaths=/opt/hermes-mariyam/var/watchdog" in service
@@ -433,3 +440,9 @@ def test_manifest_and_systemd_hardening_contracts():
     assert profile.index("- mariyam_health_guard") < profile.index(
         "- mariyam_cron_reliability"
     ) < profile.index("- mariyam_stage53_guard")
+    assert 'ctx.register_hook("pre_gateway_dispatch"' in PLUGIN_PATH.read_text(
+        encoding="utf-8"
+    )
+    assert 'ctx.register_hook("transform_llm_output"' in PLUGIN_PATH.read_text(
+        encoding="utf-8"
+    )

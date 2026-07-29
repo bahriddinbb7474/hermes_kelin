@@ -25,10 +25,7 @@ CACHE_VERSION = 1
 MAX_RESPONSE_BYTES = 2_000_000
 HTTP_TIMEOUT_SECONDS = 12
 DEFAULT_CACHE_PATH = Path("/opt/hermes-mariyam/var/external-data-cache.json")
-NEWS_FEEDS = (
-    ("uza", "UzA", "https://uza.uz/ru/rss"),
-    ("kun", "Kun.uz", "https://kun.uz/news/rss?lang=ru"),
-)
+DEFAULT_NEWS_CONFIG_PATH = Path(__file__).with_name("news_sources.json")
 
 _CACHE_LOCK = threading.Lock()
 
@@ -238,6 +235,69 @@ def _plain_text(raw: str) -> str:
     return re.sub(r"\s+", " ", without_tags).strip()
 
 
+def _news_config_path() -> Path:
+    configured = os.environ.get("MARIYAM_NEWS_CONFIG_FILE")
+    return Path(configured) if configured else DEFAULT_NEWS_CONFIG_PATH
+
+
+def _load_news_config() -> dict:
+    path = _news_config_path()
+    try:
+        raw = path.read_bytes()
+        if len(raw) > 128 * 1024:
+            raise ValueError("news config is too large")
+        value = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
+        raise ExternalDataError("news config is unavailable") from exc
+    if (
+        not isinstance(value, dict)
+        or value.get("version") != 1
+        or not isinstance(value.get("sources"), list)
+        or not isinstance(value.get("topics"), dict)
+        or not isinstance(value.get("default_sources"), list)
+        or not isinstance(value.get("default_topic"), str)
+    ):
+        raise ExternalDataError("news config has invalid shape")
+    sources: dict[str, dict] = {}
+    for item in value["sources"]:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"key", "name", "url", "enabled"}
+            or not isinstance(item["key"], str)
+            or not re.fullmatch(r"[a-z0-9_]{2,40}", item["key"])
+            or item["key"] in sources
+            or not isinstance(item["name"], str)
+            or not item["name"].strip()
+            or not isinstance(item["url"], str)
+            or not item["url"].startswith("https://")
+            or not isinstance(item["enabled"], bool)
+        ):
+            raise ExternalDataError("news config has invalid source")
+        sources[item["key"]] = item
+    if not sources or any(key not in sources for key in value["default_sources"]):
+        raise ExternalDataError("news config has invalid defaults")
+    topics: dict[str, dict] = {}
+    for key, item in value["topics"].items():
+        if (
+            not isinstance(key, str)
+            or not re.fullmatch(r"[a-z0-9_]{2,40}", key)
+            or not isinstance(item, dict)
+            or set(item) != {"name", "keywords"}
+            or not isinstance(item["name"], str)
+            or not item["name"].strip()
+            or not isinstance(item["keywords"], list)
+            or not all(
+                isinstance(keyword, str) and 1 <= len(keyword.strip()) <= 80
+                for keyword in item["keywords"]
+            )
+        ):
+            raise ExternalDataError("news config has invalid topic")
+        topics[key] = item
+    if value["default_topic"] not in topics:
+        raise ExternalDataError("news config has invalid default topic")
+    return {**value, "sources_by_key": sources, "topics": topics}
+
+
 def _parse_feed(payload: bytes, source_key: str, source_name: str) -> list[dict]:
     try:
         root = ElementTree.fromstring(payload)
@@ -245,11 +305,13 @@ def _parse_feed(payload: bytes, source_key: str, source_name: str) -> list[dict]
         raise ExternalDataError(f"{source_name} returned invalid RSS") from exc
     items = root.findall(".//item")
     if not items:
+        items = root.findall(".//{*}item")
+    if not items:
         items = root.findall(".//{*}entry")
     parsed: list[dict] = []
     for item in items[:20]:
         title = unescape(_text(item, "title") or _text(item, "{*}title"))
-        link = _text(item, "link")
+        link = _text(item, "link") or _text(item, "{*}link")
         if not link:
             link_node = item.find("{*}link")
             if link_node is not None:
@@ -295,14 +357,46 @@ def _parse_feed(payload: bytes, source_key: str, source_name: str) -> list[dict]
     return parsed
 
 
-def _fetch_news() -> dict:
-    candidates: list[dict] = []
+def _fetch_news(
+    source_keys: list[str] | None = None,
+    topic_key: str | None = None,
+) -> dict:
+    config = _load_news_config()
+    sources_by_key = config["sources_by_key"]
+    requested_sources = source_keys or list(config["default_sources"])
+    if (
+        not isinstance(requested_sources, list)
+        or not requested_sources
+        or len(requested_sources) > len(sources_by_key)
+        or not all(
+            isinstance(key, str)
+            and key in sources_by_key
+            and sources_by_key[key]["enabled"]
+            for key in requested_sources
+        )
+        or len(set(requested_sources)) != len(requested_sources)
+    ):
+        raise ExternalDataError("unsupported news source selection")
+    selected_topic = topic_key or config["default_topic"]
+    if selected_topic not in config["topics"]:
+        raise ExternalDataError("unsupported news topic")
+    by_source: list[list[dict]] = []
     source_errors: list[str] = []
-    for source_key, source_name, url in NEWS_FEEDS:
+    for source_key in requested_sources:
+        source = sources_by_key[source_key]
+        source_name = source["name"]
         try:
-            candidates.extend(_parse_feed(_http_get(url), source_key, source_name))
+            by_source.append(
+                _parse_feed(_http_get(source["url"]), source_key, source_name)
+            )
         except ExternalDataError:
             source_errors.append(source_name)
+    candidates = [
+        items[index]
+        for index in range(max((len(items) for items in by_source), default=0))
+        for items in by_source
+        if index < len(items)
+    ]
     if not candidates:
         raise ExternalDataError("all agreed news sources are unavailable")
     unique: list[dict] = []
@@ -313,15 +407,40 @@ def _fetch_news() -> dict:
             continue
         seen.add(normalized)
         unique.append(item)
+    keywords = [
+        keyword.casefold() for keyword in config["topics"][selected_topic]["keywords"]
+    ]
+    if keywords:
+        unique = [
+            item
+            for item in unique
+            if any(
+                keyword in f"{item['title_ru']} {item['summary_ru']}".casefold()
+                for keyword in keywords
+            )
+        ]
+    available_sources = [
+        {"key": key, "name": item["name"]}
+        for key, item in sources_by_key.items()
+        if item["enabled"]
+    ]
+    available_topics = [
+        {"key": key, "name": item["name"]}
+        for key, item in config["topics"].items()
+    ]
     return {
-        "agreed_sources": ["UzA", "Kun.uz"],
+        "agreed_sources": [sources_by_key[key]["name"] for key in requested_sources],
+        "selected_sources": requested_sources,
+        "selected_topic": selected_topic,
+        "available_sources": available_sources,
+        "available_topics": available_topics,
         "candidates": unique[:20],
         "source_errors": source_errors,
         "selection_note": (
-            "Hermes must choose 2–5 calm Uzbekistan items close to Oyijon's "
-            "life, paraphrase them in Uzbek Cyrillic with Cyrillic source "
-            "names, offer details from summary_ru only on request, and never "
-            "invent facts."
+            "Hermes must choose 1–2 calm items close to Oyijon's interests, "
+            "paraphrase them in Uzbek Cyrillic with the supplied Cyrillic "
+            "source names, avoid panic and graphic details, offer details "
+            "from summary_ru only on request, and never invent facts."
         ),
     }
 
@@ -391,5 +510,18 @@ async def get_tashkent_prayer_times() -> dict:
     return await _daily_cached("prayer_tashkent_hanafi", _fetch_prayer_times)
 
 
-async def get_daily_news() -> dict:
-    return await _daily_cached("news_uza_kun", _fetch_news)
+async def get_daily_news(
+    topic: str | None = None,
+    sources: list[str] | None = None,
+) -> dict:
+    selected_sources = sources or []
+    cache_key = "news:" + json.dumps(
+        {"topic": topic, "sources": selected_sources},
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return await _daily_cached(
+        cache_key,
+        lambda: _fetch_news(selected_sources or None, topic),
+    )
