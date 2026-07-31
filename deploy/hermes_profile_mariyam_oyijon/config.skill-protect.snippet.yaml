@@ -12,6 +12,8 @@
 # - display.busy_ack_enabled: false suppresses gateway busy acknowledgements
 #   (including the one-time /busy onboarding tip) without changing how the
 #   incoming message interrupts, queues, or steers the active turn
+# - display.long_running_notifications: false suppresses English "Working"
+#   gateway heartbeats while the agent is handling a long turn
 # - skills.write_approval: stage skill writes instead of immediate commit
 # - agent.disabled_toolsets: gateway/run.py loads into AIAgent
 # - toolset name "skills" → skills_list, skill_view, skill_manage (toolsets.py)
@@ -32,6 +34,8 @@ display:
   # No Hermes ⚡/⏳/⏩ busy acknowledgements or one-time English /busy tip in
   # Mariyam's chat. The incoming message is still processed normally.
   busy_ack_enabled: false
+  # No English "⏳ Working — N min" framework heartbeat in Mariyam's chat.
+  long_running_notifications: false
   tool_progress: false
 
 agent:

@@ -14,6 +14,7 @@ Supported profile-scoped fix (no Hermes core / identity guard change):
   - skills.write_approval: true
   - display.memory_notifications: "off"
   - display.busy_ack_enabled: false
+  - display.long_running_notifications: false
   The canonical contract is profile/SOUL.md; there is no mutable Mariyam skill.
   `skills.enabled` is not a Hermes v0.18.2 loader key.
 """
@@ -55,6 +56,7 @@ BUSY_ACK_MARKERS = (
     "Steered into current run",
     "Subagent working",
     "Compressing context",
+    "Working —",
     "First-time tip",
     "/busy queue",
     "/busy steer",
@@ -141,6 +143,10 @@ def test_snippet_memory_notifications_off(protect_cfg):
 
 def test_snippet_busy_ack_disabled(protect_cfg):
     assert protect_cfg["display"]["busy_ack_enabled"] is False
+
+
+def test_snippet_long_running_notifications_disabled(protect_cfg):
+    assert protect_cfg["display"]["long_running_notifications"] is False
 
 
 def test_snippet_disables_skills_toolset(protect_cfg):
@@ -243,7 +249,14 @@ def test_user_visible_busy_ack_text_suppressed(protect_cfg):
 def test_busy_ack_contract_covers_adjacent_framework_strings():
     """Document all nearby English busy-layer strings covered by one gate."""
     corpus = "\n".join(BUSY_ACK_MARKERS)
-    for marker in ("Interrupting", "Queued", "Steered", "First-time tip", "/busy"):
+    for marker in (
+        "Interrupting",
+        "Queued",
+        "Steered",
+        "Working —",
+        "First-time tip",
+        "/busy",
+    ):
         assert marker in corpus
 
 

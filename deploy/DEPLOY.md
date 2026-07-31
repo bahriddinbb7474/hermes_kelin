@@ -269,6 +269,7 @@ Stage 5.2 показал второй root cause: Hermes добавляет в s
    `deploy/hermes_profile_mariyam_oyijon/config.skill-protect.snippet.yaml`
    (ключи: `creation_nudge_interval: 0`, `write_approval: true`,
    `memory_notifications: "off"`, `busy_ack_enabled: false`,
+   `long_running_notifications: false`,
    `agent.disabled_toolsets: [skills, terminal, code_execution]`). Hermes v0.18.2
    относит `terminal`/`process` к `terminal`, а `execute_code` — к отдельному
    `code_execution`; оба отключаются только для Mariyam profile.
