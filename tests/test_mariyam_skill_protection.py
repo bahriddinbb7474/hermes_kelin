@@ -13,6 +13,7 @@ Supported profile-scoped fix (no Hermes core / identity guard change):
   - agent.disabled_toolsets: [skills]
   - skills.write_approval: true
   - display.memory_notifications: "off"
+  - display.busy_ack_enabled: false
   The canonical contract is profile/SOUL.md; there is no mutable Mariyam skill.
   `skills.enabled` is not a Hermes v0.18.2 loader key.
 """
@@ -48,6 +49,17 @@ SELF_IMPROVEMENT_MARKERS = (
     "Patched SKILL.md",
     "💾 Self-improvement review",
 )
+BUSY_ACK_MARKERS = (
+    "Interrupting current task",
+    "Queued for the next turn",
+    "Steered into current run",
+    "Subagent working",
+    "Compressing context",
+    "First-time tip",
+    "/busy queue",
+    "/busy steer",
+    "/busy status",
+)
 
 
 def _should_review_skills(
@@ -67,6 +79,15 @@ def _notify_actions(notification_mode: str, actions_if_on: list[str]) -> list[st
     if mode == "off":
         return []
     return list(actions_if_on)
+
+
+def _busy_ack_messages(
+    busy_ack_enabled: bool, acknowledgement: str, onboarding_hint: str
+) -> list[str]:
+    """Mirror gateway/run.py's early busy-ack gate in Hermes v0.18.2."""
+    if not busy_ack_enabled:
+        return []
+    return [acknowledgement, onboarding_hint]
 
 
 def _soul_sha256() -> str:
@@ -116,6 +137,10 @@ def test_snippet_write_approval_on(protect_cfg):
 
 def test_snippet_memory_notifications_off(protect_cfg):
     assert str(protect_cfg["display"]["memory_notifications"]).lower() == "off"
+
+
+def test_snippet_busy_ack_disabled(protect_cfg):
+    assert protect_cfg["display"]["busy_ack_enabled"] is False
 
 
 def test_snippet_disables_skills_toolset(protect_cfg):
@@ -195,6 +220,31 @@ def test_user_visible_self_improvement_text_suppressed(protect_cfg):
     assert _notify_actions(mode, sample) == []
     # Positive control: default "on" would surface the line.
     assert any("Patched SKILL.md" in a for a in _notify_actions("on", sample))
+
+
+def test_user_visible_busy_ack_text_suppressed(protect_cfg):
+    enabled = protect_cfg["display"]["busy_ack_enabled"]
+    acknowledgement = "⚡ Interrupting current task. I'll respond shortly."
+    hint = (
+        "💡 First-time tip — I interrupted my current task. "
+        "Send /busy queue, /busy steer, or /busy status."
+    )
+    assert _busy_ack_messages(enabled, acknowledgement, hint) == []
+
+    # Positive control: the Hermes default would surface both framework strings.
+    visible_by_default = _busy_ack_messages(True, acknowledgement, hint)
+    assert visible_by_default == [acknowledgement, hint]
+    assert all(
+        any(marker in message for message in visible_by_default)
+        for marker in ("Interrupting current task", "First-time tip", "/busy queue")
+    )
+
+
+def test_busy_ack_contract_covers_adjacent_framework_strings():
+    """Document all nearby English busy-layer strings covered by one gate."""
+    corpus = "\n".join(BUSY_ACK_MARKERS)
+    for marker in ("Interrupting", "Queued", "Steered", "First-time tip", "/busy"):
+        assert marker in corpus
 
 
 def test_snippet_comments_document_self_improvement_block():

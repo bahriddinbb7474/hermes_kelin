@@ -9,6 +9,9 @@
 # - agent/turn_finalizer.py: review_skills only if interval>0 AND skill_manage present
 # - agent/background_review.py: notify line + background_review_callback
 # - display.memory_notifications: off | on | verbose
+# - display.busy_ack_enabled: false suppresses gateway busy acknowledgements
+#   (including the one-time /busy onboarding tip) without changing how the
+#   incoming message interrupts, queues, or steers the active turn
 # - skills.write_approval: stage skill writes instead of immediate commit
 # - agent.disabled_toolsets: gateway/run.py loads into AIAgent
 # - toolset name "skills" → skills_list, skill_view, skill_manage (toolsets.py)
@@ -26,6 +29,9 @@ skills:
 display:
   # No "💾 Self-improvement review: …" messages to end users (Telegram).
   memory_notifications: "off"
+  # No Hermes ⚡/⏳/⏩ busy acknowledgements or one-time English /busy tip in
+  # Mariyam's chat. The incoming message is still processed normally.
+  busy_ack_enabled: false
   tool_progress: false
 
 agent:

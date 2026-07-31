@@ -25,6 +25,7 @@
     - `skills.creation_nudge_interval: 0` — выключить post-turn skill self-improvement;
     - `skills.write_approval: true` — skill_manage не пишет сразу (staging);
     - `display.memory_notifications: "off"` — нет служебных «Self-improvement review» в Telegram;
+    - `display.busy_ack_enabled: false` — нет английских ⚡/⏳/⏩ busy-уведомлений и одноразовой подсказки `/busy`, при этом новое сообщение по-прежнему обрабатывается;
     - `agent.disabled_toolsets: [skills, terminal, code_execution]` — нет `skill_manage`, `terminal`, `process` и `execute_code`; critical prompt загружается через SOUL, MCP tools и browser/cron/memory этими toolsets не отключаются.
     - `agent.max_turns: 6` — profile-scoped cap после duplicate-success blocker;
     - plugins: `mariyam_identity_guard` затем отдельный `mariyam_stage53_guard`.
