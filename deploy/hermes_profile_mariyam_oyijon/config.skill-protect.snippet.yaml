@@ -89,10 +89,10 @@ plugins:
 # - gateway/config.py SessionResetPolicy defaults to mode "none" (July 2026),
 #   so a Telegram session never rolls over and a memory write performed after
 #   the session started stays invisible to the model forever.
-# Daily rollover at 04:00 Asia/Tashkent (Oyijon asleep, outside every cron slot)
+# Daily rollover at 02:00 Asia/Tashkent (Oyijon asleep, outside every cron slot)
 # rebuilds the prompt once a day, so memory written on day N is in the prompt
 # on day N+1. notify: false keeps Hermes' English reset notice out of the chat.
 session_reset:
   mode: daily
-  at_hour: 4
+  at_hour: 2
   notify: false

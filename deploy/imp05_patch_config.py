@@ -5,7 +5,7 @@ reference is preserved):
 
 1. ``plugins.enabled`` gains ``mariyam_outbound_filter`` — the profile plugin
    that drops English framework status lines (provider-fallback notice).
-2. A top-level ``session_reset`` block (daily rollover at 04:00 local, silent)
+2. A top-level ``session_reset`` block (daily rollover at 02:00 local, silent)
    so a memory write performed after a session started reaches the model on the
    next day instead of never (Hermes keeps one frozen memory snapshot per
    session; the default reset policy is "none").
@@ -22,11 +22,11 @@ SESSION_RESET_BLOCK = [
     "# MEMORY.md / USER.md as a frozen snapshot taken when that prompt was",
     "# built, so memory written mid-session stays invisible. Default reset",
     "# policy is 'none' -> the snapshot never refreshes. Daily rollover at",
-    "# 04:00 Asia/Tashkent (Oyijon asleep, no cron slot) fixes that; notify is",
+    "# 02:00 Asia/Tashkent (Oyijon asleep, no cron slot) fixes that; notify is",
     "# off because Hermes' auto-reset notice is English.",
     "session_reset:",
     "  mode: daily",
-    "  at_hour: 4",
+    "  at_hour: 2",
     "  notify: false",
 ]
 
@@ -75,7 +75,7 @@ if any(line.rstrip() == "session_reset:" for line in lines):
     print("session_reset already present")
 else:
     lines.extend(SESSION_RESET_BLOCK)
-    changed.append("session_reset: daily/04:00/notify=false")
+    changed.append("session_reset: daily/02:00/notify=false")
 
 if not changed:
     raise SystemExit(0)

@@ -30,13 +30,15 @@ Third root cause (imp05-opus, same run): Hermes reuses the stored system prompt
   for a session's whole life and memory enters it as a frozen snapshot, while
   SessionResetPolicy defaults to mode "none" — so memory written after the
   session started never reaches the model. Fix: `session_reset` in the profile
-  snippet (daily rollover at 04:00 local, notify off).
+  snippet (daily rollover at 02:00 local, notify off).
 """
 
 from __future__ import annotations
 
 import hashlib
 import importlib.util
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -142,6 +144,26 @@ def _load_guard_module():
 
 def _load_outbound_filter():
     return _load_module("mariyam_outbound_filter_check", OUTBOUND_FILTER_INIT)
+
+
+def _installed_hermes_root() -> Path | None:
+    configured = os.environ.get("MARIYAM_HERMES_PYTHON")
+    roots = []
+    if configured:
+        candidate = Path(configured)
+        if not candidate.is_file():
+            return None
+        roots.append(candidate.parents[2])
+    else:
+        local_appdata = os.environ.get("LOCALAPPDATA")
+        if local_appdata:
+            roots.append(Path(local_appdata) / "hermes" / "hermes-agent")
+        roots.append(Path.home() / ".hermes" / "hermes-agent")
+
+    for root in roots:
+        if (root / "gateway" / "run.py").is_file():
+            return root
+    return None
 
 
 def _should_reset(mode: str, at_hour: int, updated_hour: int, now_hour: int) -> bool:
@@ -392,6 +414,53 @@ def test_install_is_noop_without_gateway_module():
     assert mod.install_status_filter() is False
 
 
+def test_installed_hermes_gateway_exposes_status_hook(tmp_path):
+    """Catch a Hermes upgrade that silently disables the profile filter."""
+    hermes_root = _installed_hermes_root()
+    if hermes_root is None:
+        pytest.skip("Hermes runtime is not installed locally")
+
+    site_packages = hermes_root / "venv" / "Lib" / "site-packages"
+    if not site_packages.is_dir():
+        site_packages = (
+            hermes_root
+            / "venv"
+            / "lib"
+            / f"python{sys.version_info.major}.{sys.version_info.minor}"
+            / "site-packages"
+        )
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join(
+        str(path)
+        for path in (hermes_root, site_packages)
+        if path.is_dir()
+    )
+    env["HERMES_HOME"] = str(tmp_path / "hermes-home")
+    probe = (
+        "import importlib; "
+        "module = importlib.import_module('gateway.run'); "
+        "print(hasattr(module, '_prepare_gateway_status_message'))"
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=REPO,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert completed.returncode == 0, (
+        "Installed Hermes could not import gateway.run: "
+        f"{completed.stderr.strip()}"
+    )
+    assert completed.stdout.strip().splitlines()[-1:] == ["True"], (
+        "Installed Hermes gateway.run no longer exposes "
+        "_prepare_gateway_status_message; update mariyam_outbound_filter "
+        "to use the new status hook"
+    )
+
+
 def test_register_defers_install_when_gateway_not_imported():
     """Plugin discovery runs before gateway.run is imported (cli.py:965)."""
     mod = _load_outbound_filter()
@@ -449,7 +518,7 @@ def test_filter_wraps_status_rail_and_drops_fallback_notice():
 def test_snippet_sets_daily_session_reset(protect_cfg):
     policy = protect_cfg["session_reset"]
     assert policy["mode"] == "daily"
-    assert int(policy["at_hour"]) == 4
+    assert int(policy["at_hour"]) == 2
 
 
 def test_session_reset_notice_is_silent(protect_cfg):
@@ -473,9 +542,9 @@ def test_hermes_default_policy_never_refreshes_memory():
 def test_daily_policy_rolls_session_after_reset_hour(protect_cfg):
     policy = protect_cfg["session_reset"]
     mode, at_hour = policy["mode"], int(policy["at_hour"])
-    # Live case: memory written 02:17, session last active 02:27, next
-    # message after 04:00 → session rolls over and rebuilds the prompt.
-    assert _should_reset(mode, at_hour, updated_hour=2, now_hour=4) is True
+    # Live case: memory written 01:17, session last active 01:27, next
+    # message after 02:00 → session rolls over and rebuilds the prompt.
+    assert _should_reset(mode, at_hour, updated_hour=1, now_hour=2) is True
     # Same-day traffic after the rollover does not reset again.
     assert _should_reset(mode, at_hour, updated_hour=5, now_hour=6) is False
 
