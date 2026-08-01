@@ -15,12 +15,12 @@ Root cause (live, 2026-08-01 02:27, profile mariyam_oyijon):
 
 Fix (profile-scoped, no Hermes core edit):
   At ``register()`` time — inside the gateway process only — the status rail
-  and final-response sanitizer are wrapped in-process. Everything Hermes would
-  still deliver is passed through the wrappers. Status lines that still carry
-  Latin letters are dropped; final replies that carry Latin letters are
-  replaced with one warm Uzbek-Cyrillic retry message. Programmatic surfaces
-  (``local``, ``api_server``, ``webhook``, ``msgraph_webhook``) keep raw
-  diagnostics.
+  keeps its script-based filter. The provider-error reply builder is wrapped
+  separately and tags only text created from a provider failure; the final
+  sanitizer replaces only that tagged value with one warm Uzbek-Cyrillic retry
+  message. Ordinary assistant replies are never classified by alphabet.
+  Programmatic surfaces (``local``, ``api_server``, ``webhook``,
+  ``msgraph_webhook``) keep raw diagnostics.
 
 Scope: the status/lifecycle rail and the gateway's human-chat final-response
 sanitizer. Cron deliveries and health-guard admin messages travel other paths
@@ -38,6 +38,7 @@ LOG = logging.getLogger("mariyam_outbound_filter")
 GATEWAY_RUN_MODULE = "gateway.run"
 STATUS_FN = "_prepare_gateway_status_message"
 FINAL_FN = "_sanitize_gateway_final_response"
+PROVIDER_ERROR_REPLY_FN = "_gateway_provider_error_reply"
 RAW_SURFACE_FN = "_gateway_surface_passes_raw_text"
 WRAPPED_FLAG = "_mariyam_outbound_filter_wrapped"
 
@@ -61,6 +62,10 @@ KNOWN_ENGLISH_STATUS_MARKERS = (
 _installed = False
 
 
+class _ProviderFailureReply(str):
+    """Internal provenance marker for text built by Hermes' error classifier."""
+
+
 def should_suppress(prepared: str | None, *, raw_surface: bool) -> bool:
     """Return True when a prepared status line must not reach the chat.
 
@@ -77,11 +82,13 @@ def should_suppress(prepared: str | None, *, raw_surface: bool) -> bool:
     return bool(LATIN_RE.search(str(prepared)))
 
 
-def filter_final_reply(prepared: str | None, *, raw_surface: bool) -> str | None:
-    """Replace non-Cyrillic final replies only on human chat surfaces."""
+def filter_final_reply(
+    prepared: str | None, *, raw_surface: bool, provider_failure: bool = False
+) -> str | None:
+    """Replace only provider-failure replies on human chat surfaces."""
     if prepared is None or prepared == "":
         return prepared
-    if should_suppress(prepared, raw_surface=raw_surface):
+    if provider_failure and not raw_surface:
         return WARM_PROVIDER_REPLY
     return prepared
 
@@ -144,6 +151,20 @@ def install_status_filter() -> bool:
     setattr(_filtered_status_message, WRAPPED_FLAG, True)
     setattr(module, STATUS_FN, _filtered_status_message)
 
+    original_provider_error_reply = getattr(module, PROVIDER_ERROR_REPLY_FN, None)
+    if original_provider_error_reply is None:
+        LOG.warning(
+            "mariyam_outbound_filter: %s.%s missing; provider failures cannot "
+            "be provenance-tagged",
+            GATEWAY_RUN_MODULE, PROVIDER_ERROR_REPLY_FN,
+        )
+    elif not getattr(original_provider_error_reply, WRAPPED_FLAG, False):
+        def _tagged_provider_error_reply(text):
+            return _ProviderFailureReply(original_provider_error_reply(text))
+
+        setattr(_tagged_provider_error_reply, WRAPPED_FLAG, True)
+        setattr(module, PROVIDER_ERROR_REPLY_FN, _tagged_provider_error_reply)
+
     original_final = getattr(module, FINAL_FN, None)
     if original_final is None:
         LOG.warning(
@@ -155,19 +176,23 @@ def install_status_filter() -> bool:
             prepared = original_final(platform, text)
             try:
                 raw_surface = bool(raw_surface_fn(platform)) if raw_surface_fn else False
-                filtered = filter_final_reply(prepared, raw_surface=raw_surface)
+                filtered = filter_final_reply(
+                    prepared,
+                    raw_surface=raw_surface,
+                    provider_failure=isinstance(prepared, _ProviderFailureReply),
+                )
                 if filtered != prepared:
                     LOG.info(
-                        "mariyam_outbound_filter: replaced non-Cyrillic final reply "
+                        "mariyam_outbound_filter: replaced provider-failure reply "
                         "(chars=%d)", len(str(prepared)),
                     )
                 return filtered
             except Exception:
                 LOG.warning(
                     "mariyam_outbound_filter: final-reply filter error; "
-                    "using warm retry reply", exc_info=True,
+                    "leaving Hermes-sanitized reply unchanged", exc_info=True,
                 )
-                return WARM_PROVIDER_REPLY
+                return prepared
 
         setattr(_filtered_final_response, WRAPPED_FLAG, True)
         setattr(module, FINAL_FN, _filtered_final_response)

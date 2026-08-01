@@ -399,7 +399,9 @@ def test_provider_failure_final_reply_becomes_warm_uzbek():
         "⚠️ The model provider failed after retries. I kept raw provider "
         "details out of chat; check gateway logs for diagnostics."
     )
-    assert mod.filter_final_reply(english, raw_surface=False) == (
+    assert mod.filter_final_reply(
+        english, raw_surface=False, provider_failure=True
+    ) == (
         "Ойижон, ҳозир жавоб бера олмадим. "
         "Илтимос, бироздан кейин яна ёзинг."
     )
@@ -408,13 +410,28 @@ def test_provider_failure_final_reply_becomes_warm_uzbek():
 def test_provider_failure_final_reply_stays_raw_on_programmatic_surface():
     mod = _load_outbound_filter()
     english = "Provider authentication failed: invalid API key"
-    assert mod.filter_final_reply(english, raw_surface=True) == english
+    assert mod.filter_final_reply(
+        english, raw_surface=True, provider_failure=True
+    ) == english
 
 
 def test_uzbek_final_reply_is_unchanged():
     mod = _load_outbound_filter()
     uzbek = "Ойижон, бу ойда жами 739 700 сўм сарфлабсиз."
     assert mod.filter_final_reply(uzbek, raw_surface=False) == uzbek
+
+
+@pytest.mark.parametrize(
+    "reply",
+    (
+        "Мен GPT-5.6-luna моделида ишлайман, Ойижон.",
+        "Ойижон, OpenAI — сунъий интеллект яратадиган ташкилот.",
+        "Ойижон, Wi-Fi ни ўчириб ёқинг.",
+    ),
+)
+def test_ordinary_final_reply_with_latin_text_is_unchanged(reply):
+    mod = _load_outbound_filter()
+    assert mod.filter_final_reply(reply, raw_surface=False) == reply
 
 
 def test_uzbek_status_still_delivered(protect_cfg):
@@ -476,7 +493,8 @@ def test_installed_hermes_gateway_exposes_status_hook(tmp_path):
         "import importlib; "
         "module = importlib.import_module('gateway.run'); "
         "print(hasattr(module, '_prepare_gateway_status_message') and "
-        "hasattr(module, '_sanitize_gateway_final_response'))"
+        "hasattr(module, '_sanitize_gateway_final_response') and "
+        "hasattr(module, '_gateway_provider_error_reply'))"
     )
     completed = subprocess.run(
         [sys.executable, "-c", probe],
@@ -531,11 +549,20 @@ def test_filter_wraps_status_rail_and_drops_fallback_notice():
         return platform in RAW_TEXT_PLATFORMS
 
     def _sanitize_gateway_final_response(platform, text):
-        return str(text).strip() or ""
+        body = str(text).strip()
+        if platform in RAW_TEXT_PLATFORMS:
+            return body
+        if body.startswith("API call failed") or body.startswith("HTTP 599"):
+            return fake._gateway_provider_error_reply(body)
+        return body
+
+    def _gateway_provider_error_reply(text):
+        return f"The model provider failed after retries: {text}"
 
     fake._prepare_gateway_status_message = _prepare_gateway_status_message
     fake._gateway_surface_passes_raw_text = _gateway_surface_passes_raw_text
     fake._sanitize_gateway_final_response = _sanitize_gateway_final_response
+    fake._gateway_provider_error_reply = _gateway_provider_error_reply
 
     sys.modules["gateway.run"] = fake
     try:
@@ -551,14 +578,24 @@ def test_filter_wraps_status_rail_and_drops_fallback_notice():
         ) == FALLBACK_NOTICE
 
         wrapped_final = fake._sanitize_gateway_final_response
-        english_failure = "Provider authentication failed: invalid API key"
+        english_failure = "API call failed: invalid API key"
         assert wrapped_final("telegram", english_failure) == mod.WARM_PROVIDER_REPLY
+        # A future fifth category is caught by provenance, not an output list.
+        assert wrapped_final("telegram", "HTTP 599 new provider category") == (
+            mod.WARM_PROVIDER_REPLY
+        )
         assert wrapped_final("telegram", UZBEK_STATUS) == UZBEK_STATUS
         assert wrapped_final("local", english_failure) == english_failure
+        for normal_reply in (
+            "Мен GPT-5.6-luna моделида ишлайман, Ойижон.",
+            "Ойижон, OpenAI — сунъий интеллект яратадиган ташкилот.",
+            "Ойижон, Wi-Fi ни ўчириб ёқинг.",
+        ):
+            assert wrapped_final("telegram", normal_reply) == normal_reply
         # Positive control: without the wrapper Hermes would deliver English.
         assert _sanitize_gateway_final_response(
             "telegram", english_failure
-        ) == english_failure
+        ) == _gateway_provider_error_reply(english_failure)
     finally:
         sys.modules.pop("gateway.run", None)
 

@@ -1,12 +1,12 @@
 name: mariyam_outbound_filter
-version: "1.0.1"
+version: "1.0.2"
 description: >-
   Profile-scoped outbound hygiene for Mariyam. Wraps the gateway status rail
   (gateway/run.py _prepare_gateway_status_message) in-process and drops any
   framework status/warn line that still contains Latin letters, so English
   runtime chatter — notably provider switch notices — never reaches Oyijon's
-  chat. It also wraps the final-response sanitizer and replaces a remaining
-  non-Cyrillic reply with one warm Uzbek-Cyrillic retry message. Programmatic
-  surfaces retain raw diagnostics. Hermes core files are not modified: the
-  wrappers are installed at plugin register() time in the gateway process.
+  chat. For final replies it tags text at Hermes' provider-error builder and
+  replaces only that provenance-tagged value with one warm Uzbek-Cyrillic
+  retry message; ordinary replies may contain any alphabet. Programmatic
+  surfaces retain raw diagnostics. Hermes core files are not modified.
 author: Hermes/Mariyam
