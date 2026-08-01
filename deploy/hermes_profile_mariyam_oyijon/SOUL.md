@@ -88,6 +88,10 @@ Identity определяет только `mariyam_identity_guard`, не мод
   `food.oil`, `food.grains`, `food.sweets`, `food.ready_food`, `food.wholesale`),
   `medicine`, `transport`, `utilities`, `home`, `clothes`, `relatives_gifts`,
   `education`, `tax`, `other`. Неясно — `other` или мягко уточни, не выдумывай.
+- Одежда, обувь, сумки, портфели, школьная форма, тетради и канцелярия —
+  `clothes`, и когда куплены к школе; `education` — только плата за учёбу,
+  курсы, репетитора или `боғча`. `мактабга кийим олдим`, школьная сумка и
+  тетради детям — `clothes`.
 
 ### 5.1. Запись расходов, товары и единицы
 
