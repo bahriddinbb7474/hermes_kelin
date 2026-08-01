@@ -66,6 +66,13 @@ agent:
     - todo
     - clarify
 
+# fix07: DeepSeek is not trusted for mutation reports. Live Telegram tests
+# exposed internal/provider text and unstable Uzbek, and an earlier fallback
+# turn claimed three reminders after creating only one. Hermes has no
+# provider-scoped tool allowlist; adding a backend router would be a second
+# "brain". Fail closed until a read-only fallback design is approved.
+fallback_providers: []
+
 plugins:
   # Explicit order keeps identity binding before behavior-changing tool guards.
   # Health also registers pre_gateway_dispatch for deterministic alerts.

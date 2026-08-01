@@ -31,6 +31,11 @@ Third root cause (imp05-opus, same run): Hermes reuses the stored system prompt
   SessionResetPolicy defaults to mode "none" — so memory written after the
   session started never reaches the model. Fix: `session_reset` in the profile
   snippet (daily rollover at 02:00 local, notify off).
+
+Fourth root cause (fix07, live Telegram 2026-08-01): the DeepSeek fallback can
+  misreport completed mutations and leak internal/provider text into chat.
+  Hermes has no provider-scoped tool allowlist, so the safe profile policy is
+  an empty fallback chain until a read-only design is explicitly approved.
 """
 
 from __future__ import annotations
@@ -364,6 +369,10 @@ def test_identity_guard_module_still_loads_and_exports_core_api():
 
 def test_snippet_enables_outbound_filter_plugin(protect_cfg):
     assert "mariyam_outbound_filter" in protect_cfg["plugins"]["enabled"]
+
+
+def test_profile_fails_closed_without_model_fallback(protect_cfg):
+    assert protect_cfg["fallback_providers"] == []
 
 
 def test_outbound_filter_lives_in_profile_plugins_not_hermes_core():
