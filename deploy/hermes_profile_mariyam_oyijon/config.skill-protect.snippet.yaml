@@ -74,3 +74,25 @@ plugins:
     - mariyam_health_guard
     - mariyam_cron_reliability
     - mariyam_stage53_guard
+    # Drops English framework status lines (provider-fallback notice) that
+    # Hermes has no config key for. See deploy/hermes_plugins/
+    # mariyam_outbound_filter/__init__.py.
+    - mariyam_outbound_filter
+
+# Memory freshness (imp05-opus, root cause of "Mariyam does not remember the
+# family", live 2026-08-01):
+# - tools/memory_tool.py injects MEMORY.md / USER.md as a FROZEN snapshot taken
+#   when the system prompt is built; the memory tool has no read action, so the
+#   model can only see what that snapshot held.
+# - agent/conversation_loop.py::_restore_or_build_system_prompt reuses the
+#   system prompt stored in state.db verbatim for the whole life of a session.
+# - gateway/config.py SessionResetPolicy defaults to mode "none" (July 2026),
+#   so a Telegram session never rolls over and a memory write performed after
+#   the session started stays invisible to the model forever.
+# Daily rollover at 04:00 Asia/Tashkent (Oyijon asleep, outside every cron slot)
+# rebuilds the prompt once a day, so memory written on day N is in the prompt
+# on day N+1. notify: false keeps Hermes' English reset notice out of the chat.
+session_reset:
+  mode: daily
+  at_hour: 4
+  notify: false

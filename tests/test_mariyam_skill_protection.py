@@ -17,12 +17,27 @@ Supported profile-scoped fix (no Hermes core / identity guard change):
   - display.long_running_notifications: false
   The canonical contract is profile/SOUL.md; there is no mutable Mariyam skill.
   `skills.enabled` is not a Hermes v0.18.2 loader key.
+
+Second root cause (imp05-opus, live 2026-08-01 02:27): after a provider switch
+  agent/chat_completion_helpers.py + run_agent.py::_emit_pending_fallback_notice
+  push "🔄 Switched to fallback model: …" through the gateway status rail.
+  gateway/run.py::_TELEGRAM_NOISY_STATUS_RE has no pattern for it and Hermes has
+  no config key, so the English line reached Oyijon. Fix: profile plugin
+  deploy/hermes_plugins/mariyam_outbound_filter wraps the rail in-process and
+  drops Latin-script status lines on human chat surfaces.
+
+Third root cause (imp05-opus, same run): Hermes reuses the stored system prompt
+  for a session's whole life and memory enters it as a frozen snapshot, while
+  SessionResetPolicy defaults to mode "none" — so memory written after the
+  session started never reaches the model. Fix: `session_reset` in the profile
+  snippet (daily rollover at 04:00 local, notify off).
 """
 
 from __future__ import annotations
 
 import hashlib
 import importlib.util
+import sys
 from pathlib import Path
 
 import pytest
@@ -40,6 +55,9 @@ GITATTRIBUTES = REPO / ".gitattributes"
 GUARD_INIT = (
     REPO / "deploy" / "hermes_plugins" / "mariyam_identity_guard" / "__init__.py"
 )
+OUTBOUND_FILTER_INIT = (
+    REPO / "deploy" / "hermes_plugins" / "mariyam_outbound_filter" / "__init__.py"
+)
 # Canonical Git/deploy bytes after CRLF -> LF normalization.
 EXPECTED_SOUL_SHA256 = (
     "b3e65086c5c71b9f68fea9a8f5c5c2287cbcee5e50d8c4541420809eb423c69c"
@@ -50,6 +68,19 @@ SELF_IMPROVEMENT_MARKERS = (
     "Patched SKILL.md",
     "💾 Self-improvement review",
 )
+FALLBACK_NOTICE = (
+    "🔄 Switched to fallback model: gpt-5.6-luna via n1n "
+    "→ deepseek/deepseek-chat via openrouter"
+)
+FALLBACK_SWITCH_LINE = (
+    "🔄 Primary model failed — switching to fallback: "
+    "deepseek/deepseek-chat via openrouter"
+)
+# Hermes' own status filter (gateway/run.py::_TELEGRAM_NOISY_STATUS_RE) covers
+# these; the provider-switch lines above are NOT in it — that is the defect.
+HERMES_FILTERED_STATUS = "Rate limited. Waiting 20s before retrying in 3"
+UZBEK_STATUS = "Ойижон, бир дақиқа, маълумотларни кўриб чиқяпман."
+RAW_TEXT_PLATFORMS = ("local", "api_server", "webhook", "msgraph_webhook")
 BUSY_ACK_MARKERS = (
     "Interrupting current task",
     "Queued for the next turn",
@@ -97,14 +128,29 @@ def _soul_sha256() -> str:
     return hashlib.sha256(normalized).hexdigest()
 
 
-def _load_guard_module():
-    spec = importlib.util.spec_from_file_location(
-        "mariyam_identity_guard_skill_protect_check", GUARD_INIT
-    )
+def _load_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+def _load_guard_module():
+    return _load_module("mariyam_identity_guard_skill_protect_check", GUARD_INIT)
+
+
+def _load_outbound_filter():
+    return _load_module("mariyam_outbound_filter_check", OUTBOUND_FILTER_INIT)
+
+
+def _should_reset(mode: str, at_hour: int, updated_hour: int, now_hour: int) -> bool:
+    """Mirror gateway/session.py::SessionStore._should_reset daily branch."""
+    if mode not in {"daily", "both"}:
+        return False
+    # today_reset rolls back a day when the clock is still before at_hour.
+    reset_hour_today = at_hour if now_hour >= at_hour else at_hour - 24
+    return updated_hour < reset_hour_today
 
 
 @pytest.fixture(scope="module")
@@ -289,6 +335,149 @@ def test_identity_guard_module_still_loads_and_exports_core_api():
     assert hasattr(mod, "_compute_effective_args") or hasattr(
         mod, "tool_execution_wrapper"
     ) or hasattr(mod, "register")
+
+
+# --- outbound status hygiene: provider-fallback notice (imp05-opus) ---
+
+
+def test_snippet_enables_outbound_filter_plugin(protect_cfg):
+    assert "mariyam_outbound_filter" in protect_cfg["plugins"]["enabled"]
+
+
+def test_outbound_filter_lives_in_profile_plugins_not_hermes_core():
+    assert OUTBOUND_FILTER_INIT.is_file()
+    assert OUTBOUND_FILTER_INIT.parts[-3] == "hermes_plugins"
+    text = OUTBOUND_FILTER_INIT.read_text(encoding="utf-8")
+    # In-process wrapper only: no writes into the Hermes install tree.
+    assert "hermes-agent" not in text
+    assert "sys.modules" in text
+
+
+def test_fallback_notice_suppressed_on_chat_surface():
+    mod = _load_outbound_filter()
+    assert mod.should_suppress(FALLBACK_NOTICE, raw_surface=False) is True
+    assert mod.should_suppress(FALLBACK_SWITCH_LINE, raw_surface=False) is True
+
+
+def test_uzbek_status_still_delivered(protect_cfg):
+    """Positive control: the filter is script-based, not blanket suppression."""
+    mod = _load_outbound_filter()
+    assert mod.should_suppress(UZBEK_STATUS, raw_surface=False) is False
+
+
+def test_raw_surfaces_keep_english_diagnostics():
+    mod = _load_outbound_filter()
+    for surface in RAW_TEXT_PLATFORMS:
+        assert surface in RAW_TEXT_PLATFORMS  # documents the Hermes allowlist
+    assert mod.should_suppress(FALLBACK_NOTICE, raw_surface=True) is False
+    assert mod.should_suppress(HERMES_FILTERED_STATUS, raw_surface=True) is False
+
+
+def test_status_already_dropped_by_hermes_stays_dropped():
+    mod = _load_outbound_filter()
+    assert mod.should_suppress(None, raw_surface=False) is True
+    assert mod.should_suppress(None, raw_surface=True) is True
+
+
+def test_fallback_markers_documented_in_plugin():
+    mod = _load_outbound_filter()
+    corpus = "\n".join(mod.KNOWN_ENGLISH_STATUS_MARKERS)
+    assert "Switched to fallback model" in corpus
+    assert "Primary model failed" in corpus
+
+
+def test_install_is_noop_without_gateway_module():
+    """Plugin must not import the gateway (CLI/cron processes stay cheap)."""
+    mod = _load_outbound_filter()
+    assert mod.install_status_filter() is False
+
+
+def test_register_defers_install_when_gateway_not_imported():
+    """Plugin discovery runs before gateway.run is imported (cli.py:965)."""
+    mod = _load_outbound_filter()
+
+    class _Ctx:
+        def __init__(self):
+            self.hooks = []
+
+        def register_hook(self, name, callback):
+            self.hooks.append((name, callback))
+
+    ctx = _Ctx()
+    mod.register(ctx)
+    assert [name for name, _ in ctx.hooks] == ["pre_llm_call"]
+    # The deferred hook installs the wrapper on the first agent turn and
+    # injects nothing into the user message.
+    assert mod.on_pre_llm_call(session_id="s", model="m") is None
+
+
+def test_filter_wraps_status_rail_and_drops_fallback_notice():
+    """End-to-end over a stand-in gateway.run module."""
+    import types
+
+    mod = _load_outbound_filter()
+    fake = types.ModuleType("gateway.run")
+
+    def _prepare_gateway_status_message(platform, event_type, message):
+        return str(message).strip() or None
+
+    def _gateway_surface_passes_raw_text(platform):
+        return platform in RAW_TEXT_PLATFORMS
+
+    fake._prepare_gateway_status_message = _prepare_gateway_status_message
+    fake._gateway_surface_passes_raw_text = _gateway_surface_passes_raw_text
+
+    sys.modules["gateway.run"] = fake
+    try:
+        assert mod.install_status_filter() is True
+        wrapped = fake._prepare_gateway_status_message
+        assert wrapped("telegram", "lifecycle", FALLBACK_NOTICE) is None
+        assert wrapped("telegram", "lifecycle", UZBEK_STATUS) == UZBEK_STATUS
+        # Programmatic surface keeps the diagnostic.
+        assert wrapped("local", "lifecycle", FALLBACK_NOTICE) == FALLBACK_NOTICE
+        # Positive control: without the wrapper Hermes would deliver it.
+        assert _prepare_gateway_status_message(
+            "telegram", "lifecycle", FALLBACK_NOTICE
+        ) == FALLBACK_NOTICE
+    finally:
+        sys.modules.pop("gateway.run", None)
+
+
+# --- memory freshness: session rollover (imp05-opus) ---
+
+
+def test_snippet_sets_daily_session_reset(protect_cfg):
+    policy = protect_cfg["session_reset"]
+    assert policy["mode"] == "daily"
+    assert int(policy["at_hour"]) == 4
+
+
+def test_session_reset_notice_is_silent(protect_cfg):
+    """Hermes' auto-reset notice is English; Oyijon must never see it."""
+    assert protect_cfg["session_reset"]["notify"] is False
+
+
+def test_reset_hour_avoids_every_cron_slot(protect_cfg):
+    at_hour = int(protect_cfg["session_reset"]["at_hour"])
+    # Stage 6/7 cron slots (local time): morning 08, obligations 09,
+    # evening 19:30, admin report 19:30, plan cycle 25/27/28 at 09.
+    assert at_hour not in {8, 9, 19, 20}
+    assert 0 <= at_hour <= 5
+
+
+def test_hermes_default_policy_never_refreshes_memory():
+    """Documents the pre-fix default: mode 'none' → frozen memory forever."""
+    assert _should_reset("none", 4, updated_hour=2, now_hour=23) is False
+
+
+def test_daily_policy_rolls_session_after_reset_hour(protect_cfg):
+    policy = protect_cfg["session_reset"]
+    mode, at_hour = policy["mode"], int(policy["at_hour"])
+    # Live case: memory written 02:17, session last active 02:27, next
+    # message after 04:00 → session rolls over and rebuilds the prompt.
+    assert _should_reset(mode, at_hour, updated_hour=2, now_hour=4) is True
+    # Same-day traffic after the rollover does not reset again.
+    assert _should_reset(mode, at_hour, updated_hour=5, now_hour=6) is False
 
 
 def test_identity_guard_version_file_unchanged_by_skill_protect():
