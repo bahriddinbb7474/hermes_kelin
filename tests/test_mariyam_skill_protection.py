@@ -32,10 +32,11 @@ Third root cause (imp05-opus, same run): Hermes reuses the stored system prompt
   session started never reaches the model. Fix: `session_reset` in the profile
   snippet (daily rollover at 02:00 local, notify off).
 
-Fourth root cause (fix07, live Telegram 2026-08-01): the DeepSeek fallback can
+Fourth root cause (fix07/fix08, live Telegram 2026-08-01): the DeepSeek fallback can
   misreport completed mutations and leak internal/provider text into chat.
-  Hermes has no provider-scoped tool allowlist, so the safe profile policy is
-  an empty fallback chain until a read-only design is explicitly approved.
+  It stays excluded. The approved fallback is the same Luna model through
+  independent OpenRouter infrastructure; non-Cyrillic provider failure replies
+  are replaced on human chat surfaces while raw programmatic diagnostics stay.
 """
 
 from __future__ import annotations
@@ -371,8 +372,10 @@ def test_snippet_enables_outbound_filter_plugin(protect_cfg):
     assert "mariyam_outbound_filter" in protect_cfg["plugins"]["enabled"]
 
 
-def test_profile_fails_closed_without_model_fallback(protect_cfg):
-    assert protect_cfg["fallback_providers"] == []
+def test_profile_fallback_is_only_luna_via_openrouter(protect_cfg):
+    assert protect_cfg["fallback_providers"] == [
+        {"provider": "openrouter", "model": "openai/gpt-5.6-luna"}
+    ]
 
 
 def test_outbound_filter_lives_in_profile_plugins_not_hermes_core():
@@ -388,6 +391,30 @@ def test_fallback_notice_suppressed_on_chat_surface():
     mod = _load_outbound_filter()
     assert mod.should_suppress(FALLBACK_NOTICE, raw_surface=False) is True
     assert mod.should_suppress(FALLBACK_SWITCH_LINE, raw_surface=False) is True
+
+
+def test_provider_failure_final_reply_becomes_warm_uzbek():
+    mod = _load_outbound_filter()
+    english = (
+        "⚠️ The model provider failed after retries. I kept raw provider "
+        "details out of chat; check gateway logs for diagnostics."
+    )
+    assert mod.filter_final_reply(english, raw_surface=False) == (
+        "Ойижон, ҳозир жавоб бера олмадим. "
+        "Илтимос, бироздан кейин яна ёзинг."
+    )
+
+
+def test_provider_failure_final_reply_stays_raw_on_programmatic_surface():
+    mod = _load_outbound_filter()
+    english = "Provider authentication failed: invalid API key"
+    assert mod.filter_final_reply(english, raw_surface=True) == english
+
+
+def test_uzbek_final_reply_is_unchanged():
+    mod = _load_outbound_filter()
+    uzbek = "Ойижон, бу ойда жами 739 700 сўм сарфлабсиз."
+    assert mod.filter_final_reply(uzbek, raw_surface=False) == uzbek
 
 
 def test_uzbek_status_still_delivered(protect_cfg):
@@ -448,7 +475,8 @@ def test_installed_hermes_gateway_exposes_status_hook(tmp_path):
     probe = (
         "import importlib; "
         "module = importlib.import_module('gateway.run'); "
-        "print(hasattr(module, '_prepare_gateway_status_message'))"
+        "print(hasattr(module, '_prepare_gateway_status_message') and "
+        "hasattr(module, '_sanitize_gateway_final_response'))"
     )
     completed = subprocess.run(
         [sys.executable, "-c", probe],
@@ -465,7 +493,7 @@ def test_installed_hermes_gateway_exposes_status_hook(tmp_path):
     )
     assert completed.stdout.strip().splitlines()[-1:] == ["True"], (
         "Installed Hermes gateway.run no longer exposes "
-        "_prepare_gateway_status_message; update mariyam_outbound_filter "
+        "the status/final response hooks; update mariyam_outbound_filter "
         "to use the new status hook"
     )
 
@@ -490,7 +518,7 @@ def test_register_defers_install_when_gateway_not_imported():
 
 
 def test_filter_wraps_status_rail_and_drops_fallback_notice():
-    """End-to-end over a stand-in gateway.run module."""
+    """End-to-end over both outbound rails in a stand-in gateway.run."""
     import types
 
     mod = _load_outbound_filter()
@@ -502,8 +530,12 @@ def test_filter_wraps_status_rail_and_drops_fallback_notice():
     def _gateway_surface_passes_raw_text(platform):
         return platform in RAW_TEXT_PLATFORMS
 
+    def _sanitize_gateway_final_response(platform, text):
+        return str(text).strip() or ""
+
     fake._prepare_gateway_status_message = _prepare_gateway_status_message
     fake._gateway_surface_passes_raw_text = _gateway_surface_passes_raw_text
+    fake._sanitize_gateway_final_response = _sanitize_gateway_final_response
 
     sys.modules["gateway.run"] = fake
     try:
@@ -517,6 +549,16 @@ def test_filter_wraps_status_rail_and_drops_fallback_notice():
         assert _prepare_gateway_status_message(
             "telegram", "lifecycle", FALLBACK_NOTICE
         ) == FALLBACK_NOTICE
+
+        wrapped_final = fake._sanitize_gateway_final_response
+        english_failure = "Provider authentication failed: invalid API key"
+        assert wrapped_final("telegram", english_failure) == mod.WARM_PROVIDER_REPLY
+        assert wrapped_final("telegram", UZBEK_STATUS) == UZBEK_STATUS
+        assert wrapped_final("local", english_failure) == english_failure
+        # Positive control: without the wrapper Hermes would deliver English.
+        assert _sanitize_gateway_final_response(
+            "telegram", english_failure
+        ) == english_failure
     finally:
         sys.modules.pop("gateway.run", None)
 

@@ -66,12 +66,13 @@ agent:
     - todo
     - clarify
 
-# fix07: DeepSeek is not trusted for mutation reports. Live Telegram tests
-# exposed internal/provider text and unstable Uzbek, and an earlier fallback
-# turn claimed three reminders after creating only one. Hermes has no
-# provider-scoped tool allowlist; adding a backend router would be a second
-# "brain". Fail closed until a read-only fallback design is approved.
-fallback_providers: []
+# fix08: DeepSeek remains excluded after false mutation reports, internal-text
+# leaks and unstable Uzbek in live Telegram. The only fallback is the SAME Luna
+# model through independent OpenRouter infrastructure, protecting against n1n
+# route failures without changing model behavior or the available tool set.
+fallback_providers:
+  - provider: openrouter
+    model: openai/gpt-5.6-luna
 
 plugins:
   # Explicit order keeps identity binding before behavior-changing tool guards.

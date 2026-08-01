@@ -15,13 +15,16 @@ Root cause (live, 2026-08-01 02:27, profile mariyam_oyijon):
 
 Fix (profile-scoped, no Hermes core edit):
   At ``register()`` time — inside the gateway process only — the status rail
-  function is wrapped in-process. Everything Hermes would still deliver is
-  passed through the wrapper, and any line that still carries Latin letters is
-  dropped for human chat surfaces. Programmatic surfaces (``local``,
-  ``api_server``, ``webhook``, ``msgraph_webhook``) keep raw diagnostics.
+  and final-response sanitizer are wrapped in-process. Everything Hermes would
+  still deliver is passed through the wrappers. Status lines that still carry
+  Latin letters are dropped; final replies that carry Latin letters are
+  replaced with one warm Uzbek-Cyrillic retry message. Programmatic surfaces
+  (``local``, ``api_server``, ``webhook``, ``msgraph_webhook``) keep raw
+  diagnostics.
 
-Scope: only the status/lifecycle rail. Assistant replies, cron deliveries and
-health-guard admin messages travel other paths and are not touched.
+Scope: the status/lifecycle rail and the gateway's human-chat final-response
+sanitizer. Cron deliveries and health-guard admin messages travel other paths
+and are not touched.
 """
 
 from __future__ import annotations
@@ -34,8 +37,14 @@ LOG = logging.getLogger("mariyam_outbound_filter")
 
 GATEWAY_RUN_MODULE = "gateway.run"
 STATUS_FN = "_prepare_gateway_status_message"
+FINAL_FN = "_sanitize_gateway_final_response"
 RAW_SURFACE_FN = "_gateway_surface_passes_raw_text"
 WRAPPED_FLAG = "_mariyam_outbound_filter_wrapped"
+
+WARM_PROVIDER_REPLY = (
+    "Ойижон, ҳозир жавоб бера олмадим. "
+    "Илтимос, бироздан кейин яна ёзинг."
+)
 
 LATIN_RE = re.compile(r"[A-Za-z]")
 
@@ -66,6 +75,15 @@ def should_suppress(prepared: str | None, *, raw_surface: bool) -> bool:
     if raw_surface:
         return False
     return bool(LATIN_RE.search(str(prepared)))
+
+
+def filter_final_reply(prepared: str | None, *, raw_surface: bool) -> str | None:
+    """Replace non-Cyrillic final replies only on human chat surfaces."""
+    if prepared is None or prepared == "":
+        return prepared
+    if should_suppress(prepared, raw_surface=raw_surface):
+        return WARM_PROVIDER_REPLY
+    return prepared
 
 
 def install_status_filter() -> bool:
@@ -125,8 +143,36 @@ def install_status_filter() -> bool:
 
     setattr(_filtered_status_message, WRAPPED_FLAG, True)
     setattr(module, STATUS_FN, _filtered_status_message)
+
+    original_final = getattr(module, FINAL_FN, None)
+    if original_final is None:
+        LOG.warning(
+            "mariyam_outbound_filter: %s.%s missing; final replies left untouched",
+            GATEWAY_RUN_MODULE, FINAL_FN,
+        )
+    elif not getattr(original_final, WRAPPED_FLAG, False):
+        def _filtered_final_response(platform, text):
+            prepared = original_final(platform, text)
+            try:
+                raw_surface = bool(raw_surface_fn(platform)) if raw_surface_fn else False
+                filtered = filter_final_reply(prepared, raw_surface=raw_surface)
+                if filtered != prepared:
+                    LOG.info(
+                        "mariyam_outbound_filter: replaced non-Cyrillic final reply "
+                        "(chars=%d)", len(str(prepared)),
+                    )
+                return filtered
+            except Exception:
+                LOG.warning(
+                    "mariyam_outbound_filter: final-reply filter error; "
+                    "using warm retry reply", exc_info=True,
+                )
+                return WARM_PROVIDER_REPLY
+
+        setattr(_filtered_final_response, WRAPPED_FLAG, True)
+        setattr(module, FINAL_FN, _filtered_final_response)
     _installed = True
-    LOG.info("mariyam_outbound_filter: gateway status rail wrapped")
+    LOG.info("mariyam_outbound_filter: gateway outbound rails wrapped")
     return True
 
 
