@@ -459,7 +459,7 @@ def test_max_turns_chain_order_inventory_and_manifest_are_pinned():
         / "mariyam_identity_guard"
         / "plugin.yaml"
     ).read_text(encoding="utf-8")
-    assert 'version: "1.3.0"' in manifest
+    assert 'version: "1.4.0"' in manifest
 
     tree = ast.parse((REPO / "backend" / "server.py").read_text(encoding="utf-8"))
     tools_assignment = next(
@@ -469,4 +469,4 @@ def test_max_turns_chain_order_inventory_and_manifest_are_pinned():
         and any(isinstance(target, ast.Name) and target.id == "TOOLS" for target in node.targets)
     )
     assert isinstance(tools_assignment.value, ast.List)
-    assert len(tools_assignment.value.elts) == 29
+    assert len(tools_assignment.value.elts) == 30

@@ -2,11 +2,11 @@
 
 Источник истины: `TZ_Hermes_Mariyam_FINAL_v3_0.md` (полные примеры вход/выход — §15).
 Реализация: `backend/server.py` + `backend/db.py` + `backend/external_data.py`.
-**Repo inventory: 29 tools (dispatch/MCP discovery = 29/29).** Stage 6 шаг 2
+**Repo inventory: 30 tools (dispatch/MCP discovery = 30/30).** Stage 6 шаг 2
 добавляет три read-only external-data tool с суточным файловым кэшем.
 
 **Progression:** Stage 5.3 = 21, Stage 5.3A = 24, Stage 6 шаг 1 = 26,
-Stage 6 шаг 2 = 29. Stage 5.4 utility tools остаются NO-GO/не реализованы,
+Stage 6 шаг 2 = 29; imp11 user news sources = 30. Stage 5.4 utility tools остаются NO-GO/не реализованы,
 поэтому numbering migration 005 намеренно пропускает 004.
 
 ## Общие правила
@@ -30,7 +30,7 @@ Stage 6 шаг 2 = 29. Stage 5.4 utility tools остаются NO-GO/не ре�
 - Новые user-scoped tools Этапа 5.1 (`set_monthly_budget`, `get_monthly_budget_status`) — **тоже** под guard (self-only для oyijon).
 - Malformed/unknown → fail-closed `IDENTITY_*`.
 
-## Базовые 19 tools (в составе текущего inventory 29)
+## Базовые 19 tools (в составе текущего inventory 30)
 
 - `ensure_user`, `save_expense`, `save_income`, `update_expense`, `update_last_expense`, `delete_expense`, `delete_last_expense`, `get_expense_report`, `get_balance_summary`, `save_quran_progress`, `get_quran_progress`, `save_health_note`, `save_alert_event`, `save_plan_note`, `get_admin_report_data`, `backup_data`, `get_backup_status`, `get_bot_status`, `log_usage_cost`.
 
@@ -155,26 +155,28 @@ Oyijon self-only; admin cross-target только для target из
 `allowed_target_user_ids` через отдельный narrow tool allowlist. Права на
 transactions не выдаются.
 
-### Stage 6 — daily-life external facts (+3 → repo 29)
+### Stage 6 — daily-life external facts (+3 → repo 29; imp11 добавляет 30-й tool)
 
 - `get_tashkent_weather()` — OpenWeather current facts для Ташкента. API key
   читается только из `OPENWEATHER_API_KEY`; в output/URL ключ не возвращается.
 - `get_tashkent_prayer_times()` — Aladhan timings для Ташкента с
   `school=1` (Hanafi), calculation method 3.
-- `get_daily_news()` — заголовки только согласованных источников **UzA +
-  Kun.uz**, с URL/датой/источником. Backend не пишет дайджест и не выбирает
-  смысл; Hermes выбирает 3–5 спокойных пунктов и пересказывает кириллицей.
+- `get_daily_news(user_id, topic?, sources?)` — заголовки из строгих defaults
+  (`news_sources.json`) плюс активных пользовательских RSS/Atom. Один cache-key
+  на владельца в сутки; выбор темы/источников фильтрует уже полученный bundle.
+- `manage_news_sources(user_id, action, ...)` — `add|disable|list`; `add`
+  принимает HTTPS URL, кириллическое имя и до 10 тегов, а безопасный ключ
+  создаёт backend. Не больше 15 активных пользовательских лент.
 
-У всех трёх input schema пустая: они не принимают `user_id`, не читают
-пользовательские таблицы и ничего не мутируют. Кэш — один JSON-файл
+Weather/prayer имеют пустую schema; news owner-bound через identity guard.
+Кэш — один JSON-файл
 `MARIYAM_EXTERNAL_CACHE_FILE`, freshness = текущий календарный день
 Asia/Tashkent. При отказе upstream возвращается предыдущая запись с
 `cache.stale=true` и честной пометкой; если кэша нет —
 `EXTERNAL_DATA_UNAVAILABLE`, без выдуманных значений.
 
 Все user-scoped tools Stage 5.3A–6 проходят identity guard. Unknown/untrusted
-Telegram или cron identity → fail closed до MCP. Три external-data tools не
-имеют user scope и не дают доступа к данным пользователя.
+Telegram или cron identity → fail closed до MCP. Weather/prayer остаются global.
 
 ## Обязательные поля (required) по tools
 
@@ -198,7 +200,8 @@ Telegram или cron identity → fail closed до MCP. Три external-data too
 | `get_recurring_obligations` | user_id | active/due read-only список |
 | `get_tashkent_weather` | — | read-only OpenWeather, daily cache |
 | `get_tashkent_prayer_times` | — | read-only Aladhan Hanafi, daily cache |
-| `get_daily_news` | — | read-only UzA + Kun.uz candidates, daily cache |
+| `get_daily_news` | user_id | defaults + активные ленты владельца, daily cache |
+| `manage_news_sources` | user_id, action | add/disable/list; action-specific поля валидируются до mutation |
 | `save_quran_progress` | user_id | |
 | `get_quran_progress` | user_id | |
 | `save_health_note` | user_id, note | |

@@ -54,6 +54,10 @@ def _inspect_effective_prompt(tmp_path: Path) -> dict:
     shutil.copy2(CONFIG_SNIPPET, profile / "config.yaml")
 
     env = os.environ.copy()
+    # The inspected profile must use its own Hermes venv. A caller's temporary
+    # PYTHONPATH (for example a Python 3.12 test harness) can contain ABI-bound
+    # wheels that are invalid in the deployed Python 3.11 subprocess.
+    env.pop("PYTHONPATH", None)
     env.update(
         {
             "HERMES_HOME": str(profile),
@@ -189,7 +193,7 @@ def test_effective_mariyam_tools_exclude_execution_but_preserve_other_surfaces(
     assert not ({"cronjob", "memory"} & removed)
     assert "memory" in available
     assert not ({name for name, _desc, _schema in server.TOOLS} & removed)
-    assert len(server.TOOLS) == len(server.DISPATCH) == 29
+    assert len(server.TOOLS) == len(server.DISPATCH) == 30
 
 
 def test_deploy_closes_stage_with_offline_prompt_gate_and_no_paid_retest():

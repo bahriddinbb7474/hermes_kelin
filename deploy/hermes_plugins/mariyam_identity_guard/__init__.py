@@ -64,6 +64,10 @@ USER_SCOPED_TOOLS = frozenset(
         # access.
         "upsert_recurring_obligation",
         "get_recurring_obligations",
+        # imp11: both the read path and mutations are owner-bound. The latter
+        # also receives trusted added_by below; the model cannot spoof it.
+        "get_daily_news",
+        "manage_news_sources",
     }
 )
 
@@ -95,6 +99,8 @@ ADMIN_CROSS_TARGET_TOOLS = frozenset(
         "save_plan_note",
         "upsert_recurring_obligation",
         "get_recurring_obligations",
+        "get_daily_news",
+        "manage_news_sources",
     }
 )
 
@@ -746,6 +752,11 @@ def _compute_effective_args(tool_name, args, actor_entry, tg):
     actor_role = actor_entry["role"]
     allowed_targets = actor_entry.get("allowed_target_user_ids", [])
 
+    def bind_actor(out):
+        if tool_name == "manage_news_sources":
+            out["added_by"] = actor_role
+        return out
+
     if tool_name == ENSURE_USER:
         # Account creation: bind explicitly to the verified sender identity.
         # Backend schema requires telegram_id: integer; origin may store str.
@@ -756,13 +767,13 @@ def _compute_effective_args(tool_name, args, actor_entry, tg):
         out["telegram_id"] = tg_int
         out["role"] = actor_role
         out["display_name"] = actor_entry.get("display_name")
-        return out, None
+        return bind_actor(out), None
 
     if actor_role == "oyijon":
         # Strictly self: force own user_id regardless of requested.
         out = copy.deepcopy(args)
         out["user_id"] = actor_user_id
-        return out, None
+        return bind_actor(out), None
 
     elif actor_role == "admin":
         requested = args.get("user_id")
@@ -771,11 +782,11 @@ def _compute_effective_args(tool_name, args, actor_entry, tg):
         if requested is None:
             out = copy.deepcopy(args)
             out["user_id"] = actor_user_id
-            return out, None
+            return bind_actor(out), None
 
         # Self-target always allowed.
         if requested == actor_user_id:
-            return copy.deepcopy(args), None
+            return bind_actor(copy.deepcopy(args)), None
 
         # Cross-target only via the allowlist AND allowed_target_user_ids.
         if (
@@ -785,7 +796,7 @@ def _compute_effective_args(tool_name, args, actor_entry, tg):
         ):
             out = copy.deepcopy(args)
             out["user_id"] = requested
-            return out, None
+            return bind_actor(out), None
 
         return None, "IDENTITY_TARGET_FORBIDDEN"
 

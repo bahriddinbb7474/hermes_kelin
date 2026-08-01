@@ -6,16 +6,21 @@ not write prose or decide what Mariyam should say.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import http.client
+import ipaddress
 import json
 import os
 import re
+import socket
+import ssl
 import tempfile
 import threading
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from html import unescape
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urljoin, urlsplit
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree
 
@@ -24,6 +29,7 @@ from .config import TASHKENT
 CACHE_VERSION = 1
 MAX_RESPONSE_BYTES = 2_000_000
 HTTP_TIMEOUT_SECONDS = 12
+MAX_REDIRECTS = 5
 DEFAULT_CACHE_PATH = Path("/opt/hermes-mariyam/var/external-data-cache.json")
 DEFAULT_NEWS_CONFIG_PATH = Path(__file__).with_name("news_sources.json")
 
@@ -110,6 +116,99 @@ def _http_get(url: str) -> bytes:
     if len(payload) > MAX_RESPONSE_BYTES:
         raise ExternalDataError("upstream response too large")
     return payload
+
+
+def _public_https_target(url: str) -> tuple[object, list[str]]:
+    parsed = urlsplit(url)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise ExternalDataError("feed URL must use https")
+    if parsed.port not in (None, 443):
+        raise ExternalDataError("feed URL must use the standard https port")
+    try:
+        addresses = sorted(
+            {item[4][0] for item in socket.getaddrinfo(parsed.hostname, 443, type=socket.SOCK_STREAM)}
+        )
+    except socket.gaierror as exc:
+        raise ExternalDataError("feed host could not be resolved") from exc
+    if not addresses or any(not ipaddress.ip_address(value).is_global for value in addresses):
+        raise ExternalDataError("feed host resolves to a non-public address")
+    return parsed, addresses
+
+
+def _https_get_pinned(url: str, parsed, address: str) -> tuple[int, dict[str, str], bytes]:
+    """HTTPS request pinned to the address that passed validation (anti-rebinding)."""
+    sock = socket.create_connection((address, 443), timeout=HTTP_TIMEOUT_SECONDS)
+    try:
+        tls = ssl.create_default_context().wrap_socket(sock, server_hostname=parsed.hostname)
+        request_path = parsed.path or "/"
+        if parsed.query:
+            request_path += "?" + parsed.query
+        headers = (
+            f"GET {request_path} HTTP/1.1\r\nHost: {parsed.hostname}\r\n"
+            "Accept: application/rss+xml, application/atom+xml, application/xml, text/xml\r\n"
+            "User-Agent: Hermes-Mariyam/1.0 (+private daily-life assistant)\r\n"
+            "Connection: close\r\n\r\n"
+        ).encode("ascii")
+        tls.sendall(headers)
+        response = http.client.HTTPResponse(tls)
+        response.begin()
+        length = response.getheader("Content-Length")
+        if length and int(length) > MAX_RESPONSE_BYTES:
+            raise ExternalDataError("feed response is too large")
+        payload = response.read(MAX_RESPONSE_BYTES + 1)
+        return response.status, {key.casefold(): value for key, value in response.getheaders()}, payload
+    except ExternalDataError:
+        raise
+    except Exception as exc:
+        raise ExternalDataError(f"feed request failed: {type(exc).__name__}") from exc
+    finally:
+        try:
+            sock.close()
+        except OSError:
+            pass
+
+
+def _safe_feed_get(url: str) -> bytes:
+    current = url
+    for _ in range(MAX_REDIRECTS + 1):
+        parsed, addresses = _public_https_target(current)
+        # The connection is pinned to a prevalidated address, so a second DNS
+        # answer cannot redirect the socket to a private target.
+        status, headers, payload = _https_get_pinned(current, parsed, addresses[0])
+        if len(payload) > MAX_RESPONSE_BYTES:
+            raise ExternalDataError("feed response is too large")
+        if status in (301, 302, 303, 307, 308):
+            location = headers.get("location")
+            if not location:
+                raise ExternalDataError("feed redirect has no destination")
+            current = urljoin(current, location)
+            continue
+        if not 200 <= status < 300:
+            raise ExternalDataError("feed server returned an error")
+        return payload
+    raise ExternalDataError("feed has too many redirects")
+
+
+def validate_user_news_feed(url: str, display_name: str, topics: list[str] | None) -> bytes:
+    if not isinstance(url, str):
+        raise ExternalDataError("feed URL is required")
+    if not isinstance(display_name, str) or not 1 <= len(display_name.strip()) <= 120:
+        raise ExternalDataError("feed name is required")
+    if re.search(r"[A-Za-z]", display_name) or not re.search(r"[\u0400-\u04ff]", display_name):
+        raise ExternalDataError("feed name must be in Uzbek Cyrillic")
+    if topics is not None and (
+        not isinstance(topics, list) or len(topics) > 10
+        or any(not isinstance(item, str) or not 1 <= len(item.strip()) <= 80 for item in topics)
+    ):
+        raise ExternalDataError("topics must be a short list")
+    payload = _safe_feed_get(url)
+    _parse_feed(payload, "validation", display_name.strip())
+    return payload
+
+
+def generated_news_source_key(user_id: int, url: str) -> str:
+    digest = hashlib.sha256(f"{user_id}\0{url}".encode("utf-8")).hexdigest()[:20]
+    return f"custom_{digest}"
 
 
 def _json_get(url: str) -> dict:
@@ -511,17 +610,78 @@ async def get_tashkent_prayer_times() -> dict:
 
 
 async def get_daily_news(
+    pool=None,
+    user_id: int | None = None,
     topic: str | None = None,
     sources: list[str] | None = None,
 ) -> dict:
-    selected_sources = sources or []
-    cache_key = "news:" + json.dumps(
-        {"topic": topic, "sources": selected_sources},
-        ensure_ascii=True,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    return await _daily_cached(
-        cache_key,
-        lambda: _fetch_news(selected_sources or None, topic),
-    )
+    # Backward-compatible defaults-only path used by offline unit tests.
+    if pool is None or user_id is None:
+        selected_sources = sources or []
+        cache_key = "news:" + json.dumps(
+            {"topic": topic, "sources": selected_sources}, sort_keys=True, separators=(",", ":")
+        )
+        return await _daily_cached(cache_key, lambda: _fetch_news(selected_sources or None, topic))
+
+    from . import db
+    custom_sources = await db.get_active_news_sources(pool, user_id)
+
+    def fetch_all() -> dict:
+        base = _fetch_news(None, "daily")
+        all_candidates = list(base["candidates"])
+        errors = list(base["source_errors"])
+        for source in custom_sources:
+            try:
+                items = _parse_feed(
+                    _safe_feed_get(source["url"]), source["source_key"], source["display_name"]
+                )
+                for item in items:
+                    item["topics"] = source["topics"]
+                all_candidates.extend(items)
+            except ExternalDataError:
+                errors.append(source["display_name"])
+        base["candidates"] = all_candidates
+        base["source_errors"] = errors
+        base["available_sources"].extend(
+            {"key": item["source_key"], "name": item["display_name"], "custom": True}
+            for item in custom_sources
+        )
+        return base
+
+    # One cache key per owner: source/topic selections only filter the daily
+    # bundle in memory and therefore cannot multiply upstream requests.
+    result = await _daily_cached(f"news_user:{user_id}", fetch_all)
+    if not result.get("ok"):
+        return result
+    available_keys = {item["key"] for item in result["available_sources"]}
+    selected = sources or [item["key"] for item in result["available_sources"]]
+    if not isinstance(selected, list) or not selected or len(selected) > len(available_keys) or (
+        len(set(selected)) != len(selected) or any(key not in available_keys for key in selected)
+    ):
+        return {
+            "ok": False,
+            "error_code": "INVALID_NEWS_SELECTION",
+            "message_ru": "Выбран неизвестный или отключённый источник новостей",
+            "message_uz": "Номаълум ёки ўчирилган хабар манбаси танланди",
+            "cache": result.get("cache"),
+        }
+    candidates = [item for item in result["candidates"] if item["source_key"] in selected]
+    config = _load_news_config()
+    selected_topic = topic or config["default_topic"]
+    if selected_topic in config["topics"]:
+        keywords = [word.casefold() for word in config["topics"][selected_topic]["keywords"]]
+        if keywords:
+            candidates = [
+                item for item in candidates
+                if any(word in f"{item['title_ru']} {item['summary_ru']}".casefold() for word in keywords)
+            ]
+    else:
+        needle = selected_topic.strip().casefold()
+        candidates = [
+            item for item in candidates
+            if needle in [value.casefold() for value in item.get("topics", [])]
+        ]
+    result["selected_sources"] = selected
+    result["selected_topic"] = selected_topic
+    result["candidates"] = candidates[:20]
+    return result

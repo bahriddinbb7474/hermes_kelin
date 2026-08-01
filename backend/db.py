@@ -22,6 +22,8 @@ PRICE_BASES = ("last", "average", "manual")
 OBLIGATION_TYPES = ("internet", "loan", "tax", "utility", "other")
 OBLIGATION_ACTIONS = ("upsert", "mark_paid", "disable")
 OBLIGATION_REPEAT_RULES = ("none", "monthly", "yearly", "interval_days")
+NEWS_SOURCE_ACTIONS = ("add", "disable", "list")
+MAX_ACTIVE_NEWS_SOURCES = 15
 
 
 def _one_of(field: str, value, allowed: tuple[str, ...], *, allow_none: bool = False):
@@ -29,6 +31,98 @@ def _one_of(field: str, value, allowed: tuple[str, ...], *, allow_none: bool = F
         return
     if value not in allowed:
         raise ValueError(f"INVALID_INPUT: {field} must be one of {', '.join(allowed)}")
+
+
+def _news_source_result(row) -> dict:
+    return {
+        "source_id": row["id"],
+        "source_key": row["source_key"],
+        "display_name": row["display_name"],
+        "url": row["url"],
+        "topics": list(row["topics"] or []),
+        "active": bool(row["active"]),
+        "added_at": row["added_at"].isoformat(),
+        "added_by": row["added_by"],
+        "disabled_at": row["disabled_at"].isoformat() if row["disabled_at"] else None,
+    }
+
+
+async def manage_news_sources(
+    pool, user_id, action, *, source_id=None, source_key=None,
+    display_name=None, url=None, topics=None, added_by=None,
+):
+    """Store/list user-owned feeds; network validation happens before this call."""
+    _one_of("action", action, NEWS_SOURCE_ACTIONS)
+    if action == "list":
+        rows = await pool.fetch(
+            "SELECT * FROM user_news_sources WHERE user_id=$1 ORDER BY active DESC, added_at, id",
+            user_id,
+        )
+        return {"sources": [_news_source_result(row) for row in rows]}
+    if action == "disable":
+        if not isinstance(source_id, int) or isinstance(source_id, bool) or source_id < 1:
+            raise ValueError("INVALID_INPUT: source_id is required for disable")
+        row = await pool.fetchrow(
+            """UPDATE user_news_sources SET active=false, disabled_at=now(), updated_at=now()
+               WHERE user_id=$1 AND id=$2 AND active RETURNING *""",
+            user_id, source_id,
+        )
+        if row is None:
+            existing = await pool.fetchrow(
+                "SELECT * FROM user_news_sources WHERE user_id=$1 AND id=$2", user_id, source_id
+            )
+            if existing is None:
+                return {"_news_source_error": "NOT_FOUND"}
+            return {**_news_source_result(existing), "idempotent": True}
+        return {**_news_source_result(row), "idempotent": False}
+
+    if added_by not in ROLES:
+        raise ValueError("INVALID_INPUT: trusted added_by is required")
+    normalized_topics = list(dict.fromkeys(topics or []))
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.fetchval("SELECT id FROM users WHERE id=$1 FOR UPDATE", user_id)
+            active_count = await conn.fetchval(
+                "SELECT COUNT(*) FROM user_news_sources WHERE user_id=$1 AND active",
+                user_id,
+            )
+            existing = await conn.fetchrow(
+                "SELECT * FROM user_news_sources WHERE user_id=$1 AND url=$2 FOR UPDATE",
+                user_id, url,
+            )
+            if int(active_count) >= MAX_ACTIVE_NEWS_SOURCES and not (existing and existing["active"]):
+                return {"_news_source_error": "ACTIVE_LIMIT"}
+            row = await conn.fetchrow(
+                """INSERT INTO user_news_sources
+                   (user_id, source_key, display_name, url, topics, active, added_by)
+                   VALUES ($1,$2,$3,$4,$5,true,$6)
+                   ON CONFLICT (user_id,url) DO UPDATE SET
+                     display_name=EXCLUDED.display_name, topics=EXCLUDED.topics,
+                     active=true, disabled_at=NULL, updated_at=now()
+                   RETURNING *""",
+                user_id, source_key, display_name, url, normalized_topics, added_by,
+            )
+            return {**_news_source_result(row), "idempotent": bool(existing and existing["active"])}
+
+
+async def get_active_news_sources(pool, user_id):
+    rows = await pool.fetch(
+        "SELECT * FROM user_news_sources WHERE user_id=$1 AND active ORDER BY id", user_id
+    )
+    return [_news_source_result(row) for row in rows]
+
+
+async def news_source_capacity_available(pool, user_id, url) -> bool:
+    """Cheap preflight; the transaction in manage_news_sources rechecks it."""
+    existing_active = await pool.fetchval(
+        "SELECT active FROM user_news_sources WHERE user_id=$1 AND url=$2", user_id, url
+    )
+    if existing_active is True:
+        return True
+    count = await pool.fetchval(
+        "SELECT COUNT(*) FROM user_news_sources WHERE user_id=$1 AND active", user_id
+    )
+    return int(count) < MAX_ACTIVE_NEWS_SOURCES
 
 
 def _normalize_qty_unit(item: dict) -> tuple[float | None, str | None]:

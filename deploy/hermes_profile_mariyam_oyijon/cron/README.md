@@ -42,15 +42,16 @@ RSS и темы задаются `backend/news_sources.json`. Утро **08:00**
 
 | File | Schedule | Deliver | Purpose | mapped allowed_tools |
 |---|---|---|---|---|
-| `06_morning.md` | `0 8 * * *` | тест‑Ойижон | приветствие, заботливая погода, 1–2 разговорные новости | внешние read-only tools без user scope |
+| `06_morning.md` | `0 8 * * *` | тест‑Ойижон | приветствие, заботливая погода, 1–2 разговорные новости | внешние read-only tools; news identity injected by guard |
 | `06_obligation_reminders.md` | `15 9 * * *` | тест‑Ойижон | заранее / due / due+1, без мутаций, максимум одно сообщение | `get_recurring_obligations` |
 | `06_evening.md` | `30 19 * * *` | тест‑Ойижон | один мягкий вопрос, только если за день данных нет | `get_admin_report_data` |
 | `07_admin_report.md` | `30 19 * * *` | тест‑админ | фактический отчёт день/месяц/план/обязательства/alerts, без health-текстов | `get_admin_report_data` |
 
 Все mapped allowlists строго read-only. Внешние tools
-`get_tashkent_weather`, `get_tashkent_prayer_times`, `get_daily_news` не имеют
-`user_id` и не дают доступ к пользовательским данным. Их результат кэшируется
-backend на день; stale возвращается с честной пометкой.
+`get_tashkent_weather`, `get_tashkent_prayer_times` не имеют
+`user_id`. `get_daily_news` owner-bound и объединяет стандартные ленты с
+активными лентами владельца. Результат кэшируется backend на день; stale
+возвращается с честной пометкой.
 
 Отдельный user-systemd timer `mariyam-prayer-scheduler.timer` после полуночи
 получает свежий Aladhan-кэш и создаёт шесть finite one-shot: список времён в

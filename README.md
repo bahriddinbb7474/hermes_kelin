@@ -54,7 +54,15 @@ hermes-mariyam/
 
 Настроить Hermes profile `mariyam_oyijon`, Telegram allowlist, skill личности Мариям, память, сквозной STT-тест на реальном голосе (TTS отложен — ТЗ v3.2, ответы только текстом), маленький MCP backend с PostgreSQL для точных данных, бухгалтерию с исправлением/удалением, Hermes cron для напоминаний и отчётов, safety alerts, backup/restore и мониторинг.
 
-## Текущее состояние (2026-07-29)
+## Текущее состояние (2026-08-02)
+
+**imp11 — пользовательские источники новостей CLOSED / LIVE PASS:** migration
+006 хранит owner-bound RSS/Atom-ленты и темы в PostgreSQL; runtime
+inventory/dispatch/discovery = **30/30/30**, identity guard **1.4.0**. URL
+проверяются до сохранения (HTTPS, публичный адрес, redirect/DNS-rebinding,
+RSS/Atom, timeout/2 MiB), лимит — 15 активных лент. Семейная Telegram-приёмка
+add/list/disable/re-enable PASS; активна полезная лента Habr, admin-alerts = 0.
+Дневной кэш новостей остаётся одним на пользователя.
 
 **Финальная приёмка imp09 — технические AC и штатный 08:30 PASS; 19:30 pending:**
 язык 19/19; полный offline regression 298 passed; reboot/autostart/backup/

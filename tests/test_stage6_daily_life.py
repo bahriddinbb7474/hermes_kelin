@@ -21,25 +21,26 @@ def cache_env(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_inventory_dispatch_and_discovery_are_29():
+async def test_inventory_dispatch_and_discovery_are_30():
     tools = await server.list_tools()
-    assert len(tools) == len(server.TOOLS) == len(server.DISPATCH) == 29
+    assert len(tools) == len(server.TOOLS) == len(server.DISPATCH) == 30
     names = [tool.name for tool in tools]
     assert len(names) == len(set(names))
-    assert names[-3:] == [
+    assert names[-4:] == [
         "get_tashkent_weather",
         "get_tashkent_prayer_times",
         "get_daily_news",
+        "manage_news_sources",
     ]
     schemas = {tool.name: tool.inputSchema for tool in tools}
-    for name in names[-3:-1]:
+    for name in ("get_tashkent_weather", "get_tashkent_prayer_times"):
         assert schemas[name] == {
             "type": "object",
             "properties": {},
             "required": [],
         }
-    assert set(schemas["get_daily_news"]["properties"]) == {"topic", "sources"}
-    assert schemas["get_daily_news"]["required"] == []
+    assert set(schemas["get_daily_news"]["properties"]) == {"user_id", "topic", "sources"}
+    assert schemas["get_daily_news"]["required"] == ["user_id"]
 
 
 @pytest.mark.asyncio
