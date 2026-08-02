@@ -73,6 +73,21 @@ def test_each_prayer_slot_has_ten_cyrillic_rotating_templates():
     )
 
 
+def test_isha_templates_ask_about_blood_pressure_and_offer_recording():
+    templates = rhythm.PRAYER_TEMPLATES["isha"]
+    assert len(templates) == 10
+    assert all(text.count("?") == 1 for text in templates)
+    assert all("босим" in text.lower() for text in templates)
+    assert all(
+        any(
+            marker in text.lower()
+            for marker in ("айтсангиз", "қайд", "ёзиб", "кирит", "сақлаб")
+        )
+        for text in templates
+    )
+    assert all(not re.search(r"[A-Za-z0-9]", text) for text in templates)
+
+
 def test_reminders_are_ten_minutes_before_and_times_message_is_separate():
     timings = {
         "fajr": "04:10",

@@ -75,6 +75,11 @@ def test_keyword_layer_accepts_narrow_openai_stt_breathing_variant():
     assert guard.detect_health_keyword("Нафас олишим яхши.") is None
 
 
+def test_keyword_layer_accepts_russian_davlenie_without_numeric_false_alert():
+    assert guard.detect_health_keyword("Давлениям баланд") == "high_blood_pressure"
+    assert guard.detect_health_keyword("Давлениям 108/67") is None
+
+
 def test_guard_rejects_untrusted_sender_before_dispatch(tmp_path, monkeypatch):
     mapping = tmp_path / "identity.json"
     mapping.write_text(
