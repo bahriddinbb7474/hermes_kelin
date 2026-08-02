@@ -123,7 +123,15 @@ def test_prayer_contract_is_tashkent_hanafi(monkeypatch):
                     "Maghrib": "19:47 (+05)",
                     "Isha": "21:15 (+05)",
                 },
-                "date": {"gregorian": {"date": "26-07-2026"}},
+                "date": {
+                    "gregorian": {"date": "02-08-2026"},
+                    "hijri": {
+                        "date": "19-02-1448",
+                        "day": "19",
+                        "month": {"number": 2, "en": "Safar"},
+                        "year": "1448",
+                    },
+                },
             },
         }
 
@@ -131,10 +139,55 @@ def test_prayer_contract_is_tashkent_hanafi(monkeypatch):
     value = external_data._fetch_prayer_times()
     assert "city=Tashkent" in captured["url"]
     assert "country=Uzbekistan" in captured["url"]
-    assert "method=3" in captured["url"]
+    assert "method=99" in captured["url"]
     assert "school=1" in captured["url"]
+    assert "methodSettings=15.5%2Cnull%2C15.5" in captured["url"]
+    assert "tune=0%2C0%2C-5%2C5%2C0%2C5%2C0%2C-4%2C0" in captured["url"]
     assert value["school"] == "Hanafi"
     assert value["asr"] == "17:23"
+    assert value["hijri_display_uz"] == "19 САФАР (1448)"
+    assert value["source"] == "Aladhan (custom settings matched to Fatvo.uz)"
+
+
+def test_prayer_custom_method_matches_fatvo_calendar_on_ten_seasonal_dates():
+    # Captured 2026-08-02 from the public Fatvo API and the Fatvo calendar's
+    # published ihtiyot adjustments: sunrise -5, dhuhr +5, maghrib +1,
+    # isha -4.  Values were checked live on 2026-08-02.
+    references = {
+        "15-01-2026": ("06:23", "07:42", "12:37", "15:37", "17:23", "18:38"),
+        "15-02-2026": ("05:59", "07:13", "12:42", "16:14", "18:02", "19:12"),
+        "15-03-2026": ("05:17", "06:30", "12:37", "16:42", "18:34", "19:44"),
+        "15-04-2026": ("04:20", "05:39", "12:28", "17:06", "19:08", "20:23"),
+        "15-05-2026": ("03:29", "05:00", "12:24", "17:24", "19:40", "21:06"),
+        "15-06-2026": ("03:03", "04:44", "12:29", "17:39", "20:03", "21:40"),
+        "02-08-2026": ("03:45", "05:14", "12:34", "17:31", "19:44", "21:09"),
+        "15-09-2026": ("04:43", "05:58", "12:23", "16:43", "18:38", "19:49"),
+        "15-10-2026": ("05:16", "06:29", "12:14", "15:59", "17:48", "18:57"),
+        "15-12-2026": ("06:16", "07:37", "12:23", "15:13", "16:59", "18:16"),
+    }
+    custom = {
+        "15-01-2026": ("06:23", "07:42", "12:37", "15:37", "17:24", "18:38"),
+        "15-02-2026": ("05:59", "07:13", "12:42", "16:13", "18:02", "19:12"),
+        "15-03-2026": ("05:17", "06:30", "12:37", "16:42", "18:34", "19:44"),
+        "15-04-2026": ("04:20", "05:39", "12:28", "17:05", "19:08", "20:23"),
+        "15-05-2026": ("03:30", "05:00", "12:25", "17:24", "19:40", "21:06"),
+        "15-06-2026": ("03:04", "04:45", "12:29", "17:39", "20:03", "21:39"),
+        "02-08-2026": ("03:46", "05:14", "12:34", "17:32", "19:44", "21:08"),
+        "15-09-2026": ("04:43", "05:58", "12:23", "16:44", "18:38", "19:49"),
+        "15-10-2026": ("05:16", "06:29", "12:14", "16:00", "17:48", "18:57"),
+        "15-12-2026": ("06:16", "07:36", "12:23", "15:14", "17:00", "18:16"),
+    }
+
+    def minutes(value):
+        hour, minute = map(int, value.split(":"))
+        return hour * 60 + minute
+
+    assert references.keys() == custom.keys()
+    assert all(
+        abs(minutes(actual) - minutes(expected)) <= 1
+        for day in references
+        for actual, expected in zip(custom[day], references[day])
+    )
 
 
 def test_news_uses_configured_sources_without_uza_and_deduplicates(monkeypatch):

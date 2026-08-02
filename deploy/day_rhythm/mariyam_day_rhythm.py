@@ -196,7 +196,7 @@ def _cached_prayer_times(now: datetime) -> dict[str, str] | None:
         if len(raw) > 2_000_000:
             return None
         cache = json.loads(raw.decode("utf-8"))
-        entry = cache.get("entries", {}).get("prayer_tashkent_hanafi")
+        entry = cache.get("entries", {}).get("prayer_tashkent_fatvo_v1")
         fetched_at = datetime.fromisoformat(entry["fetched_at"].replace("Z", "+00:00"))
         data = entry["data"]
         if fetched_at.astimezone(TASHKENT).date() != now.astimezone(TASHKENT).date():
@@ -241,8 +241,12 @@ def render_prayer_reminder(slot: str, day: date) -> str:
     return templates[day.toordinal() % len(templates)]
 
 
-def render_prayer_times(timings: dict[str, str]) -> str:
+def render_prayer_times(
+    timings: dict[str, str], hijri_display_uz: str | None = None
+) -> str:
     lines = ["Ойижон, бугунги намоз вақтлари:"]
+    if hijri_display_uz:
+        lines.append(hijri_display_uz)
     lines.extend(f"• {SLOT_NAMES[slot]} — {timings[slot]}" for slot in SLOTS)
     lines.append("Ҳар намоздан 10 дақиқа олдин эслатаман.")
     return "\n".join(lines)

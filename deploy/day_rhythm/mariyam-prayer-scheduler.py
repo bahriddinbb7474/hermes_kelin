@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create today's prayer-care no-agent one-shots from the Aladhan cache."""
+"""Create today's prayer-care no-agent one-shots from the Fatvo-matched cache."""
 
 from __future__ import annotations
 
@@ -173,26 +173,28 @@ def _create_job(
 
 def _validated_timings(result: dict, today) -> dict[str, str]:
     if result.get("ok") is not True or result.get("cache", {}).get("stale") is True:
-        raise RuntimeError("fresh Aladhan data is required")
+        raise RuntimeError("fresh Fatvo-matched prayer data is required")
     try:
         day, month, year = map(int, str(result["date"]).split("-"))
         source_day = date(year, month, day)
         timings = {slot: result[slot] for slot in SLOTS}
     except (KeyError, TypeError, ValueError) as exc:
-        raise RuntimeError("invalid Aladhan result") from exc
+        raise RuntimeError("invalid Fatvo-matched prayer result") from exc
     if source_day != today:
-        raise RuntimeError("Aladhan result date does not match today")
+        raise RuntimeError("prayer result date does not match today")
     return timings
 
 
-def build_plan(now: datetime, timings: dict[str, str]) -> list[dict]:
+def build_plan(
+    now: datetime, timings: dict[str, str], hijri_display_uz: str | None = None
+) -> list[dict]:
     local = now.astimezone(TASHKENT)
     day = local.date()
     plan = [
         {
             "name": f"mariyam_prayer_times_{day:%Y%m%d}",
             "when": datetime.combine(day, PRAYER_TIMES_AT, TASHKENT),
-            "message": render_prayer_times(timings),
+            "message": render_prayer_times(timings, hijri_display_uz),
         }
     ]
     for slot, when in reminder_times(day, timings).items():
@@ -214,7 +216,7 @@ def main() -> int:
     existing = _existing_job_names()
     created = 0
     skipped = 0
-    for item in build_plan(now, timings):
+    for item in build_plan(now, timings, result.get("hijri_display_uz")):
         if item["name"] in existing:
             skipped += 1
             continue

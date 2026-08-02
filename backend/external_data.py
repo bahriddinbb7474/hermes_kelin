@@ -275,23 +275,29 @@ def _fetch_weather() -> dict:
 
 def _clean_prayer_time(value) -> str:
     if not isinstance(value, str):
-        raise ExternalDataError("Aladhan timing is missing")
+        raise ExternalDataError("prayer timing is missing")
     match = re.fullmatch(r"\s*(\d{1,2}):(\d{2})(?:\s+\([^)]*\))?\s*", value)
     if not match:
-        raise ExternalDataError("Aladhan timing has invalid format")
+        raise ExternalDataError("prayer timing has invalid format")
     hour, minute = int(match.group(1)), int(match.group(2))
     if not 0 <= hour <= 23 or not 0 <= minute <= 59:
-        raise ExternalDataError("Aladhan timing is out of range")
+        raise ExternalDataError("prayer timing is out of range")
     return f"{hour:02d}:{minute:02d}"
 
 
 def _fetch_prayer_times() -> dict:
+    # Fatvo.uz's published Tashkent calendar uses 15.5-degree dawn/night
+    # angles plus fixed ihtiyot (precaution) minute adjustments.  Aladhan's
+    # custom method keeps the calculation and Hijri date in one JSON request.
     query = urlencode(
         {
             "city": "Tashkent",
             "country": "Uzbekistan",
-            "method": 3,
+            "method": 99,
             "school": 1,
+            "methodSettings": "15.5,null,15.5",
+            # Imsak,Fajr,Sunrise,Dhuhr,Asr,Maghrib,Sunset,Isha,Midnight.
+            "tune": "0,0,-5,5,0,5,0,-4,0",
         }
     )
     value = _json_get(f"https://api.aladhan.com/v1/timingsByCity?{query}")
@@ -307,6 +313,29 @@ def _fetch_prayer_times() -> dict:
         if isinstance(date_data.get("gregorian"), dict)
         else {}
     )
+    hijri = date_data.get("hijri") if isinstance(date_data.get("hijri"), dict) else {}
+    hijri_month = hijri.get("month") if isinstance(hijri.get("month"), dict) else {}
+    hijri_months_uz = (
+        "МУҲАРРАМ",
+        "САФАР",
+        "РАБИЪУЛ АВВАЛ",
+        "РАБИЪУС СОНИЙ",
+        "ЖУМОДУЛ АВВАЛ",
+        "ЖУМОДУС СОНИЙ",
+        "РАЖАБ",
+        "ШАЪБОН",
+        "РАМАЗОН",
+        "ШАВВОЛ",
+        "ЗУЛҚАЪДА",
+        "ЗУЛҲИЖЖА",
+    )
+    try:
+        hijri_day = str(int(hijri["day"]))
+        hijri_year = str(int(hijri["year"]))
+        hijri_month_number = int(hijri_month["number"])
+        hijri_month_uz = hijri_months_uz[hijri_month_number - 1]
+    except (KeyError, TypeError, ValueError, IndexError) as exc:
+        raise ExternalDataError("Aladhan Hijri date is incomplete") from exc
     return {
         "city": "Tashkent",
         "date": gregorian.get("date"),
@@ -316,9 +345,15 @@ def _fetch_prayer_times() -> dict:
         "asr": _clean_prayer_time(timings.get("Asr")),
         "maghrib": _clean_prayer_time(timings.get("Maghrib")),
         "isha": _clean_prayer_time(timings.get("Isha")),
+        "hijri_date": hijri.get("date"),
+        "hijri_day": hijri_day,
+        "hijri_month": hijri_month_number,
+        "hijri_month_uz": hijri_month_uz,
+        "hijri_year": hijri_year,
+        "hijri_display_uz": f"{hijri_day} {hijri_month_uz} ({hijri_year})",
         "school": "Hanafi",
-        "calculation_method": "Muslim World League",
-        "source": "Aladhan",
+        "calculation_method": "Custom Uzbekistan: 15.5°/15.5° + Fatvo.uz ihtiyot",
+        "source": "Aladhan (custom settings matched to Fatvo.uz)",
         "source_url": "https://aladhan.com/prayer-times-api",
     }
 
@@ -606,7 +641,7 @@ async def get_tashkent_weather() -> dict:
 
 
 async def get_tashkent_prayer_times() -> dict:
-    return await _daily_cached("prayer_tashkent_hanafi", _fetch_prayer_times)
+    return await _daily_cached("prayer_tashkent_fatvo_v1", _fetch_prayer_times)
 
 
 async def get_daily_news(

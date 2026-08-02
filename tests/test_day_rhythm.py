@@ -42,7 +42,7 @@ def _write_cache(path: Path, now: datetime, timings: dict[str, str]) -> None:
             {
                 "version": 1,
                 "entries": {
-                    "prayer_tashkent_hanafi": {
+                    "prayer_tashkent_fatvo_v1": {
                         "fetched_at": now.isoformat(),
                         "data": timings,
                     }
@@ -88,6 +88,8 @@ def test_reminders_are_ten_minutes_before_and_times_message_is_separate():
     message = rhythm.render_prayer_times(timings)
     assert message.count("\n• ") == 5
     assert "Ҳар намоздан 10 дақиқа олдин эслатаман." in message
+    dated = rhythm.render_prayer_times(timings, "19 САФАР (1448)")
+    assert "19 САФАР (1448)" in dated
 
 
 def test_sleep_and_quran_quiet_windows_are_private_and_deterministic(
@@ -195,7 +197,7 @@ def test_scheduler_and_systemd_are_no_agent_hardened_contracts():
     )
     assert '"--no-agent"' in source
     assert '"--repeat",\n        "1"' in source
-    assert "fresh Aladhan data is required" in source
+    assert "fresh Fatvo-matched prayer data is required" in source
     assert "NoNewPrivileges=yes" in service
     assert "ProtectSystem=strict" in service
     assert "OnCalendar=*-*-* 00:20:00 Asia/Tashkent" in timer
