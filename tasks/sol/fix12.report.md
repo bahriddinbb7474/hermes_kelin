@@ -111,5 +111,5 @@ system prompt, но Luna его не исполнила и не вызвала t
 
 Развёрнутый source commit: `bbf6429` —
 `soul: always call prayer tool and report hijri date` (уже находился в
-`origin/main`). Первичный commit этого отчёта: `REPORT_COMMIT`; metadata commit
+`origin/main`). Первичный commit этого отчёта: `1be7132`; metadata commit
 с подстановкой hash также отправлен в `origin/main`.
