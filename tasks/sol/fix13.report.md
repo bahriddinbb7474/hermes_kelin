@@ -91,5 +91,5 @@ august_expense_total_matches_task=true
 Исходный commit: `66fe5ab` —
 `soul: news feed control — topic hint, disable any feed, instant refresh`.
 
-Первичный commit этого отчёта: `REPORT_COMMIT`; metadata commit с подстановкой
+Первичный commit этого отчёта: `1263993`; metadata commit с подстановкой
 hash также отправлен в `origin/main`.
