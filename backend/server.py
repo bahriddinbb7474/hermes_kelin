@@ -360,17 +360,22 @@ async def t_manage_news_sources(pool, a):
     action = a["action"]
     defaults = external_data.default_news_sources()
     if action == "add":
-        if not await db.news_source_capacity_available(pool, a["user_id"], a.get("url")):
-            ru, uz = NEWS_SOURCE_ERRORS["ACTIVE_LIMIT"]
-            return err("ACTIVE_LIMIT", ru, uz)
         try:
-            await asyncio.to_thread(
+            # The owner may name a site instead of a feed; autodiscovery
+            # returns the actual feed URL, already validated (imp10). Capacity
+            # is checked against that resolved URL, not the typed one, so a
+            # feed already stored is recognised even when named by its site.
+            feed_url, _payload = await asyncio.to_thread(
                 external_data.validate_user_news_feed,
                 a.get("url"), a.get("display_name"), a.get("topics"),
             )
         except external_data.ExternalDataError as exc:
             return err("INVALID_NEWS_SOURCE", f"Источник не добавлен: {exc}", "Манба текширувдан ўтмади")
-        source_key = external_data.generated_news_source_key(a["user_id"], a["url"])
+        if not await db.news_source_capacity_available(pool, a["user_id"], feed_url):
+            ru, uz = NEWS_SOURCE_ERRORS["ACTIVE_LIMIT"]
+            return err("ACTIVE_LIMIT", ru, uz)
+        a = {**a, "url": feed_url}
+        source_key = external_data.generated_news_source_key(a["user_id"], feed_url)
     else:
         # disable/enable may address a shipped feed by its key (imp09).
         source_key = a.get("source_key")

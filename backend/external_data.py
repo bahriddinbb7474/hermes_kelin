@@ -212,7 +212,76 @@ def _safe_feed_get(url: str) -> bytes:
     raise ExternalDataError("feed has too many redirects")
 
 
-def validate_user_news_feed(url: str, display_name: str, topics: list[str] | None) -> bytes:
+RSS_LINK_RE = re.compile(
+    rb"""<link\b[^>]*>""",
+    re.IGNORECASE,
+)
+FEED_TYPE_RE = re.compile(
+    rb"""type\s*=\s*["']?application/(?:rss|atom)\+xml""", re.IGNORECASE
+)
+ALTERNATE_REL_RE = re.compile(rb"""rel\s*=\s*["']?alternate""", re.IGNORECASE)
+HREF_RE = re.compile(rb"""href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))""", re.IGNORECASE)
+# Feed autodiscovery lives in <head>; never parse a whole page for it.
+HTML_HEAD_SCAN_BYTES = 64 * 1024
+
+
+def _discover_feed_url(payload: bytes, base_url: str) -> str | None:
+    """Return the first RSS/Atom feed a page advertises in its <head>.
+
+    Only the first ``HTML_HEAD_SCAN_BYTES`` are scanned, and the result is a
+    plain URL string: the caller must still run it through the same safety
+    path as a hand-typed address (imp10).
+    """
+    head = payload[:HTML_HEAD_SCAN_BYTES]
+    cutoff = head.lower().find(b"</head>")
+    if cutoff != -1:
+        head = head[:cutoff]
+    for tag in RSS_LINK_RE.findall(head):
+        if not FEED_TYPE_RE.search(tag) or not ALTERNATE_REL_RE.search(tag):
+            continue
+        match = HREF_RE.search(tag)
+        if not match:
+            continue
+        raw = next(group for group in match.groups() if group)
+        href = unescape(raw.decode("utf-8", "ignore")).strip()
+        if not href:
+            continue
+        absolute = urljoin(base_url, href)
+        if absolute.startswith("https://"):
+            return absolute
+    return None
+
+
+def resolve_feed_url(url: str) -> tuple[str, bytes]:
+    """Resolve a feed address the user may have given as a plain site URL.
+
+    Returns ``(feed_url, payload)``. A direct feed behaves exactly as before.
+    When the address answers with a page instead, the feed it advertises is
+    fetched through ``_safe_feed_get`` again — the same https-only, public-IP,
+    pinned-address, redirect-bounded, size-capped path — because that URL came
+    from a third-party page and is not trusted in any way. Autodiscovery is
+    single-level: the discovered feed is never scanned for further links.
+    """
+    payload = _safe_feed_get(url)
+    try:
+        _parse_feed(payload, "validation", "манба")
+        return url, payload
+    except ExternalDataError:
+        pass
+    discovered = _discover_feed_url(payload, url)
+    if not discovered:
+        raise ExternalDataError("site does not advertise an RSS or Atom feed")
+    return discovered, _safe_feed_get(discovered)
+
+
+def validate_user_news_feed(
+    url: str, display_name: str, topics: list[str] | None
+) -> tuple[str, bytes]:
+    """Validate a feed the owner asked for. Returns ``(feed_url, payload)``.
+
+    ``url`` may be a site address: the feed it advertises is discovered and
+    validated on the same path (imp10), so the stored URL is always the feed.
+    """
     if not isinstance(url, str):
         raise ExternalDataError("feed URL is required")
     if not isinstance(display_name, str) or not 1 <= len(display_name.strip()) <= 120:
@@ -224,9 +293,9 @@ def validate_user_news_feed(url: str, display_name: str, topics: list[str] | Non
         or any(not isinstance(item, str) or not 1 <= len(item.strip()) <= 80 for item in topics)
     ):
         raise ExternalDataError("topics must be a short list")
-    payload = _safe_feed_get(url)
+    feed_url, payload = resolve_feed_url(url)
     _parse_feed(payload, "validation", display_name.strip())
-    return payload
+    return feed_url, payload
 
 
 def generated_news_source_key(user_id: int, url: str) -> str:
