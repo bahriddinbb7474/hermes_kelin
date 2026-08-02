@@ -580,19 +580,36 @@ async def expense_report(
     args = [user_id, start, end]
     cat_filter = ""
     if category_code:
-        cat_filter = " AND category_code = $4"
+        # A parent group (`food`) covers its subgroups (`food.*`); a subgroup
+        # code matches only itself.
+        cat_filter = " AND (category_code = $4 OR category_code LIKE $4 || '.%')"
         args.append(category_code)
+    # Without a category filter the report is a top-level group summary
+    # (`food.*` folded into `food`): that is what the general and comparison
+    # reports print. Subgroup rows are returned only when the caller asked
+    # about one concrete group.
+    group_expr = (
+        "t.category_code" if category_code
+        else "COALESCE(ec.parent_code, t.category_code)"
+    )
     rows = await pool.fetch(
-        f"""SELECT t.category_code AS category_code,
-                   COALESCE(ec.name_uz, cat_root.name_uz) AS name_uz,
-                   SUM(t.amount) AS sum_uzs
-            FROM transactions t
-            LEFT JOIN expense_categories ec ON ec.code = t.category_code
-            LEFT JOIN expense_categories cat_root ON cat_root.code = split_part(t.category_code, '.', 1)
-            WHERE t.user_id=$1 AND t.type='expense' AND t.occurred_at >= $2 AND t.occurred_at < $3
-                  {cat_filter}
-            GROUP BY t.category_code, ec.name_uz, cat_root.name_uz
-            ORDER BY sum_uzs DESC""",
+        f"""SELECT grouped.category_code AS category_code,
+                   COALESCE(gc.name_uz, gr.name_uz) AS name_uz,
+                   grouped.sum_uzs AS sum_uzs
+            FROM (
+                SELECT {group_expr} AS category_code,
+                       SUM(t.amount) AS sum_uzs
+                FROM transactions t
+                LEFT JOIN expense_categories ec ON ec.code = t.category_code
+                WHERE t.user_id=$1 AND t.type='expense'
+                      AND t.occurred_at >= $2 AND t.occurred_at < $3
+                      {cat_filter}
+                GROUP BY 1
+            ) grouped
+            LEFT JOIN expense_categories gc ON gc.code = grouped.category_code
+            LEFT JOIN expense_categories gr
+                   ON gr.code = split_part(grouped.category_code, '.', 1)
+            ORDER BY grouped.sum_uzs DESC""",
         *args,
     )
     total = sum(int(r["sum_uzs"]) for r in rows)
@@ -629,7 +646,7 @@ async def expense_report(
         p_args = [user_id, p_start, p_end]
         p_cat = ""
         if category_code:
-            p_cat = " AND category_code = $4"
+            p_cat = " AND (category_code = $4 OR category_code LIKE $4 || '.%')"
             p_args.append(category_code)
         prev_total = await pool.fetchval(
             f"""SELECT COALESCE(SUM(amount),0) FROM transactions
@@ -662,7 +679,7 @@ async def expense_report(
         s_args = [user_id, s_utc, e_utc]
         s_cat = ""
         if category_code:
-            s_cat = " AND category_code = $4"
+            s_cat = " AND (category_code = $4 OR category_code LIKE $4 || '.%')"
             s_args.append(category_code)
         m_total = await pool.fetchval(
             f"""SELECT COALESCE(SUM(amount),0) FROM transactions
@@ -1207,25 +1224,23 @@ async def get_monthly_budget_status(
     start_utc = start_t.astimezone(timezone.utc)
     end_utc = end_t.astimezone(timezone.utc)
     rows = await pool.fetch(
+        # Both sides are folded to top-level groups (`food.*` -> `food`), so the
+        # general monthly report always comes back by group, no matter how the
+        # plan was written. Plan of a folded row = sum of the subgroup plans,
+        # therefore Режа/Қолгани stay honest. Totals are unchanged: this only
+        # regroups, it never filters.
         """WITH planned AS (
-               SELECT category_code, planned_amount_uzs AS planned_uzs
-               FROM monthly_budget_plans
-               WHERE user_id=$1 AND month=$2
+               SELECT COALESCE(pc.parent_code, p.category_code) AS category_code,
+                      SUM(p.planned_amount_uzs)::numeric AS planned_uzs
+               FROM monthly_budget_plans p
+               LEFT JOIN expense_categories pc ON pc.code = p.category_code
+               WHERE p.user_id=$1 AND p.month=$2
+               GROUP BY 1
            ), actual AS (
-               SELECT CASE
-                          WHEN EXISTS (
-                              SELECT 1 FROM planned exact_plan
-                              WHERE exact_plan.category_code = t.category_code
-                          ) THEN t.category_code
-                          WHEN t.category_code LIKE 'food.%'
-                               AND EXISTS (
-                                   SELECT 1 FROM planned parent_plan
-                                   WHERE parent_plan.category_code = 'food'
-                               ) THEN 'food'
-                          ELSE t.category_code
-                      END AS category_code,
+               SELECT COALESCE(tc.parent_code, t.category_code) AS category_code,
                       SUM(t.amount)::numeric AS actual_uzs
                FROM transactions t
+               LEFT JOIN expense_categories tc ON tc.code = t.category_code
                WHERE t.user_id=$1 AND t.type='expense' AND t.currency='UZS'
                  AND t.occurred_at >= $3 AND t.occurred_at < $4
                GROUP BY 1

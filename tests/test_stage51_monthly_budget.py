@@ -164,24 +164,17 @@ async def test_monthly_budget_postgres_plan_fact_and_call_tool(monkeypatch):
         assert status["planned_total_uzs"] == 350
         assert status["actual_total_uzs"] == 180
         assert status["remaining_uzs"] == 170
-        assert [x["category_code"] for x in status["by_category"]] == [
-            "food.bread",
-            "food.meat",
-            "food.oil",
-            "food.vegetables",
-        ]
+        # imp11: the plan is written per food subgroup, the status comes back as
+        # one top-level `food` row — plan = sum of the subgroup plans.
+        assert [x["category_code"] for x in status["by_category"]] == ["food"]
         by_cat = {x["category_code"]: x for x in status["by_category"]}
-        assert by_cat["food.bread"] == {
-            "category_code": "food.bread",
-            "planned_uzs": 150,
-            "actual_uzs": 130,
-            "difference_uzs": 20,
-            "usage_percent": 86.6667,
+        assert by_cat["food"] == {
+            "category_code": "food",
+            "planned_uzs": 350,
+            "actual_uzs": 180,
+            "difference_uzs": 170,
+            "usage_percent": 51.4286,
         }
-        assert by_cat["food.meat"]["actual_uzs"] == 0  # planned only
-        assert by_cat["food.oil"]["planned_uzs"] == 0  # actual only
-        assert by_cat["food.oil"]["usage_percent"] is None
-        assert by_cat["food.vegetables"]["usage_percent"] is None
 
         # Exceed total plan -> negative remaining.
         await pool.execute(
