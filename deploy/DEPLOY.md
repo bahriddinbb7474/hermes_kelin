@@ -352,6 +352,21 @@ SOUL SHA `5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`
 - Перед любым destructive suite ещё раз проверить, что имя БД — ровно
   `hermes_test`. Если это не так, прогон немедленно остановить.
 
+## Скрипты в `deploy/` (что осталось и зачем, imp07)
+
+Одноразовые deploy-обёртки закрытых задач удалены (`imp04_deploy.sh`,
+`imp04_patch_config.py`, `imp09_stt_deploy.sh`, `imp11_deploy.sh`) — их шаги
+описаны ниже в исторических разделах и в evidence-документах. Оставлены только
+те, что нужны при правках промптов, восстановлении и пересоздании профиля:
+
+| скрипт | когда нужен |
+|---|---|
+| `imp04_refresh_cron_fingerprints.py` | **обязательно** после любой правки cron-промпта: пересчитывает `job_fingerprint_sha256` и `prompt_sha256` в приватной cron-identity-карте. Без этого identity guard заблокирует tools внутри job. Сначала без флага (dry-run), затем `--apply` |
+| `imp05_patch_config.py` | пересоздание профиля: идемпотентно добавляет `mariyam_outbound_filter` в `plugins.enabled` и блок `session_reset` (daily 02:00, notify off) |
+| `imp09_patch_stt_config.py` | пересоздание профиля: STT-конфигурация голосовых сообщений |
+| `imp04_job_id.py` | найти id cron-job по имени (нужен как вход для двух скриптов выше) |
+| `fix02_deploy.sh` | исторический day-rhythm деплой; на него завязана регрессия `tests/test_day_rhythm.py`, поэтому файл сохранён |
+
 ## FORBIDDEN — что НЕ трогать
 
 - `/opt/time-agent`, `time_agent_bot`, Time-Agent `.env`, SQLite volume, logs, backups.
