@@ -381,6 +381,12 @@ Hermes/Mariyam использует только свои ресурсы: `name:
 2. Добавить `OPENWEATHER_API_KEY` только в
    `/opt/hermes-mariyam-secrets/backend.env` (mode 0600). Значение не печатать.
    Aladhan key не требует.
+   Для stdio MCP одной записи в private env недостаточно: gateway загружает
+   profile `.env` через systemd drop-in
+   `hermes-gateway-mariyam_oyijon.service.d/10-profile-env.conf`, а
+   `mcp_servers.mariyam_backend.env.OPENWEATHER_API_KEY` хранит только
+   placeholder `${OPENWEATHER_API_KEY}`. Основной unit генерирует Hermes и
+   может перезаписать, поэтому `EnvironmentFile` нельзя добавлять только туда.
 3. Установить `backend/external_data.py`, `backend/server.py`, canonical SOUL и
    три `cron/06_*.md`; cache path =
    `/opt/hermes-mariyam/var/external-data-cache.json`.
