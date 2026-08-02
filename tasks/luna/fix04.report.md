@@ -119,6 +119,6 @@ def test_keyword_layer_handles_negated_russian_davlenie_variants():
 ## Commit and push
 
 - Required commit message: `health guard: do not alert on negated high pressure; docs: list applied migrations`
-- Commit hash: to be filled after commit.
+- Implementation commit hash: `04b0ffa`.
 - Push status: pending explicit authorization for this fix04 payload to `origin/main`.
 - VPS deploy: not performed, as requested.
