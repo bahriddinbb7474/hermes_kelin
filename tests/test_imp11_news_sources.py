@@ -89,8 +89,11 @@ async def test_inventory_and_tool_contract_are_30():
     assert len(tools) == len(server.TOOLS) == len(server.DISPATCH) == 30
     schema = {tool.name: tool.inputSchema for tool in tools}["manage_news_sources"]
     assert schema["required"] == ["user_id", "action"]
-    assert schema["properties"]["action"]["enum"] == ["add", "disable", "list"]
-    assert "source_key" not in schema["properties"]
+    # imp09 widened the contract: `enable` returns a feed the owner switched
+    # off, and `source_key` addresses a shipped feed (custom ones keep using
+    # source_id). The tool count stays 30 — no new tool was introduced.
+    assert schema["properties"]["action"]["enum"] == ["add", "disable", "enable", "list"]
+    assert schema["properties"]["source_key"]["pattern"] == "^[a-z0-9_]{2,40}$"
 
 
 def test_identity_guard_binds_owner_and_trusted_added_by():

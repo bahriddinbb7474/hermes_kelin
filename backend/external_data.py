@@ -30,6 +30,17 @@ CACHE_VERSION = 1
 MAX_RESPONSE_BYTES = 2_000_000
 HTTP_TIMEOUT_SECONDS = 12
 MAX_REDIRECTS = 5
+# News is the only external read that is not day-scoped: RSS is public, free
+# and updates through the day (Euronews itself advertises <ttl>30</ttl>).
+# Weather and prayer times keep the daily contract (imp09 §1a).
+NEWS_CACHE_TTL_SECONDS = 30 * 60
+_FETCH_LOCKS: dict = {}
+NEWS_SELECTION_NOTE = (
+    "Hermes must choose 1–2 calm items close to Oyijon's interests, "
+    "paraphrase them in Uzbek Cyrillic with the supplied Cyrillic "
+    "source names, avoid panic and graphic details, offer details "
+    "from summary_ru only on request, and never invent facts."
+)
 DEFAULT_CACHE_PATH = Path("/opt/hermes-mariyam/var/external-data-cache.json")
 DEFAULT_NEWS_CONFIG_PATH = Path(__file__).with_name("news_sources.json")
 
@@ -88,6 +99,18 @@ def _write_cache(cache: dict) -> None:
             temp_path.unlink()
         except FileNotFoundError:
             pass
+
+
+def _within_ttl(iso_value: str, now: datetime, ttl_seconds: int) -> bool:
+    """Freshness by elapsed time — used by news only (imp09)."""
+    try:
+        fetched = datetime.fromisoformat(iso_value.replace("Z", "+00:00"))
+        if fetched.tzinfo is None:
+            return False
+        age = (now - fetched).total_seconds()
+        return 0 <= age < ttl_seconds
+    except (AttributeError, TypeError, ValueError):
+        return False
 
 
 def _same_tashkent_day(iso_value: str, now: datetime) -> bool:
@@ -497,7 +520,24 @@ def _fetch_news(
 ) -> dict:
     config = _load_news_config()
     sources_by_key = config["sources_by_key"]
-    requested_sources = source_keys or list(config["default_sources"])
+    # ``None`` means "the configured defaults"; an explicit empty list means the
+    # owner switched every default off (imp09) and only custom feeds remain.
+    requested_sources = (
+        list(config["default_sources"]) if source_keys is None else list(source_keys)
+    )
+    if source_keys == []:
+        return {
+            "agreed_sources": [],
+            "selected_sources": [],
+            "selected_topic": topic_key or config["default_topic"],
+            "available_sources": [],
+            "available_topics": [
+                {"key": key, "name": item["name"]} for key, item in config["topics"].items()
+            ],
+            "candidates": [],
+            "source_errors": [],
+            "selection_note": NEWS_SELECTION_NOTE,
+        }
     if (
         not isinstance(requested_sources, list)
         or not requested_sources
@@ -570,30 +610,70 @@ def _fetch_news(
         "available_topics": available_topics,
         "candidates": unique[:20],
         "source_errors": source_errors,
-        "selection_note": (
-            "Hermes must choose 1–2 calm items close to Oyijon's interests, "
-            "paraphrase them in Uzbek Cyrillic with the supplied Cyrillic "
-            "source names, avoid panic and graphic details, offer details "
-            "from summary_ru only on request, and never invent facts."
-        ),
+        "selection_note": NEWS_SELECTION_NOTE,
     }
 
 
-async def _daily_cached(cache_key: str, fetcher) -> dict:
+def _cache_entry_is_fresh(entry, now: datetime, ttl_seconds: int | None) -> bool:
+    if not (isinstance(entry, dict) and isinstance(entry.get("data"), dict)):
+        return False
+    if ttl_seconds is None:
+        return _same_tashkent_day(entry.get("fetched_at"), now)
+    return _within_ttl(entry.get("fetched_at"), now, ttl_seconds)
+
+
+def _entry_lock(cache_key: str):
+    """One in-process lock per cache key, so a single fetch serves all waiters.
+
+    Best-effort: if no running loop owns a usable lock (different loop, exotic
+    runtime) the caller simply fetches without coordination, exactly like
+    before (imp09).
+    """
+    try:
+        with _CACHE_LOCK:
+            lock = _FETCH_LOCKS.get(cache_key)
+            if lock is None:
+                lock = asyncio.Lock()
+                _FETCH_LOCKS[cache_key] = lock
+            return lock
+    except RuntimeError:
+        return None
+
+
+async def _daily_cached(cache_key: str, fetcher, *, ttl_seconds: int | None = None) -> dict:
+    """Cached external read. Day-scoped by default; news passes an explicit TTL."""
     now = _now_utc()
     with _CACHE_LOCK:
         cache = _read_cache()
         entry = cache["entries"].get(cache_key)
-        if (
-            isinstance(entry, dict)
-            and isinstance(entry.get("data"), dict)
-            and _same_tashkent_day(entry.get("fetched_at"), now)
-        ):
+        if _cache_entry_is_fresh(entry, now, ttl_seconds):
             return {
                 "ok": True,
                 **entry["data"],
                 "cache": {"hit": True, "stale": False, "fetched_at": entry["fetched_at"]},
             }
+
+    lock = _entry_lock(cache_key)
+    if lock is not None:
+        async with lock:
+            # Another waiter may have refreshed this key while we queued.
+            now = _now_utc()
+            with _CACHE_LOCK:
+                cache = _read_cache()
+                entry = cache["entries"].get(cache_key)
+                if _cache_entry_is_fresh(entry, now, ttl_seconds):
+                    return {
+                        "ok": True,
+                        **entry["data"],
+                        "cache": {
+                            "hit": True, "stale": False, "fetched_at": entry["fetched_at"],
+                        },
+                    }
+            return await _fetch_and_store(cache_key, fetcher, now)
+    return await _fetch_and_store(cache_key, fetcher, now)
+
+
+async def _fetch_and_store(cache_key: str, fetcher, now: datetime) -> dict:
     try:
         data = await asyncio.to_thread(fetcher)
     except ExternalDataError as exc:
@@ -636,6 +716,46 @@ async def _daily_cached(cache_key: str, fetcher) -> dict:
     }
 
 
+def user_news_cache_key(user_id: int) -> str:
+    return f"news_user:{user_id}"
+
+
+def default_news_sources() -> list[dict]:
+    """Feeds shipped in news_sources.json, in configured order."""
+    config = _load_news_config()
+    return [
+        {
+            "source_key": key,
+            "display_name": config["sources_by_key"][key]["name"],
+            "url": config["sources_by_key"][key]["url"],
+        }
+        for key in config["default_sources"]
+    ]
+
+
+def invalidate_user_news_cache(user_id: int) -> bool:
+    """Drop this owner's daily news bundle so the next read refetches it.
+
+    Called only when the owner changes their own feed set (imp09): the daily
+    bundle was assembled before the change and would otherwise keep the new
+    feed invisible until tomorrow. Weather and prayer caches are separate keys
+    and stay untouched. Returns True when an entry was actually removed.
+    """
+    key = user_news_cache_key(user_id)
+    with _CACHE_LOCK:
+        cache = _read_cache()
+        if key not in cache["entries"]:
+            return False
+        del cache["entries"][key]
+        try:
+            _write_cache(cache)
+        except OSError:
+            # Failing to persist the removal only costs one stale read; the
+            # caller must not lose the successful feed change over it.
+            return False
+    return True
+
+
 async def get_tashkent_weather() -> dict:
     return await _daily_cached("weather_tashkent", _fetch_weather)
 
@@ -656,13 +776,24 @@ async def get_daily_news(
         cache_key = "news:" + json.dumps(
             {"topic": topic, "sources": selected_sources}, sort_keys=True, separators=(",", ":")
         )
-        return await _daily_cached(cache_key, lambda: _fetch_news(selected_sources or None, topic))
+        return await _daily_cached(
+            cache_key,
+            lambda: _fetch_news(selected_sources or None, topic),
+            ttl_seconds=NEWS_CACHE_TTL_SECONDS,
+        )
 
     from . import db
     custom_sources = await db.get_active_news_sources(pool, user_id)
+    # Defaults the owner switched off keep a disabled row in the same table
+    # (imp09); news_sources.json and other users are unaffected.
+    disabled_defaults = await db.get_disabled_default_keys(pool, user_id)
+    enabled_defaults = [
+        item["source_key"] for item in default_news_sources()
+        if item["source_key"] not in disabled_defaults
+    ]
 
     def fetch_all() -> dict:
-        base = _fetch_news(None, "daily")
+        base = _fetch_news(enabled_defaults, "daily")
         all_candidates = list(base["candidates"])
         errors = list(base["source_errors"])
         for source in custom_sources:
@@ -685,7 +816,9 @@ async def get_daily_news(
 
     # One cache key per owner: source/topic selections only filter the daily
     # bundle in memory and therefore cannot multiply upstream requests.
-    result = await _daily_cached(f"news_user:{user_id}", fetch_all)
+    result = await _daily_cached(
+        user_news_cache_key(user_id), fetch_all, ttl_seconds=NEWS_CACHE_TTL_SECONDS
+    )
     if not result.get("ok"):
         return result
     available_keys = {item["key"] for item in result["available_sources"]}

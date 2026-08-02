@@ -22,7 +22,12 @@ PRICE_BASES = ("last", "average", "manual")
 OBLIGATION_TYPES = ("internet", "loan", "tax", "utility", "other")
 OBLIGATION_ACTIONS = ("upsert", "mark_paid", "disable")
 OBLIGATION_REPEAT_RULES = ("none", "monthly", "yearly", "interval_days")
-NEWS_SOURCE_ACTIONS = ("add", "disable", "list")
+NEWS_SOURCE_ACTIONS = ("add", "disable", "enable", "list")
+# Keys of feeds shipped in news_sources.json look like `kun`; feeds the owner
+# added get a generated `custom_<digest>` key. A disabled default is stored as
+# a row with the default's own key and active=false (imp09), so the two kinds
+# must stay distinguishable by prefix alone.
+CUSTOM_SOURCE_PREFIX = "custom_"
 MAX_ACTIVE_NEWS_SOURCES = 15
 
 
@@ -49,32 +54,166 @@ def _news_source_result(row) -> dict:
 
 async def manage_news_sources(
     pool, user_id, action, *, source_id=None, source_key=None,
-    display_name=None, url=None, topics=None, added_by=None,
+    display_name=None, url=None, topics=None, added_by=None, defaults=None,
 ):
-    """Store/list user-owned feeds; network validation happens before this call."""
+    """Store/list user-owned feeds; network validation happens before this call.
+
+    ``defaults`` is the shipped feed list (``source_key``/``display_name``/``url``)
+    supplied by the caller — the storage layer never reads news_sources.json.
+    Disabling a default writes a row with that default's key and active=false;
+    enabling it deletes the row again (imp09).
+    """
     _one_of("action", action, NEWS_SOURCE_ACTIONS)
+    default_list = list(defaults or [])
+    defaults_by_key = {item["source_key"]: item for item in default_list}
+
     if action == "list":
         rows = await pool.fetch(
             "SELECT * FROM user_news_sources WHERE user_id=$1 ORDER BY active DESC, added_at, id",
             user_id,
         )
-        return {"sources": [_news_source_result(row) for row in rows]}
-    if action == "disable":
-        if not isinstance(source_id, int) or isinstance(source_id, bool) or source_id < 1:
-            raise ValueError("INVALID_INPUT: source_id is required for disable")
-        row = await pool.fetchrow(
-            """UPDATE user_news_sources SET active=false, disabled_at=now(), updated_at=now()
-               WHERE user_id=$1 AND id=$2 AND active RETURNING *""",
-            user_id, source_id,
-        )
-        if row is None:
-            existing = await pool.fetchrow(
-                "SELECT * FROM user_news_sources WHERE user_id=$1 AND id=$2", user_id, source_id
+        custom = [
+            _news_source_result(row) for row in rows
+            if str(row["source_key"]).startswith(CUSTOM_SOURCE_PREFIX)
+        ]
+        disabled_default_keys = {
+            row["source_key"] for row in rows
+            if not str(row["source_key"]).startswith(CUSTOM_SOURCE_PREFIX)
+            and not row["active"]
+        }
+        default_entries = [
+            {
+                "source_key": item["source_key"],
+                "display_name": item["display_name"],
+                "url": item["url"],
+                "topics": [],
+                "active": item["source_key"] not in disabled_default_keys,
+                "kind": "default",
+                "source_id": None,
+                "added_at": None,
+                "added_by": None,
+                "disabled_at": None,
+            }
+            for item in default_list
+        ]
+        return {
+            "sources": default_entries + [{**item, "kind": "custom"} for item in custom],
+            "active_total": (
+                sum(1 for item in default_entries if item["active"])
+                + sum(1 for item in custom if item["active"])
+            ),
+        }
+
+    if action in ("disable", "enable"):
+        addressing_default = isinstance(source_key, str) and source_key in defaults_by_key
+        if not addressing_default and (
+            not isinstance(source_id, int) or isinstance(source_id, bool) or source_id < 1
+        ):
+            raise ValueError(
+                f"INVALID_INPUT: source_id or a known source_key is required for {action}"
             )
-            if existing is None:
-                return {"_news_source_error": "NOT_FOUND"}
-            return {**_news_source_result(existing), "idempotent": True}
-        return {**_news_source_result(row), "idempotent": False}
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.fetchval("SELECT id FROM users WHERE id=$1 FOR UPDATE", user_id)
+                rows = await conn.fetch(
+                    "SELECT * FROM user_news_sources WHERE user_id=$1 FOR UPDATE", user_id
+                )
+                by_id = {row["id"]: row for row in rows}
+                disabled_default_keys = {
+                    row["source_key"] for row in rows
+                    if not str(row["source_key"]).startswith(CUSTOM_SOURCE_PREFIX)
+                    and not row["active"]
+                }
+                active_defaults = [
+                    item["source_key"] for item in default_list
+                    if item["source_key"] not in disabled_default_keys
+                ]
+                active_custom = [
+                    row for row in rows
+                    if str(row["source_key"]).startswith(CUSTOM_SOURCE_PREFIX) and row["active"]
+                ]
+
+                if action == "disable":
+                    if addressing_default:
+                        if source_key in disabled_default_keys:
+                            return {
+                                "source_key": source_key,
+                                "display_name": defaults_by_key[source_key]["display_name"],
+                                "kind": "default",
+                                "active": False,
+                                "idempotent": True,
+                            }
+                        if len(active_defaults) + len(active_custom) <= 1:
+                            return {"_news_source_error": "LAST_SOURCE"}
+                        meta = defaults_by_key[source_key]
+                        await conn.execute(
+                            """INSERT INTO user_news_sources
+                               (user_id, source_key, display_name, url, topics, active,
+                                added_by, disabled_at)
+                               VALUES ($1,$2,$3,$4,'{}',false,$5,now())
+                               ON CONFLICT (user_id,source_key) DO UPDATE SET
+                                 active=false, disabled_at=now(), updated_at=now()""",
+                            user_id, source_key, meta["display_name"], meta["url"],
+                            added_by if added_by in ROLES else "oyijon",
+                        )
+                        return {
+                            "source_key": source_key,
+                            "display_name": meta["display_name"],
+                            "kind": "default",
+                            "active": False,
+                            "idempotent": False,
+                        }
+                    existing = by_id.get(source_id)
+                    if existing is None:
+                        return {"_news_source_error": "NOT_FOUND"}
+                    if not existing["active"]:
+                        return {**_news_source_result(existing), "kind": "custom", "idempotent": True}
+                    if len(active_defaults) + len(active_custom) <= 1:
+                        return {"_news_source_error": "LAST_SOURCE"}
+                    row = await conn.fetchrow(
+                        """UPDATE user_news_sources
+                           SET active=false, disabled_at=now(), updated_at=now()
+                           WHERE user_id=$1 AND id=$2 RETURNING *""",
+                        user_id, source_id,
+                    )
+                    return {**_news_source_result(row), "kind": "custom", "idempotent": False}
+
+                # action == "enable"
+                if addressing_default:
+                    meta = defaults_by_key[source_key]
+                    if source_key not in disabled_default_keys:
+                        return {
+                            "source_key": source_key,
+                            "display_name": meta["display_name"],
+                            "kind": "default",
+                            "active": True,
+                            "idempotent": True,
+                        }
+                    await conn.execute(
+                        "DELETE FROM user_news_sources WHERE user_id=$1 AND source_key=$2",
+                        user_id, source_key,
+                    )
+                    return {
+                        "source_key": source_key,
+                        "display_name": meta["display_name"],
+                        "kind": "default",
+                        "active": True,
+                        "idempotent": False,
+                    }
+                existing = by_id.get(source_id)
+                if existing is None:
+                    return {"_news_source_error": "NOT_FOUND"}
+                if existing["active"]:
+                    return {**_news_source_result(existing), "kind": "custom", "idempotent": True}
+                if len(active_custom) >= MAX_ACTIVE_NEWS_SOURCES:
+                    return {"_news_source_error": "ACTIVE_LIMIT"}
+                row = await conn.fetchrow(
+                    """UPDATE user_news_sources
+                       SET active=true, disabled_at=NULL, updated_at=now()
+                       WHERE user_id=$1 AND id=$2 RETURNING *""",
+                    user_id, source_id,
+                )
+                return {**_news_source_result(row), "kind": "custom", "idempotent": False}
 
     if added_by not in ROLES:
         raise ValueError("INVALID_INPUT: trusted added_by is required")
@@ -106,10 +245,23 @@ async def manage_news_sources(
 
 
 async def get_active_news_sources(pool, user_id):
+    """Active feeds the owner added. Disabled-default rows never match."""
     rows = await pool.fetch(
-        "SELECT * FROM user_news_sources WHERE user_id=$1 AND active ORDER BY id", user_id
+        """SELECT * FROM user_news_sources
+           WHERE user_id=$1 AND active AND source_key LIKE $2 ORDER BY id""",
+        user_id, f"{CUSTOM_SOURCE_PREFIX}%",
     )
     return [_news_source_result(row) for row in rows]
+
+
+async def get_disabled_default_keys(pool, user_id) -> set[str]:
+    """Keys of shipped feeds this owner switched off (imp09)."""
+    rows = await pool.fetch(
+        """SELECT source_key FROM user_news_sources
+           WHERE user_id=$1 AND NOT active AND source_key NOT LIKE $2""",
+        user_id, f"{CUSTOM_SOURCE_PREFIX}%",
+    )
+    return {row["source_key"] for row in rows}
 
 
 async def news_source_capacity_available(pool, user_id, url) -> bool:

@@ -349,11 +349,16 @@ NEWS_SOURCE_ERRORS = {
         f"Можно включить не больше {db.MAX_ACTIVE_NEWS_SOURCES} своих источников",
         f"Кўпи билан {db.MAX_ACTIVE_NEWS_SOURCES} та шахсий манбани ёқиш мумкин",
     ),
+    "LAST_SOURCE": (
+        "Это последний включённый источник — хотя бы один должен остаться",
+        "Бу охирги ёқилган манба — камида биттаси қолиши керак",
+    ),
 }
 
 
 async def t_manage_news_sources(pool, a):
     action = a["action"]
+    defaults = external_data.default_news_sources()
     if action == "add":
         if not await db.news_source_capacity_available(pool, a["user_id"], a.get("url")):
             ru, uz = NEWS_SOURCE_ERRORS["ACTIVE_LIMIT"]
@@ -367,17 +372,22 @@ async def t_manage_news_sources(pool, a):
             return err("INVALID_NEWS_SOURCE", f"Источник не добавлен: {exc}", "Манба текширувдан ўтмади")
         source_key = external_data.generated_news_source_key(a["user_id"], a["url"])
     else:
-        source_key = None
+        # disable/enable may address a shipped feed by its key (imp09).
+        source_key = a.get("source_key")
     r = await db.manage_news_sources(
         pool, a["user_id"], action,
         source_id=a.get("source_id"), source_key=source_key,
         display_name=a.get("display_name"), url=a.get("url"),
-        topics=a.get("topics"), added_by=a.get("added_by"),
+        topics=a.get("topics"), added_by=a.get("added_by"), defaults=defaults,
     )
     code = r.get("_news_source_error")
     if code:
         ru, uz = NEWS_SOURCE_ERRORS[code]
         return err(code, ru, uz)
+    # The daily bundle for this owner was assembled before the change, so it
+    # would hide the new feed (or keep a disabled one) until tomorrow.
+    if action in ("add", "disable", "enable") and not r.get("idempotent"):
+        r["cache_reset"] = external_data.invalidate_user_news_cache(a["user_id"])
     return ok(**r)
 
 
@@ -533,6 +543,7 @@ P = {
     "estimated_cost_usd": {"type": "number"},
     "news_source_action": {"type": "string", "enum": list(db.NEWS_SOURCE_ACTIONS)},
     "news_source_id": {"type": "integer", "minimum": 1},
+    "news_source_key": {"type": "string", "pattern": "^[a-z0-9_]{2,40}$"},
     "news_display_name": {"type": "string", "minLength": 1, "maxLength": 120},
     "news_url": {"type": "string", "pattern": "^https://"},
     "news_topics": {"type": "array", "maxItems": 10, "uniqueItems": True,
@@ -603,10 +614,11 @@ TOOLS = [
     ),
     (
         "manage_news_sources",
-        "Пользовательские RSS/Atom: action=add|disable|list. add проверяет HTTPS/RSS и принимает имя узбекской кириллицей и темы; ключ генерирует backend",
+        "Ленты новостей: action=add|disable|enable|list. list отдаёт и штатные ленты, и добавленные, с их состоянием. Свою ленту адресуй source_id, штатную — source_key из list. add проверяет HTTPS/RSS и принимает имя узбекской кириллицей и темы; ключ генерирует backend. Последнюю включённую ленту выключить нельзя",
         schema({
             **pick("user_id"), "action": P["news_source_action"],
-            "source_id": P["news_source_id"], "display_name": P["news_display_name"],
+            "source_id": P["news_source_id"], "source_key": P["news_source_key"],
+            "display_name": P["news_display_name"],
             "url": P["news_url"], "topics": P["news_topics"],
         }, ["user_id", "action"]),
     ),
