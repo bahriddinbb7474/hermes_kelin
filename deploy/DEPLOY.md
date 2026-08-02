@@ -109,6 +109,18 @@ docker compose down
 `backend/sql/001_init.sql` применяется контейнером Postgres только при первом создании volume.
 Для будущих миграций `002_*.sql` на существующей БД применять вручную:
 
+Применённые миграции (в порядке применения):
+
+1. `001_init` — схема и справочники.
+2. `002_stage51_quantity_budget` — количество и месячные бюджеты.
+3. `003_stage53_product_plans` — планы продуктов.
+4. `005_stage6_recurring_obligations` — повторяющиеся обязательства.
+5. `006_user_news_sources` — пользовательские источники новостей.
+6. `007_food_subcategories` — подгруппы еды: молочное, напитки, соусы,
+   полуфабрикаты.
+
+Миграция `004` в репозитории отсутствует.
+
 ```bash
 set -a; . backend/.env; set +a
 docker compose exec -T hermes_mariyam_postgres psql -U hermes -d hermes -f /docker-entrypoint-initdb.d/002_next.sql

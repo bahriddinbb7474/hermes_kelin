@@ -41,6 +41,9 @@ REWRITE_PREFIX = (
 )
 
 # Narrow multi-word patterns. No standalone ёмон/ёрдам/дард/бемор/температура.
+HIGH_BLOOD_PRESSURE_END = (
+    r"(?:баланд|юқори|кўтар)(?!\s+(?:эмас|емас)\b)"
+)
 KEYWORD_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "heart_pain",
@@ -79,9 +82,12 @@ KEYWORD_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         "high_blood_pressure",
         re.compile(
             r"\b(?:қон\s+босим(?:им)?(?:\s+\S+){0,3}\s+"
-            r"(?:баланд|юқори|кўтар)"
-            r"|босимим(?:\s+\S+){0,3}\s+(?:баланд|юқори|кўтар)"
-            r"|давлен\w*(?:\s+\S+){0,3}\s+(?:баланд|юқори|кўтар))"
+            + HIGH_BLOOD_PRESSURE_END
+            + r"|босимим(?:\s+\S+){0,3}\s+"
+            + HIGH_BLOOD_PRESSURE_END
+            + r"|давлен\w*(?:\s+\S+){0,3}\s+"
+            + HIGH_BLOOD_PRESSURE_END
+            + r")"
         ),
     ),
 )

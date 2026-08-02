@@ -75,8 +75,16 @@ def test_keyword_layer_accepts_narrow_openai_stt_breathing_variant():
     assert guard.detect_health_keyword("Нафас олишим яхши.") is None
 
 
-def test_keyword_layer_accepts_russian_davlenie_without_numeric_false_alert():
+def test_keyword_layer_handles_negated_russian_davlenie_variants():
     assert guard.detect_health_keyword("Давлениям баланд") == "high_blood_pressure"
+    assert guard.detect_health_keyword("Давлениям юқори эмас") is None
+    assert guard.detect_health_keyword("Давлениям яхши, юқори эмас") is None
+    assert guard.detect_health_keyword("Қон босимим баланд эмас") is None
+    assert guard.detect_health_keyword("Босимим кўтарилди") == "high_blood_pressure"
+    assert (
+        guard.detect_health_keyword("Давлениям бугун жуда баланд")
+        == "high_blood_pressure"
+    )
     assert guard.detect_health_keyword("Давлениям 108/67") is None
 
 
