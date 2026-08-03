@@ -68,7 +68,7 @@ OUTBOUND_FILTER_INIT = (
 )
 # Canonical Git/deploy bytes after CRLF -> LF normalization.
 EXPECTED_SOUL_SHA256 = (
-    "7a51c8a0ef47d8ccfc268a123c392cfdd1795fc108cb68897651ac8b201c22de"
+    "c63f0233dee86ab300bd29df57974c5804bd436372599a944bdc9bc7cb2060ef"
 )
 PROFILE_SCOPED_DIR = "hermes_profile_mariyam_oyijon"
 SELF_IMPROVEMENT_MARKERS = (
