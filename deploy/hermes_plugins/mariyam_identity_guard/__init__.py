@@ -95,6 +95,9 @@ ADMIN_CROSS_TARGET_TOOLS = frozenset(
     {
         "get_expense_report",
         "get_balance_summary",
+        # fix03: family money reports are readable by admin. Read-only tool;
+        # `set_monthly_budget` deliberately stays out — planning is Oyijon's.
+        "get_monthly_budget_status",
         "get_admin_report_data",
         "save_plan_note",
         "upsert_recurring_obligation",
@@ -103,6 +106,24 @@ ADMIN_CROSS_TARGET_TOOLS = frozenset(
         "manage_news_sources",
     }
 )
+
+# fix03: SOUL makes the model always send `user_id: 0`. For admin that used to
+# be a dead end (0 is not a valid cross-target), so the customer could not read
+# the family reports from his own account at all. `0` is now resolved to the
+# single allowed target — but ONLY for the read-only tools listed here.
+#
+# This list must stay read-only and explicit. A mutating tool reached with
+# `user_id: 0` from admin has to keep failing: an accidental `save_expense`
+# would silently land in Oyijon's data with no way to tell where it came from.
+# Subset of ADMIN_CROSS_TARGET_TOOLS by construction (asserted below).
+ADMIN_ZERO_TARGET_READ_TOOLS = frozenset(
+    {
+        "get_expense_report",
+        "get_balance_summary",
+        "get_monthly_budget_status",
+    }
+)
+assert ADMIN_ZERO_TARGET_READ_TOOLS <= ADMIN_CROSS_TARGET_TOOLS
 
 # Safe error codes (fail-closed; never reveal internals/telegram ids in detail).
 SAFE_ERROR_CODES = frozenset(
@@ -207,6 +228,15 @@ def canonical_tool_name(tool_name):
 def _is_pos_int(value):
     """True if value is a positive int (bool is explicitly rejected)."""
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _is_zero_target(value):
+    """True only for a literal integer 0 (bool, "0", 0.0 are rejected).
+
+    `0` is the placeholder SOUL puts in `user_id`; anything else keeps the
+    strict cross-target path.
+    """
+    return isinstance(value, int) and not isinstance(value, bool) and value == 0
 
 
 def _to_pos_int(value):
@@ -787,6 +817,21 @@ def _compute_effective_args(tool_name, args, actor_entry, tg):
         # Self-target always allowed.
         if requested == actor_user_id:
             return bind_actor(copy.deepcopy(args)), None
+
+        # fix03: `user_id: 0` (the value SOUL always sends) means "the family",
+        # and only for the read-only tools above. Exactly one allowed target or
+        # nothing: with two Oyijon-like ids in the mapping there is no honest
+        # way to pick one, so the guard refuses instead of guessing.
+        if _is_zero_target(requested) and tool_name in ADMIN_ZERO_TARGET_READ_TOOLS:
+            if (
+                not isinstance(allowed_targets, list)
+                or len(allowed_targets) != 1
+                or not _is_pos_int(allowed_targets[0])
+            ):
+                return None, "IDENTITY_TARGET_FORBIDDEN"
+            out = copy.deepcopy(args)
+            out["user_id"] = allowed_targets[0]
+            return bind_actor(out), None
 
         # Cross-target only via the allowlist AND allowed_target_user_ids.
         if (

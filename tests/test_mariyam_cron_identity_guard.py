@@ -459,7 +459,7 @@ def test_max_turns_chain_order_inventory_and_manifest_are_pinned():
         / "mariyam_identity_guard"
         / "plugin.yaml"
     ).read_text(encoding="utf-8")
-    assert 'version: "1.4.0"' in manifest
+    assert 'version: "1.5.0"' in manifest
 
     tree = ast.parse((REPO / "backend" / "server.py").read_text(encoding="utf-8"))
     tools_assignment = next(

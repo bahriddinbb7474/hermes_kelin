@@ -189,6 +189,132 @@ def test_admin_missing_user_defaults_self(resolver, fake_map):
     assert calls["args"]["user_id"] == 1
 
 
+# ---- fix03: admin reads the family reports with the `user_id: 0` sentinel ----
+# SOUL always sends 0. For oyijon that has always meant "self"; for admin it
+# used to be a dead end, so the customer could not read anything from his own
+# account. Now it resolves to the single allowed target — reads only.
+ADMIN_ZERO_READ_TOOLS = (
+    "get_expense_report",
+    "get_balance_summary",
+    "get_monthly_budget_status",
+)
+
+# Every mutating user-scoped tool must keep failing on the same sentinel. This
+# list is the point of the test: a write must never silently land in Oyijon's
+# data because the admin asked a question.
+ADMIN_ZERO_WRITE_TOOLS = (
+    "save_expense",
+    "save_income",
+    "update_expense",
+    "update_last_expense",
+    "delete_expense",
+    "delete_last_expense",
+    "set_monthly_budget",
+    "save_quran_progress",
+    "save_health_note",
+    "save_alert_event",
+    "save_plan_note",
+    "upsert_recurring_obligation",
+    "manage_news_sources",
+    "approve_monthly_plan",
+    "open_monthly_plan_cycle",
+)
+
+
+@pytest.mark.parametrize("tool_name", ADMIN_ZERO_READ_TOOLS)
+def test_fix03_admin_zero_sentinel_reads_family_reports(tool_name, resolver, fake_map):
+    _, _, calls = _call(tool_name, {"user_id": 0}, session_id="sess-admin")
+    assert calls["n"] == 1
+    assert calls["args"]["user_id"] == 20
+
+
+@pytest.mark.parametrize("tool_name", ADMIN_ZERO_READ_TOOLS)
+def test_fix03_admin_zero_sentinel_works_with_mcp_prefix(tool_name, resolver, fake_map):
+    _, _, calls = _call(
+        f"mcp__mariyam_backend__{tool_name}", {"user_id": 0}, session_id="sess-admin"
+    )
+    assert calls["args"]["user_id"] == 20
+
+
+@pytest.mark.parametrize("tool_name", ADMIN_ZERO_WRITE_TOOLS)
+def test_fix03_admin_zero_sentinel_never_writes_to_oyijon(tool_name, resolver, fake_map):
+    _, parsed, calls = _call(tool_name, {"user_id": 0}, session_id="sess-admin")
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_TARGET_FORBIDDEN"
+
+
+def test_fix03_zero_read_list_contains_no_mutating_tool():
+    assert set(ADMIN_ZERO_WRITE_TOOLS) <= guard.USER_SCOPED_TOOLS
+    assert set(ADMIN_ZERO_WRITE_TOOLS).isdisjoint(guard.ADMIN_ZERO_TARGET_READ_TOOLS)
+    assert guard.ADMIN_ZERO_TARGET_READ_TOOLS <= guard.ADMIN_CROSS_TARGET_TOOLS
+    assert set(ADMIN_ZERO_READ_TOOLS) == set(guard.ADMIN_ZERO_TARGET_READ_TOOLS)
+
+
+@pytest.mark.parametrize(
+    "targets", [[], [20, 21], "20", None]
+)
+def test_fix03_zero_sentinel_needs_exactly_one_target(targets, resolver, monkeypatch):
+    """Two Oyijon-like ids (or none) — refuse instead of guessing."""
+    entry = dict(FAKE_MAP["111111111"])
+    if targets is None:
+        entry.pop("allowed_target_user_ids")
+    else:
+        entry["allowed_target_user_ids"] = targets
+    monkeypatch.setattr(
+        guard, "load_identity_map", lambda: ({"111111111": entry}, None)
+    )
+    _, parsed, calls = _call(
+        "get_expense_report", {"user_id": 0}, session_id="sess-admin"
+    )
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_TARGET_FORBIDDEN"
+
+
+@pytest.mark.parametrize("requested", [False, "0", 0.0, [0], "", "null"])
+def test_fix03_only_a_real_integer_zero_is_the_sentinel(requested, resolver, fake_map):
+    """Look-alikes must not open the read path; only a JSON integer 0 does."""
+    _, parsed, calls = _call(
+        "get_expense_report", {"user_id": requested}, session_id="sess-admin"
+    )
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_TARGET_FORBIDDEN"
+
+
+def test_fix03_oyijon_branch_is_untouched(resolver, fake_map):
+    """Oyijon still forced to self for reads and writes alike."""
+    for tool_name in ADMIN_ZERO_READ_TOOLS + ("save_expense", "set_monthly_budget"):
+        _, _, calls = _call(tool_name, {"user_id": 0}, session_id="sess-oyijon")
+        assert calls["n"] == 1
+        assert calls["args"]["user_id"] == 20
+        _, _, calls = _call(tool_name, {"user_id": 1}, session_id="sess-oyijon")
+        assert calls["args"]["user_id"] == 20
+
+
+def test_fix03_admin_health_access_is_not_widened(resolver, fake_map):
+    """Health stays out of the sentinel path (alerts/notes are not reports)."""
+    for tool_name in ("save_health_note", "save_alert_event", "get_quran_progress"):
+        assert tool_name not in guard.ADMIN_ZERO_TARGET_READ_TOOLS
+    for tool_name in ("save_health_note", "save_alert_event"):
+        assert tool_name not in guard.ADMIN_CROSS_TARGET_TOOLS
+    _, parsed, calls = _call(
+        "get_quran_progress", {"user_id": 0}, session_id="sess-admin"
+    )
+    assert calls["n"] == 0
+    assert parsed["error_code"] == "IDENTITY_TARGET_FORBIDDEN"
+
+
+def test_fix03_unknown_role_still_fails_closed(resolver, monkeypatch):
+    entry = dict(FAKE_MAP["111111111"], role="superadmin")
+    monkeypatch.setattr(
+        guard, "load_identity_map", lambda: ({"111111111": entry}, None)
+    )
+    _, parsed, calls = _call(
+        "get_expense_report", {"user_id": 0}, session_id="sess-admin"
+    )
+    assert calls["n"] == 0
+    assert parsed["error_code"] in guard.SAFE_ERROR_CODES
+
+
 # ---- Stage 5.1 monthly-budget tools (plugin 1.0.4) ----
 STAGE51_BUDGET_TOOLS = ("set_monthly_budget", "get_monthly_budget_status")
 
@@ -221,11 +347,21 @@ def test_stage51_budget_admin_self_allowed(tool_name, resolver, fake_map):
     assert calls["args"]["user_id"] == 1
 
 
-@pytest.mark.parametrize("tool_name", STAGE51_BUDGET_TOOLS)
-def test_stage51_budget_admin_cross_target_blocked(tool_name, resolver, fake_map):
-    _, parsed, calls = _call(tool_name, {"user_id": 20}, session_id="sess-admin")
-    assert calls["n"] == 0
-    assert parsed["error_code"] == "IDENTITY_TARGET_FORBIDDEN"
+def test_stage51_budget_admin_cross_target_blocked(resolver, fake_map):
+    """Planning stays Oyijon's: admin cannot write her plan, with or without id."""
+    for args in ({"user_id": 20}, {"user_id": 0}):
+        _, parsed, calls = _call("set_monthly_budget", args, session_id="sess-admin")
+        assert calls["n"] == 0
+        assert parsed["error_code"] == "IDENTITY_TARGET_FORBIDDEN"
+
+
+def test_stage51_budget_status_admin_cross_target_allowed(resolver, fake_map):
+    """fix03: the read side of the budget is a family report the admin may see."""
+    _, _, calls = _call(
+        "get_monthly_budget_status", {"user_id": 20}, session_id="sess-admin"
+    )
+    assert calls["n"] == 1
+    assert calls["args"]["user_id"] == 20
 
 
 @pytest.mark.parametrize("tool_name", STAGE51_BUDGET_TOOLS)
@@ -244,7 +380,10 @@ def test_stage51_budget_primary_exception_downstream_zero(
 
 def test_stage51_budget_policy_classification_is_strict():
     assert set(STAGE51_BUDGET_TOOLS) <= guard.USER_SCOPED_TOOLS
-    assert set(STAGE51_BUDGET_TOOLS).isdisjoint(guard.ADMIN_CROSS_TARGET_TOOLS)
+    # fix03: the read tool joined the admin allowlist, the write tool did not.
+    assert "get_monthly_budget_status" in guard.ADMIN_CROSS_TARGET_TOOLS
+    assert "set_monthly_budget" not in guard.ADMIN_CROSS_TARGET_TOOLS
+    assert "set_monthly_budget" not in guard.ADMIN_ZERO_TARGET_READ_TOOLS
 
 
 # ---- Stage 6 recurring obligations (plugin 1.3.0) ----
