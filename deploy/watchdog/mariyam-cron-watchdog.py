@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
-"""Provider-independent +15 minute watchdog for critical Mariyam cron jobs."""
+"""Provider-independent +15 minute watchdog for critical Mariyam cron jobs.
+
+Also watches the cron identity fingerprints (fix04). A trusted job whose
+definition changed — prompt, schedule, or `deliver`, e.g. after rebinding the
+bot to another Telegram account — is silently refused by the identity guard:
+the job still runs and still delivers, only without its data. Nothing in the
+run looks failed, so the retry logic above cannot see it. The drift check is
+what makes that visible within one timer tick instead of one day.
+"""
 
 from __future__ import annotations
 
 import argparse
+import hashlib
+import importlib.util
 import json
 import os
 import sqlite3
@@ -93,6 +103,139 @@ def load_jobs(home: Path) -> list[dict]:
     if not isinstance(jobs, list) or any(not isinstance(job, dict) for job in jobs):
         raise RuntimeError("invalid cron jobs store")
     return jobs
+
+
+def load_guard(home: Path):
+    """Load the identity guard module to reuse its own canonicalisation.
+
+    The fingerprint must be computed by the guard's code, not by a copy of it:
+    a second implementation would drift and report "healthy" while the guard
+    keeps refusing.
+    """
+    path = Path(
+        os.environ.get("MARIYAM_IDENTITY_GUARD")
+        or home / "plugins" / "mariyam_identity_guard" / "__init__.py"
+    )
+    spec = importlib.util.spec_from_file_location("mariyam_guard_watchdog", path)
+    if not spec or not spec.loader:
+        raise RuntimeError(f"cannot load identity guard from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def stale_trusted_jobs(home: Path, mapping_path: Path) -> list[tuple[str, str]]:
+    """Trusted jobs the identity guard would refuse right now.
+
+    Returns (job_id, job_name) pairs: mapping entries whose stored hashes no
+    longer match the live job definition, plus entries whose job disappeared.
+    """
+    guard = load_guard(home)
+    data = json.loads(_regular_bounded(mapping_path, private=True).decode("utf-8"))
+    entries = data.get("jobs") if isinstance(data, dict) else None
+    if data.get("version") != 1 or not isinstance(entries, dict):
+        raise RuntimeError("invalid private cron mapping")
+    by_id = {str(job.get("id")): job for job in load_jobs(home)}
+    stale: list[tuple[str, str]] = []
+    for job_id, entry in sorted(entries.items()):
+        job = by_id.get(job_id)
+        if job is None:
+            stale.append((job_id, f"missing:{job_id}"))
+            continue
+        prompt = job.get("prompt") or ""
+        if (
+            guard.cron_job_fingerprint(job) != entry.get("job_fingerprint_sha256")
+            or guard._sha256_text(prompt) != entry.get("prompt_sha256")
+        ):
+            stale.append((job_id, str(job.get("name") or job_id)))
+    return stale
+
+
+def _drift_key(stale: list[tuple[str, str]], now: datetime) -> str:
+    """One alert per distinct drift set per day: informative, never a flood."""
+    digest = hashlib.sha256(
+        "|".join(sorted(job_id for job_id, _ in stale)).encode("utf-8")
+    ).hexdigest()[:16]
+    return f"{now.astimezone(TASHKENT):%Y-%m-%d}:{digest}"
+
+
+def notify_admin_drift(job_names: list[str], now: datetime, reason: str) -> None:
+    token = os.environ["TELEGRAM_BOT_TOKEN"]
+    admin = os.environ["ADMIN_TELEGRAM_ID"]
+    text = (
+        "🚨 Mariyam cron watchdog: отпечатки cron-задач разошлись с картой "
+        "доверия — guard молча откажет их инструментам, сообщения уйдут "
+        f"пустыми. Задачи: {', '.join(job_names[:10])}. "
+        "Починка: imp04_refresh_cron_fingerprints.py --apply, затем --check."
+    )
+    payload = urllib.parse.urlencode({"chat_id": admin, "text": text}).encode()
+    request = urllib.request.Request(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        data=payload,
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        result = json.load(response)
+    if not result.get("ok"):
+        raise RuntimeError("admin notification failed")
+
+
+def check_fingerprints(
+    now: datetime,
+    *,
+    home: Path,
+    mapping_path: Path,
+    state_path: Path,
+    notifier: Callable[[list[str], datetime, str], None] = notify_admin_drift,
+) -> str:
+    stale = stale_trusted_jobs(home, mapping_path)
+    if not stale:
+        return "trusted"
+    names = [name for _, name in stale]
+    key = _drift_key(stale, now)
+    reason = "cron identity fingerprints stale"
+    # The attempts table is reused for deduplication: the same drift alerts
+    # once a day, a new drift alerts immediately. The alert intent is stored
+    # before the network call, so an interrupted delivery is retried on the
+    # next tick instead of being lost.
+    fresh = _claim_drift(state_path, key, now, reason)
+    if fresh or _drift_status(state_path, key) == "alert_pending":
+        notifier(names, now, reason)
+        _mark_drift_alerted(state_path, key, now, reason)
+        print(f"WATCHDOG_FINGERPRINTS=DRIFT_ADMIN_NOTIFIED jobs={','.join(names)}")
+        return "admin_alerted"
+    print(f"WATCHDOG_FINGERPRINTS=DRIFT_ALREADY_ALERTED jobs={','.join(names)}")
+    return "already_alerted"
+
+
+def _claim_drift(path: Path, key: str, now: datetime, reason: str) -> bool:
+    with _connect_state(path) as connection:
+        cursor = connection.execute(
+            """INSERT OR IGNORE INTO attempts
+               (job_id, expected_at, status, retry_started_at, last_error)
+               VALUES ('fingerprint_drift', ?, 'alert_pending', ?, ?)""",
+            (key, now.isoformat(), reason[:200]),
+        )
+        return cursor.rowcount == 1
+
+
+def _drift_status(path: Path, key: str) -> str | None:
+    with _connect_state(path) as connection:
+        row = connection.execute(
+            """SELECT status FROM attempts
+               WHERE job_id='fingerprint_drift' AND expected_at=?""",
+            (key,),
+        ).fetchone()
+    return row[0] if row else None
+
+
+def _mark_drift_alerted(path: Path, key: str, now: datetime, reason: str) -> None:
+    with _connect_state(path) as connection:
+        connection.execute(
+            """UPDATE attempts SET status='admin_alerted', finished_at=?, last_error=?
+               WHERE job_id='fingerprint_drift' AND expected_at=?""",
+            (now.isoformat(), reason[:200], key),
+        )
 
 
 def load_trusted_job_ids(path: Path) -> set[str]:
@@ -464,6 +607,14 @@ def check_spec(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--now", help="operator/test ISO timestamp")
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help=(
+            "only verify cron identity fingerprints: no retries, no alerts, "
+            "no state writes; exit 1 if the guard would refuse a trusted job"
+        ),
+    )
     args = parser.parse_args()
     now = (
         datetime.fromisoformat(args.now)
@@ -483,6 +634,17 @@ def main() -> None:
     python = Path(
         os.environ.get("MARIYAM_HERMES_PYTHON", str(DEFAULT_HERMES_PYTHON))
     )
+    if args.check:
+        stale = stale_trusted_jobs(home, mapping_path)
+        if stale:
+            names = ", ".join(name for _, name in stale)
+            raise SystemExit(
+                f"FAIL: identity guard would refuse {len(stale)} trusted job(s): "
+                f"{names}. Run imp04_refresh_cron_fingerprints.py --apply."
+            )
+        print("cron identity fingerprints current; all trusted jobs would pass")
+        return
+
     trusted_ids = load_trusted_job_ids(mapping_path)
     for spec in load_specs(config):
         check_spec(
@@ -493,6 +655,11 @@ def main() -> None:
             trusted_ids=trusted_ids,
             python=python,
         )
+    # After the retry logic: a drifted fingerprint produces runs that look
+    # perfectly healthy above, so it needs its own alert path.
+    check_fingerprints(
+        now, home=home, mapping_path=mapping_path, state_path=state_path
+    )
 
 
 if __name__ == "__main__":
