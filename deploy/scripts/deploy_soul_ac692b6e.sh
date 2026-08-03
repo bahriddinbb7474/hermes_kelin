@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# imp01: deploy canonical SOUL.md (ac692b6e...) to profile mariyam_oyijon.
+# imp01/imp02: deploy canonical SOUL.md to profile mariyam_oyijon.
 # Does NOT carry SOUL text itself: it verifies a file already delivered
 # separately (see SOURCE below), then backs up, writes, verifies, restarts
 # only the Mariyam gateway, and rolls back on any mismatch. Touches nothing
 # belonging to Time-Agent.
+#
+# Parametrized by SHA so the same script covers every SOUL rollout instead of
+# a new copy per commit: pass OLD_SHA_EXPECTED/NEW_SHA_EXPECTED/SOURCE for the
+# transition you're deploying (defaults below are the imp01 ac692b6e rollout).
 set -euo pipefail
 
 SOURCE="${SOURCE:-/tmp/imp01_soul_ac692b6e.md}"
@@ -16,15 +20,15 @@ UNIT="hermes-gateway-mariyam_oyijon.service"
 # thing a human is allowed to remember — the deploy fails without it.
 PY="${PY:-python3}"
 REFRESH="${REFRESH:-/opt/hermes-mariyam/deploy/imp04_refresh_cron_fingerprints.py}"
-OLD_SHA_EXPECTED="f3377d9c0e032127cd5675408b525437a39b36ba9d148ab1f594e84c889aa679"
-NEW_SHA_EXPECTED="ac692b6e3356c43cf0b174e87ce0f2580b1dac75360a156ca3168256707823e3"
+OLD_SHA_EXPECTED="${OLD_SHA_EXPECTED:-f3377d9c0e032127cd5675408b525437a39b36ba9d148ab1f594e84c889aa679}"
+NEW_SHA_EXPECTED="${NEW_SHA_EXPECTED:-ac692b6e3356c43cf0b174e87ce0f2580b1dac75360a156ca3168256707823e3}"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP="$SOUL.bak.$STAMP"
 
 sha() { sed 's/\r$//' "$1" | sha256sum | cut -d' ' -f1; }
 run() { echo "+ $*"; "$@"; }
 
-echo "== imp01: deploy SOUL ac692b6e =="
+echo "== deploy SOUL: $OLD_SHA_EXPECTED -> $NEW_SHA_EXPECTED =="
 echo "source:  $SOURCE"
 echo "target:  $SOUL"
 
