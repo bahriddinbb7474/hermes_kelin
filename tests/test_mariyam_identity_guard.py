@@ -197,6 +197,9 @@ ADMIN_ZERO_READ_TOOLS = (
     "get_expense_report",
     "get_balance_summary",
     "get_monthly_budget_status",
+    # fix06: без списка обязательств админ не видит ближайших платежей, а
+    # правило «расход закрывает обязательство» обрывается на первом шаге.
+    "get_recurring_obligations",
 )
 
 # Every mutating user-scoped tool must keep failing on the same sentinel. This

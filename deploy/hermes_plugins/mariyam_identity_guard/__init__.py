@@ -121,6 +121,11 @@ ADMIN_ZERO_TARGET_READ_TOOLS = frozenset(
         "get_expense_report",
         "get_balance_summary",
         "get_monthly_budget_status",
+        # fix06 live check: without this the admin cannot even see which
+        # payments are due, and the "expense closes the obligation" rule dies
+        # on its first step. Read-only; `upsert_recurring_obligation` (the
+        # mutating side, including mark_paid) deliberately stays out.
+        "get_recurring_obligations",
     }
 )
 assert ADMIN_ZERO_TARGET_READ_TOOLS <= ADMIN_CROSS_TARGET_TOOLS

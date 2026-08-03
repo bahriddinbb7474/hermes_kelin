@@ -1,5 +1,5 @@
 name: mariyam_identity_guard
-version: "1.5.0"
+version: "1.5.1"
 description: >-
   Deterministic Telegram/cron session -> internal users.id guard for all
   user-scoped Mariyam MCP tools. Rewrites tool arguments from a private
@@ -14,4 +14,5 @@ description: >-
   Version 1.5.0 lets admin read the family money reports with the SOUL
   sentinel user_id 0 (resolved to the single allowed target) for an explicit
   read-only tool list; every mutating tool keeps failing on that sentinel.
+  Version 1.5.1 adds get_recurring_obligations to that read-only list.
 author: Hermes/Mariyam
