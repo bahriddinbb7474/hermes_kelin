@@ -128,6 +128,9 @@ evening_id="$(job_id mariyam_daily_evening)"
 "$PY" -m hermes_cli.main --profile mariyam_oyijon cron edit "$evening_id" \
   --prompt "$(cat "$SRC/deploy/hermes_profile_mariyam_oyijon/cron/06_evening.md")"
 "$PY" "$SRC/deploy/imp04_refresh_cron_fingerprints.py" --apply
+# fix04: гейт до старта gateway — иначе задача уедет в прод недоверенной и
+# будет молча доставлять пустые сообщения.
+"$PY" "$SRC/deploy/imp04_refresh_cron_fingerprints.py" --check
 
 systemctl --user daemon-reload
 systemctl --user enable --now "$PRAYER_TIMER"

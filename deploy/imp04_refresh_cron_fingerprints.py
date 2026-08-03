@@ -11,9 +11,12 @@ already-trusted jobs are refreshed. Any job id in the mapping that is missing
 from jobs.json aborts the run.
 
 Usage:
-    python3 imp04_refresh_cron_fingerprints.py [--apply]
+    python3 imp04_refresh_cron_fingerprints.py [--apply|--check]
 
-Without --apply it only prints what would change.
+Without a flag it only prints what would change (dry run, always exit 0).
+``--check`` writes nothing and exits 1 if any trusted job would be refused by
+the guard — that is the form deploy scripts use as a gate, so a forgotten
+refresh fails the deploy instead of silently disarming a cron job (fix04).
 """
 
 from __future__ import annotations
@@ -47,7 +50,11 @@ def _load_guard():
 
 
 def main() -> int:
-    apply = "--apply" in sys.argv[1:]
+    flags = sys.argv[1:]
+    apply = "--apply" in flags
+    check = "--check" in flags
+    if apply and check:
+        raise SystemExit("--apply and --check are mutually exclusive")
     guard = _load_guard()
 
     jobs_raw = json.loads(JOBS.read_text(encoding="utf-8"))
@@ -76,11 +83,19 @@ def main() -> int:
             entry["prompt_sha256"] = new_prompt
 
     if not changes:
-        print("fingerprints already current; nothing to do")
+        print(f"fingerprints already current; {len(entries)} trusted job(s) verified")
         return 0
 
     for job_id, name, purpose in changes:
         print(f"refresh {job_id}  name={name}  purpose={purpose}")
+
+    if check:
+        print(
+            f"\nFAIL: {len(changes)} trusted job(s) would be refused by the guard.\n"
+            "Run this script with --apply (the cron identity map is stale after any\n"
+            "change to a job prompt, schedule or delivery target)."
+        )
+        return 1
 
     if not apply:
         print(f"\n{len(changes)} entr(y|ies) would change; re-run with --apply")

@@ -364,6 +364,43 @@ SOUL SHA `5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`
 - Перед любым destructive suite ещё раз проверить, что имя БД — ровно
   `hermes_test`. Если это не так, прогон немедленно остановить.
 
+## Cron identity — обязательный шаг любого deploy (fix04)
+
+Trusted cron-задачи привязаны к отпечатку своего определения. Отпечаток
+считается по полям `id, name, prompt, schedule, repeat, deliver, origin,
+skills, script, no_agent, context_from, enabled_toolsets, workdir, model,
+provider, base_url`. Как только любое из них меняется, guard перестаёт
+доверять задаче и **молча** отказывает её инструментам: задача отрабатывает и
+даже доставляет сообщение, но без данных. Так уже дважды ломалась утренняя
+сводка Ойижон — это её главное сообщение за день.
+
+**Правило.** Отпечатки пересчитываются в том же прогоне, что и изменение —
+не «потом руками». Пересчёт нужен не только после правки промпта: смена
+расписания, `deliver` (например, перепривязка бота на другой Telegram-аккаунт
+при handover), модели или провайдера ломает доверие точно так же.
+
+```bash
+python3 /opt/hermes-mariyam/deploy/imp04_refresh_cron_fingerprints.py           # dry-run
+python3 /opt/hermes-mariyam/deploy/imp04_refresh_cron_fingerprints.py --apply
+python3 /opt/hermes-mariyam/deploy/imp04_refresh_cron_fingerprints.py --check   # гейт: exit 1, если хоть одна задача не пройдёт guard
+```
+
+Требования к любому скрипту деплоя, который трогает профиль (SOUL, cron-задачи,
+delivery, модель):
+
+1. вызвать `--apply`, затем `--check` **до** рестарта gateway;
+2. при ненулевом коде `--check` — откатиться и не деплоить;
+3. сам файл `imp04_refresh_cron_fingerprints.py` должен лежать на VPS в
+   `/opt/hermes-mariyam/deploy/`; его отсутствие — повод остановить деплой,
+   а не пропустить шаг.
+
+Это закреплено тестом `tests/test_fix04_cron_fingerprint_gate.py`: он падает,
+если в `deploy/` появится скрипт, который пишет `SOUL.md` или `cron/jobs.json`
+и не вызывает пересчёт отпечатков.
+
+После deploy проверить, что доверены **все девять** задач: `--check` печатает
+`fingerprints already current; 9 trusted job(s) verified`.
+
 ## Скрипты в `deploy/` (что осталось и зачем, imp07)
 
 Одноразовые deploy-обёртки закрытых задач удалены (`imp04_deploy.sh`,
@@ -373,7 +410,7 @@ SOUL SHA `5f7b08569cfd75cd26d78a234fbb8a39322dfc65e9221ae2d461e89444148266`
 
 | скрипт | когда нужен |
 |---|---|
-| `imp04_refresh_cron_fingerprints.py` | **обязательно** после любой правки cron-промпта: пересчитывает `job_fingerprint_sha256` и `prompt_sha256` в приватной cron-identity-карте. Без этого identity guard заблокирует tools внутри job. Сначала без флага (dry-run), затем `--apply` |
+| `imp04_refresh_cron_fingerprints.py` | **обязательно** после любой правки cron-задачи: пересчитывает `job_fingerprint_sha256` и `prompt_sha256` в приватной cron-identity-карте. Без этого identity guard заблокирует tools внутри job. Сначала без флага (dry-run), затем `--apply`, затем `--check` как гейт (см. раздел «Cron identity — обязательный шаг любого deploy») |
 | `imp05_patch_config.py` | пересоздание профиля: идемпотентно добавляет `mariyam_outbound_filter` в `plugins.enabled` и блок `session_reset` (daily 02:00, notify off) |
 | `imp09_patch_stt_config.py` | пересоздание профиля: STT-конфигурация голосовых сообщений |
 | `imp04_job_id.py` | найти id cron-job по имени (нужен как вход для двух скриптов выше) |

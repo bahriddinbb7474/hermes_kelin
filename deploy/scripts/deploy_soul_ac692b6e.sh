@@ -10,6 +10,12 @@ SOURCE="${SOURCE:-/tmp/imp01_soul_ac692b6e.md}"
 PROFILE="${HERMES_HOME:-$HOME/.hermes/profiles/mariyam_oyijon}"
 SOUL="$PROFILE/SOUL.md"
 UNIT="hermes-gateway-mariyam_oyijon.service"
+# fix04: cron identity gate. Trusted cron jobs are bound to a fingerprint of
+# their definition; if it goes stale the guard silently refuses their tools and
+# Oyijon gets an empty morning brief. Refreshing is not optional and not a
+# thing a human is allowed to remember — the deploy fails without it.
+PY="${PY:-python3}"
+REFRESH="${REFRESH:-/opt/hermes-mariyam/deploy/imp04_refresh_cron_fingerprints.py}"
 OLD_SHA_EXPECTED="f3377d9c0e032127cd5675408b525437a39b36ba9d148ab1f594e84c889aa679"
 NEW_SHA_EXPECTED="ac692b6e3356c43cf0b174e87ce0f2580b1dac75360a156ca3168256707823e3"
 STAMP="$(date +%Y%m%d_%H%M%S)"
@@ -24,6 +30,13 @@ echo "target:  $SOUL"
 
 if [ ! -f "$SOURCE" ]; then
   echo "ERROR: $SOURCE not found. Deliver it first (scp), then re-run. Nothing changed."
+  exit 1
+fi
+
+if [ ! -f "$REFRESH" ]; then
+  echo "ERROR: cron fingerprint tool not found: $REFRESH"
+  echo "Install deploy/imp04_refresh_cron_fingerprints.py there (or set REFRESH=...)."
+  echo "Nothing changed."
   exit 1
 fi
 
@@ -79,6 +92,27 @@ if [ "$written_sha" != "$NEW_SHA_EXPECTED" ]; then
   exit 1
 fi
 
+restore_soul() {
+  echo "Restoring SOUL from backup..."
+  run chmod 644 "$SOUL"
+  run cp "$BACKUP" "$SOUL"
+  run chmod 444 "$SOUL"
+}
+
+echo "== cron identity fingerprints =="
+if ! run "$PY" "$REFRESH" --apply; then
+  echo "!!! fingerprint refresh FAILED !!!"
+  restore_soul
+  echo "SOUL NOT deployed. Cron jobs left untouched."
+  exit 1
+fi
+if ! run "$PY" "$REFRESH" --check; then
+  echo "!!! cron jobs would be refused by the identity guard !!!"
+  restore_soul
+  echo "SOUL NOT deployed. Fix the cron identity map before retrying."
+  exit 1
+fi
+
 run systemctl --user restart "$UNIT"
 sleep 3
 service_status="$(systemctl --user is-active "$UNIT" || true)"
@@ -88,3 +122,4 @@ echo "old sha:  $current_sha"
 echo "new sha:  $written_sha"
 echo "backup:   $BACKUP"
 echo "service:  $UNIT = $service_status"
+echo "cron:     fingerprints refreshed and verified"
