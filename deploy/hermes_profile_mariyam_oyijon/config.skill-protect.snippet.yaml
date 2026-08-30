@@ -20,6 +20,22 @@
 # - toolset name "terminal" → terminal, process (toolsets.py)
 # - toolset name "code_execution" → execute_code (toolsets.py)
 
+# fix16: use a named custom provider. A bare top-level `provider: custom`
+# without model.base_url is incomplete in Hermes v0.18.2 and resolves through
+# the OpenRouter default, even when N1N_API_KEY exists. The named route binds
+# the endpoint and its key without storing the secret in YAML.
+model:
+  default: gpt-5.6-luna
+  provider: custom:n1n
+
+providers:
+  n1n:
+    name: n1n
+    base_url: https://api.n1n.ai/v1
+    key_env: N1N_API_KEY
+    default_model: gpt-5.6-luna
+    transport: chat_completions
+
 skills:
   # `skills.enabled` is not a Hermes v0.18.2 loader key. Mariyam's canonical
   # contract is profile/SOUL.md, which Hermes injects directly.
@@ -82,6 +98,9 @@ plugins:
     - mariyam_health_guard
     - mariyam_cron_reliability
     - mariyam_stage53_guard
+    # Rotates a due daily route before generic DB recovery can reopen the
+    # ended session; also classifies empty length/no-usage as provider failure.
+    - mariyam_runtime_guard
     # Drops English framework status lines (provider-fallback notice) that
     # Hermes has no config key for. See deploy/hermes_plugins/
     # mariyam_outbound_filter/__init__.py.

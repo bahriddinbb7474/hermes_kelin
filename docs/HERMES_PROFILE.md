@@ -21,7 +21,13 @@
 
 > **ТЗ v3.19:** Stage 5.2 = **CLOSED / LIVE PASS**; Stage 5.3 = **CLOSED / LIVE PASS** ([evidence](EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md)). Единственный repo/VPS canonical prompt — `deploy/hermes_profile_mariyam_oyijon/SOUL.md`, LF SHA `ba51bee5411c0dafc5758060a7bfe0145b758df97077c6e2644d5705bcf6bf07`; active Mariyam `SKILL.md` отсутствует. Repo/VPS = 21 tools + explicit-empty DB rejection + отдельный `mariyam_stage53_guard` 1.0.0; identity plugin остаётся 1.0.4, Hermes core не менялся. Guard state хранится вне model-visible profile, mode 0600, TTL 30 минут; profile limit = 6 iterations. Controlled deploy PASS; [Telegram E2E live acceptance evidence](EVIDENCE_STAGE_5_3_LIVE_PASS_2026-07-23.md). Stage 5.3A–6 остаются **PLANNED / NOT IMPLEMENTED**; реальная Ойижон не подключалась.
 
-**Модель профиля:** `gpt-5.6-luna` через api.n1n.ai (`provider: custom`, `base_url: https://api.n1n.ai/v1`, ключ `N1N_API_KEY` в профильном `.env`, 600). Резерв: `deepseek/deepseek-v4-flash` (DECISIONS.md, 2026-07-12).
+**Актуализация fix16 (2026-08-30):** `gpt-5.6-luna` через именованный
+`custom:n1n` (`https://api.n1n.ai/v1`, `N1N_API_KEY` только в профильном
+`.env`, mode 0600). Bare `provider: custom` без `model.base_url` запрещён: в
+Hermes v0.18.2 он разрешается через дефолтный OpenRouter URL. Единственный
+резерв — та же модель `openai/gpt-5.6-luna` через OpenRouter; DeepSeek исключён.
+Профильный `mariyam_runtime_guard` ротирует due daily route до DB recovery и
+классифицирует пустой `finish_reason=length` без usage как provider failure.
 
 1. Установить Hermes Agent на VPS по официальной документации (репозиторий NousResearch; ссылки — в конце ТЗ). Зафиксировать версию: `hermes --version` — от неё зависят точные имена конфиг-полей ниже.
 2. Создать профиль `mariyam_oyijon`.

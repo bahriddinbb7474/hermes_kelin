@@ -432,6 +432,35 @@ delivery, модель):
 | `imp04_job_id.py` | найти id cron-job по имени (нужен как вход для двух скриптов выше) |
 | `fix02_deploy.sh` | исторический day-rhythm деплой; на него завязана регрессия `tests/test_day_rhythm.py`, поэтому файл сохранён |
 
+## fix16: n1n primary, routing rotation, malformed provider replies
+
+Профиль использует именованный primary `custom:n1n`: endpoint
+`https://api.n1n.ai/v1`, ключ только из `N1N_API_KEY`. Запись
+`provider: custom` без `model.base_url` не является полным маршрутом в Hermes
+v0.18.2 и может разрешиться через OpenRouter. Единственный fallback остаётся
+той же моделью `openai/gpt-5.6-luna` через OpenRouter.
+
+`mariyam_runtime_guard` оборачивает три точки Hermes без изменения core:
+
+- `gateway.session.SessionStore.get_or_create_session`: если наступил daily
+  reset, вызывает штатный `reset_session` до generic DB recovery, поэтому
+  ended `agent_close` row не открывается повторно и обе routing-копии получают
+  новый session id;
+- `run_agent.AIAgent._interruptible_api_call` и
+  `_interruptible_streaming_api_call`: пустой `finish_reason=length` без
+  content/reasoning/tool_calls/usage повторяется один раз на текущем provider;
+  повторный malformed поднимается как provider-call failure, после чего
+  Hermes включает штатный retry/fallback. Итоговый terminal failure проходит
+  через `mariyam_outbound_filter::_ProviderFailureReply`.
+
+Перед deploy сохранить mode 0600: `config.yaml`, `.env`, `auth.json`,
+`sessions/sessions.json`, `state.db` и каталог текущего плагина. После deploy:
+`/v1/models` n1n = HTTP 200, `hermes config check`, gateway active, а свежая
+строка `agent.log` содержит `provider=custom base_url=https://api.n1n.ai/v1`.
+Тест-сторож `tests/test_fix16_runtime_guard.py` обязан выполняться с
+`MARIYAM_HERMES_PYTHON=<profile venv>/python`; переименование любой точки
+перехвата делает тест красным.
+
 ## FORBIDDEN — что НЕ трогать
 
 - `/opt/time-agent`, `time_agent_bot`, Time-Agent `.env`, SQLite volume, logs, backups.

@@ -1,0 +1,8 @@
+name: mariyam_runtime_guard
+version: "1.0.0"
+description: >-
+  Profile-scoped recovery for Mariyam. Rotates Telegram routing before a due
+  daily reset can recover an ended agent_close session, and retries an empty
+  finish_reason=length response once before raising it into Hermes' existing
+  retry/fallback and provider-failure reply path. Hermes core is not modified.
+author: Hermes/Mariyam
