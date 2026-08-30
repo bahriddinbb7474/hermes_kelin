@@ -111,7 +111,12 @@ def test_group_mapping_missing_plan_and_negative_remaining_are_explicit():
     section = _section()
     for group in ("Озиқ-овқат", "Дори-дармон", "Коммунал", "Уй", "Бошқа"):
         assert group in section
-    assert "План отсутствует —\n`айтилмаган`, не `0`" in section
+    # imp12-opus: reworded to remove the fix12-terra-flagged internal
+    # contradiction (a plan-less line vs. a plan-less group both claimed
+    # `айтилмаган`); the two cases are now stated as one condition each,
+    # in the opposite but unambiguous order.
+    assert "конкретная строка пуста — `айтилмаган`, не `0`" in section
+    assert "плана по группе нет вообще — колонки `Режа` и `Қолгани` не выводи" in section
     assert "Отрицательный остаток" in section
     assert "Режадан 50 000 сўм кўп сарфланди." in section
 
