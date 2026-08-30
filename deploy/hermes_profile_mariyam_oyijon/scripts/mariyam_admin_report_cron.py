@@ -1,14 +1,11 @@
 """No-agent replacement for the `mariyam_admin_report_1930` cron job (imp12-opus).
 
-Same read-only tool (`get_admin_report_data`), same five facts requested by
-the retired `cron/07_admin_report.md` prompt (kept in the repo for reference
-and instant rollback via `hermes cron edit <id> --agent`): day totals, month
-totals by group, plan status, due/overdue obligations, today's alerts. All
-numbers come straight from `backend.db.admin_report_data` — nothing is
-computed or guessed here, matching "Ничего не вычисляй и не придумывай
-самостоятельно" from the old prompt. Health-note text, diagnoses and
-Telegram/internal IDs were never part of that dict's return shape, so there
-is nothing to accidentally leak.
+Thin, dependency-free wrapper — see `mariyam_obligation_reminders_cron.py`'s
+docstring for why: Hermes runs no-agent `.py` scripts under its own venv,
+which does not carry asyncpg/mcp, so the actual DB work happens in
+`backend.cron_admin_report`, shelled out to under the backend's own venv
+(the same one the MCP stdio server runs under) exactly like the already
+deployed `mariyam_health_guard` -> `stage7_record_keyword_alert.py` handoff.
 
 Unlike the Oyijon-facing obligation-reminder script, this job's only reader
 is the admin (Бахриддин ака), who already tolerates Russian/technical text
@@ -20,91 +17,16 @@ today".
 from __future__ import annotations
 
 import os
-import sys
+import subprocess
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-# Single-family profile: same internal `users.id` the identity guard's
-# private cron mapping already resolves for this job today. Verified against
-# the live `users` table during imp12-opus.
-OYIJON_USER_ID = 20
-
+WORKER_MODULE = "backend.cron_admin_report"
+SUBPROCESS_TIMEOUT_SECONDS = 25
 TASHKENT = ZoneInfo("Asia/Tashkent")
-TOP_CATEGORIES = 6
 
 
-def _fmt_uzs(value: object) -> str:
-    try:
-        return f"{int(value):,}".replace(",", " ") + " сум"
-    except (TypeError, ValueError):
-        return "0 сум"
-
-
-def _fmt_categories(rows: list[dict]) -> str:
-    if not rows:
-        return "нет расходов"
-    top = rows[:TOP_CATEGORIES]
-    parts = [f"{row['name_uz']}: {_fmt_uzs(row['sum_uzs'])}" for row in top]
-    if len(rows) > TOP_CATEGORIES:
-        parts.append("…")
-    return "; ".join(parts)
-
-
-def _fmt_obligations(rows: list[dict], through: str) -> str:
-    if not rows:
-        return "нет"
-    parts = []
-    for row in rows:
-        tail = ", просрочено" if row.get("overdue") else ""
-        parts.append(
-            f"{row['name']} — {row['due_date']} "
-            f"({_fmt_uzs(row['expected_amount_uzs'])}{tail})"
-        )
-    return f"{'; '.join(parts)} (до {through})"
-
-
-def _fmt_alerts(rows: list[dict]) -> str:
-    if not rows:
-        return "нет"
-    by_severity: dict[str, int] = {}
-    delivered = 0
-    for row in rows:
-        by_severity[row["severity"]] = by_severity.get(row["severity"], 0) + 1
-        if row.get("sent_to_admin"):
-            delivered += 1
-    severities = ", ".join(f"{k}×{v}" for k, v in sorted(by_severity.items()))
-    return f"{len(rows)} ({severities}), админу доставлено: {delivered}"
-
-
-def render_report(data: dict) -> str:
-    plan = data.get("plan") or {}
-    lines = [
-        f"Отчёт за {data['date']} (Бахриддин ака).",
-        f"День: расход {_fmt_uzs(data['expense_total_uzs'])}, "
-        f"доход {_fmt_uzs(data['income_total_uzs'])}.",
-        f"Месяц {data['month']}: расход {_fmt_uzs(data['month_expense_total_uzs'])}, "
-        f"доход {_fmt_uzs(data['month_income_total_uzs'])}.",
-        f"По группам: {_fmt_categories(data.get('month_expense_by_category') or [])}.",
-        (
-            f"План: статус {plan.get('status') or 'айтилмаган'}, "
-            f"план {_fmt_uzs(plan.get('planned_total_uzs'))}, "
-            f"факт {_fmt_uzs(plan.get('actual_total_uzs'))}, "
-            f"остаток {_fmt_uzs(plan.get('remaining_uzs'))}."
-        ),
-        (
-            "Обязательства: "
-            + _fmt_obligations(
-                data.get("due_obligations") or [],
-                data.get("due_obligations_through", "?"),
-            )
-            + "."
-        ),
-        f"Alerts за день: {_fmt_alerts(data.get('alerts') or [])}.",
-    ]
-    return "\n".join(lines)
-
-
-def _load_env_file(path: Path) -> None:
+def _load_env_file(path: Path, env: dict) -> None:
     try:
         if not path.is_file():
             return
@@ -114,50 +36,66 @@ def _load_env_file(path: Path) -> None:
                 continue
             key, _, value = stripped.partition("=")
             key = key.strip()
-            if key and key not in os.environ:
-                os.environ[key] = value.strip()
+            if key and key not in env:
+                env[key] = value.strip()
     except OSError:
         pass
 
 
-def _bootstrap_backend_import() -> None:
-    home_raw = os.environ.get("HERMES_HOME")
+def _backend_python(root: Path) -> Path:
+    posix = root / ".venv" / "bin" / "python"
+    if posix.is_file():
+        return posix
+    return root / ".venv" / "Scripts" / "python.exe"
+
+
+def _run_worker() -> tuple[str | None, str]:
+    """Returns (stdout_or_None, short_diagnostic_reason)."""
+    env = dict(os.environ)
+    home_raw = env.get("HERMES_HOME")
     if home_raw:
-        _load_env_file(Path(home_raw) / ".env")
-    root = os.environ.get("MARIYAM_BACKEND_ROOT")
-    if not root:
-        raise RuntimeError("MARIYAM_BACKEND_ROOT is not set")
-    root_path = Path(root).resolve()
-    if not (root_path / "backend").is_dir():
-        raise RuntimeError(f"backend package not found under {root_path}")
-    sys.path.insert(0, str(root_path))
-
-
-async def _fetch_report(today_iso: str) -> dict:
-    from backend import db
-    from backend.config import get_pool
-
-    pool = await get_pool()
+        _load_env_file(Path(home_raw) / ".env", env)
+    root_raw = env.get("MARIYAM_BACKEND_ROOT")
+    if not root_raw:
+        return None, "MARIYAM_BACKEND_ROOT не задан"
+    root = Path(root_raw).resolve()
+    python = _backend_python(root)
+    if not python.is_file():
+        return None, "backend python не найден"
+    if not (root / "backend").is_dir():
+        return None, "backend пакет не найден"
     try:
-        return await db.admin_report_data(pool, OYIJON_USER_ID, today_iso)
-    finally:
-        await pool.close()
+        completed = subprocess.run(
+            [str(python), "-m", WORKER_MODULE],
+            cwd=str(root),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=SUBPROCESS_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return None, "таймаут воркера"
+    except (OSError, subprocess.SubprocessError) as exc:
+        return None, f"{type(exc).__name__}"
+    if completed.returncode != 0:
+        stderr_lines = (completed.stderr or "").strip().splitlines()
+        return None, (stderr_lines[-1] if stderr_lines else "worker exit != 0")
+    return completed.stdout.strip(), ""
 
 
 def main() -> None:
-    import datetime
-
-    today_iso = datetime.datetime.now(TASHKENT).date().isoformat()
+    today_iso = __import__("datetime").datetime.now(TASHKENT).date().isoformat()
     try:
-        _bootstrap_backend_import()
-        import asyncio
-
-        data = asyncio.run(_fetch_report(today_iso))
-        print(render_report(data))
+        message, reason = _run_worker()
     except Exception as exc:  # noqa: BLE001 - admin tolerates a short diagnostic
+        message, reason = None, type(exc).__name__
+    if message:
+        print(message)
+    else:
         print(
             f"Отчёт за {today_iso} не собрался (Бахриддин ака): "
-            f"{type(exc).__name__}. См. agent.log."
+            f"{reason or 'неизвестная ошибка'}. См. agent.log."
         )
 
 

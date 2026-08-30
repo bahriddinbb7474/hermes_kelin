@@ -1,19 +1,24 @@
 """imp12-opus: no-agent replacement for `mariyam_admin_report_1930`.
 
-Pure-function contract for `mariyam_admin_report_cron.py` against the exact
-return shape of `backend.db.admin_report_data`. No DB/Hermes runtime needed:
-`backend` imports are deferred inside functions.
+Same split as the obligation-reminder job: `backend/cron_admin_report.py` is
+the worker (runs under the backend venv, tested here by importing the real
+package), `deploy/hermes_profile_mariyam_oyijon/scripts/mariyam_admin_report_cron.py`
+is the thin wrapper Hermes executes under its own (asyncpg-less) venv and
+shells out to the worker as a subprocess.
 """
 from __future__ import annotations
 
 import importlib.util
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
+from backend import cron_admin_report as mod
+
 REPO = Path(__file__).resolve().parents[1]
-MODULE_PATH = (
+WRAPPER_PATH = (
     REPO
     / "deploy"
     / "hermes_profile_mariyam_oyijon"
@@ -22,9 +27,9 @@ MODULE_PATH = (
 )
 
 
-def _load():
+def _load_wrapper():
     spec = importlib.util.spec_from_file_location(
-        "mariyam_admin_report_cron_test", MODULE_PATH
+        "mariyam_admin_report_cron_test", WRAPPER_PATH
     )
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -33,7 +38,7 @@ def _load():
     return module
 
 
-mod = _load()
+wrapper = _load_wrapper()
 
 
 def _data(**overrides) -> dict:
@@ -64,11 +69,7 @@ def _data(**overrides) -> dict:
     return base
 
 
-def test_module_has_no_top_level_backend_imports():
-    source = MODULE_PATH.read_text(encoding="utf-8")
-    for line in source.splitlines():
-        if line.startswith(("from backend", "import backend", "import asyncpg")):
-            pytest.fail(f"backend import must be indented (deferred), got: {line!r}")
+# --- worker: pure formatting logic -------------------------------------------
 
 
 def test_report_uses_only_tool_numbers_nothing_invented():
@@ -152,7 +153,6 @@ def test_category_list_is_capped_with_ellipsis_when_long():
     ]
     report = mod.render_report(_data(month_expense_by_category=many))
     assert "…" in report
-    # first category (highest sum) must be present, the tail must be cut
     assert "Группа0" in report
     assert f"Группа{mod.TOP_CATEGORIES + 2}" not in report
 
@@ -160,3 +160,60 @@ def test_category_list_is_capped_with_ellipsis_when_long():
 def test_zero_totals_are_shown_as_zero_not_omitted():
     report = mod.render_report(_data(expense_total_uzs=0, income_total_uzs=0))
     assert "0 сум" in report
+
+
+# --- wrapper: dependency-free, delegates via subprocess, never silent -------
+
+
+def test_wrapper_has_no_top_level_backend_or_asyncio_imports():
+    source = WRAPPER_PATH.read_text(encoding="utf-8")
+    for line in source.splitlines():
+        if line.startswith(("from backend", "import backend", "import asyncpg", "import asyncio")):
+            pytest.fail(f"backend/asyncio import must not be top-level: {line!r}")
+
+
+def test_wrapper_reports_missing_backend_root_instead_of_silence(monkeypatch):
+    monkeypatch.delenv("MARIYAM_BACKEND_ROOT", raising=False)
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    message, reason = wrapper._run_worker()
+    assert message is None
+    assert reason  # non-empty: admin gets a reason, never bare silence
+
+
+def test_wrapper_reports_worker_failure_with_stderr_tail(monkeypatch, tmp_path):
+    root = tmp_path / "backend_root"
+    (root / "backend").mkdir(parents=True)
+    (root / ".venv" / "bin").mkdir(parents=True)
+    (root / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
+    monkeypatch.setenv("MARIYAM_BACKEND_ROOT", str(root))
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    fake_result = MagicMock(returncode=1, stdout="", stderr="Traceback...\nRuntimeError: db down")
+    monkeypatch.setattr(wrapper.subprocess, "run", lambda *a, **k: fake_result)
+    message, reason = wrapper._run_worker()
+    assert message is None
+    assert "RuntimeError" in reason
+
+
+def test_wrapper_returns_stdout_on_success(monkeypatch, tmp_path):
+    root = tmp_path / "backend_root"
+    (root / "backend").mkdir(parents=True)
+    (root / ".venv" / "bin").mkdir(parents=True)
+    (root / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
+    monkeypatch.setenv("MARIYAM_BACKEND_ROOT", str(root))
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    fake_result = MagicMock(returncode=0, stdout="Отчёт за ...\n", stderr="")
+    monkeypatch.setattr(wrapper.subprocess, "run", lambda *a, **k: fake_result)
+    message, reason = wrapper._run_worker()
+    assert message == "Отчёт за ..."
+    assert reason == ""
+
+
+def test_wrapper_main_never_raises_and_always_prints_something(monkeypatch, capsys):
+    """Unlike the Oyijon-facing job, admin must never get bare silence."""
+    monkeypatch.setattr(
+        wrapper, "_run_worker", lambda: (_ for _ in ()).throw(RuntimeError("x"))
+    )
+    wrapper.main()  # must not raise
+    out = capsys.readouterr().out
+    assert out.strip()
+    assert "RuntimeError" in out

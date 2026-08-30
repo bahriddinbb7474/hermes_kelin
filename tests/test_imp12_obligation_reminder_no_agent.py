@@ -1,8 +1,16 @@
 """imp12-opus: no-agent replacement for `mariyam_obligation_reminders`.
 
-Pure-function contract for `mariyam_obligation_reminders_cron.py`. The
-module defers every `backend`/`asyncpg` import inside functions, so it loads
-and is fully testable without a live database or Hermes runtime.
+Two files, two dependency profiles:
+
+- `backend/cron_obligation_reminder.py` — the worker; runs under the
+  backend's own venv (asyncpg/mcp available), tested here directly by
+  importing the real package (this file lives in `tests/`, so `backend` is
+  already importable the normal way).
+- `deploy/hermes_profile_mariyam_oyijon/scripts/mariyam_obligation_reminders_cron.py`
+  — the thin wrapper Hermes actually executes under its OWN venv (no
+  asyncpg there); it shells out to the worker as a subprocess. Loaded via
+  importlib and exercised with a stubbed `subprocess.run` so no real
+  process or DB is needed.
 """
 from __future__ import annotations
 
@@ -11,11 +19,14 @@ import re
 import sys
 from datetime import date
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
+from backend import cron_obligation_reminder as mod
+
 REPO = Path(__file__).resolve().parents[1]
-MODULE_PATH = (
+WRAPPER_PATH = (
     REPO
     / "deploy"
     / "hermes_profile_mariyam_oyijon"
@@ -24,9 +35,9 @@ MODULE_PATH = (
 )
 
 
-def _load():
+def _load_wrapper():
     spec = importlib.util.spec_from_file_location(
-        "mariyam_obligation_reminders_cron_test", MODULE_PATH
+        "mariyam_obligation_reminders_cron_test", WRAPPER_PATH
     )
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -35,7 +46,7 @@ def _load():
     return module
 
 
-mod = _load()
+wrapper = _load_wrapper()
 
 
 def _obligation(**overrides) -> dict:
@@ -52,17 +63,7 @@ def _obligation(**overrides) -> dict:
     return base
 
 
-def test_module_has_no_top_level_backend_or_network_imports():
-    """The script must stay importable without Hermes/asyncpg installed.
-
-    `backend`/`asyncio` imports are deferred inside functions on purpose
-    (module-level import would make even the pure formatting helpers below
-    require a live DB driver to test).
-    """
-    source = MODULE_PATH.read_text(encoding="utf-8")
-    for line in source.splitlines():
-        if line.startswith(("from backend", "import backend", "import asyncpg")):
-            pytest.fail(f"backend import must be indented (deferred), got: {line!r}")
+# --- worker: pure date-window / message-building logic ----------------------
 
 
 @pytest.mark.parametrize(
@@ -122,16 +123,12 @@ def test_amount_is_never_invented_when_missing_or_zero():
 
 
 def test_opener_rotates_deterministically_by_day_of_year():
-    obligations = [_obligation(due_date="2026-09-10")]
     seen = {
         mod.build_message(date(2026, 9, 10 + i), [
             _obligation(due_date=(date(2026, 9, 10 + i)).isoformat())
         ])
         for i in range(len(mod._OPENERS))
     }
-    # Not every day must differ (mod arithmetic can repeat for other lengths),
-    # but with a run exactly as long as the tuple we must see it exercised
-    # beyond a single hardcoded phrase.
     assert len(seen) > 1
 
 
@@ -140,8 +137,6 @@ def test_rendered_message_is_pure_uzbek_cyrillic_and_ascii_digits_only():
     obligations = [_obligation(due_date="2026-09-10")]
     message = mod.build_message(today, obligations)
     assert message
-    # No Latin letters anywhere (SOUL rule 1 applies to every Oyijon-facing
-    # surface, not only LLM output).
     assert not re.search(r"[A-Za-z]", message)
     assert re.search(r"[Ѐ-ӿ]", message)
 
@@ -151,3 +146,64 @@ def test_overdue_window_is_exactly_one_day_not_open_ended():
     today = date(2026, 9, 12)
     obligation = _obligation(due_date="2026-09-10")  # 2 days late
     assert mod.classify(today, obligation) is None
+
+
+def test_worker_module_never_needs_a_running_event_loop_at_import_time():
+    """Import must succeed without a DB/asyncio context — main() is opt-in."""
+    assert hasattr(mod, "main")
+    assert callable(mod.main)
+
+
+# --- wrapper: dependency-free, delegates via subprocess ----------------------
+
+
+def test_wrapper_has_no_top_level_backend_or_asyncio_imports():
+    """The wrapper runs under Hermes' own venv, which has no asyncpg/mcp."""
+    source = WRAPPER_PATH.read_text(encoding="utf-8")
+    for line in source.splitlines():
+        if line.startswith(("from backend", "import backend", "import asyncpg", "import asyncio")):
+            pytest.fail(f"backend/asyncio import must not be top-level: {line!r}")
+
+
+def test_wrapper_silent_when_backend_root_env_missing(monkeypatch):
+    monkeypatch.delenv("MARIYAM_BACKEND_ROOT", raising=False)
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    assert wrapper._run_worker() is None
+
+
+def test_wrapper_silent_on_nonzero_worker_exit(monkeypatch, tmp_path):
+    root = tmp_path / "backend_root"
+    (root / "backend").mkdir(parents=True)
+    (root / ".venv" / "bin").mkdir(parents=True)
+    fake_python = root / ".venv" / "bin" / "python"
+    fake_python.write_text("", encoding="utf-8")
+    monkeypatch.setenv("MARIYAM_BACKEND_ROOT", str(root))
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    fake_result = MagicMock(returncode=1, stdout="", stderr="boom")
+    monkeypatch.setattr(
+        wrapper.subprocess, "run", lambda *a, **k: fake_result
+    )
+    assert wrapper._run_worker() is None
+
+
+def test_wrapper_returns_stripped_stdout_on_success(monkeypatch, tmp_path):
+    root = tmp_path / "backend_root"
+    (root / "backend").mkdir(parents=True)
+    (root / ".venv" / "bin").mkdir(parents=True)
+    (root / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
+    monkeypatch.setenv("MARIYAM_BACKEND_ROOT", str(root))
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    fake_result = MagicMock(returncode=0, stdout="Ойижон, эслатма.\n", stderr="")
+    monkeypatch.setattr(
+        wrapper.subprocess, "run", lambda *a, **k: fake_result
+    )
+    assert wrapper._run_worker() == "Ойижон, эслатма."
+
+
+def test_wrapper_main_never_raises_when_everything_fails(monkeypatch):
+    """Whatever goes wrong, main() must not propagate an exception (which
+    Hermes would surface as a raw error alert in Oyijon's chat)."""
+    monkeypatch.setattr(
+        wrapper, "_run_worker", lambda: (_ for _ in ()).throw(RuntimeError("x"))
+    )
+    wrapper.main()  # must not raise
