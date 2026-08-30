@@ -47,6 +47,14 @@ RSS и темы задаются `backend/news_sources.json`. Утро **08:00**
 | `06_evening.md` | `30 19 * * *` | тест‑Ойижон | один мягкий вопрос, только если за день данных нет | `get_admin_report_data` |
 | `07_admin_report.md` | `30 19 * * *` | тест‑админ | фактический отчёт день/месяц/план/обязательства/alerts, без health-текстов | `get_admin_report_data` |
 
+**imp12-opus:** `06_obligation_reminders.md` и `07_admin_report.md` остаются в
+репозитории как справочный контракт и путь мгновенного отката
+(`hermes cron edit <id> --agent`), но с деплоя imp12 сами job'ы выполняются
+как `no_agent=true` script, а не LLM turn — см. `scripts/mariyam_obligation_reminders_cron.py`,
+`scripts/mariyam_admin_report_cron.py` и раздел watchdog ниже. `06_morning.md`
+и `06_evening.md` остаются LLM-driven без изменений: их текст требует
+интерпретации ленты новостей и тона, а не только форматирования фактов.
+
 Все mapped allowlists строго read-only. Внешние tools
 `get_tashkent_weather`, `get_tashkent_prayer_times` не имеют
 `user_id`. `get_daily_news` owner-bound и объединяет стандартные ленты с
@@ -75,9 +83,9 @@ jobs не переписываются; у trusted jobs по-прежнему `s
 
 ## +15-minute watchdog
 
-System timer `mariyam-cron-watchdog.timer` проверяет раз в пять минут восемь
-критичных recurring jobs: цикл 25/27/28/1a/1b, morning, obligations и admin
-report. После 15-минутного grace он требует одновременно:
+System timer `mariyam-cron-watchdog.timer` проверяет раз в пять минут шесть
+критичных recurring LLM-jobs: цикл 25/27/28/1a/1b и morning. После
+15-минутного grace он требует одновременно:
 
 - успешный `last_run_at`/`last_status` без `last_delivery_error`;
 - новый cron output;
@@ -89,6 +97,19 @@ Claim хранится в private SQLite, поэтому следующий time
 delivery state не зафиксирован) отправляет test-admin прямой Telegram alert
 механизмом Stage 8; LLM не участвует. Interrupted claim не повторяет user
 delivery и через 10 минут эскалируется админу.
+
+**imp12-opus:** `mariyam_obligation_reminders` и `mariyam_admin_report_1930`
+переведены на `no_agent=true` script (`scripts/mariyam_obligation_reminders_cron.py`,
+`scripts/mariyam_admin_report_cron.py`) и вышли из этого списка — проверка
+`_validate_production_job` жёстко требует `script=null`/`no_agent=false` у
+всех watched jobs (это LLM-turn health check: «модель отработала и вызвала
+tools», а не-agent job этого не делает по определению). Отпечаток в приватной
+cron-identity-карте у обоих job'ов не тронут и продолжает проверяться
+`check_fingerprints`/`--check` как раньше. Обязательство напомнить Ойижон
+теряет +15-минутный авто-retry ради того, чтобы сбой script никогда не привёл
+к сырой английской ошибке в её чате (см. docstring скрипта); просроченные и
+предстоящие обязательства всё равно приходят админу каждый вечер в отчёте
+19:30 независимо от утреннего напоминания.
 
 ## Чистая доставка (без cron-обёртки) — обязательно
 

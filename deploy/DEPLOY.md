@@ -564,3 +564,69 @@ bash /tmp/fix02/deploy/fix02_deploy.sh --rollback \
 Stage 5.3; backend `29/29/29`; morning exact `0 8 * * *`; watchdog exact;
 prayer timer active; шесть daily finite jobs без LLM; quiet-state 0600;
 health-alert не подавляется; rollback backup остаётся private.
+
+## imp12: SOUL diet + no-agent cron conversion + news top-3
+
+Цель — приблизить $35/мес к рамке $10–15 без потери смысла ответов. Три
+независимых изменения, один деплой.
+
+1. **SOUL.md.** Только текстовая правка, SHA пересчитывается как обычно
+   (см. «Deterministic profile prompt» выше). Права/установка не меняются.
+2. **Кроны → no_agent.** `mariyam_obligation_reminders` (`06_obligation_reminders.md`)
+   и `mariyam_admin_report_1930` (`07_admin_report.md`) переводятся с LLM-turn
+   на `no_agent=true` script:
+   `scripts/mariyam_obligation_reminders_cron.py`,
+   `scripts/mariyam_admin_report_cron.py` (устанавливаются в
+   `<profile>/scripts/`, рядом с `stage7_record_keyword_alert.py`). Оба
+   скрипта импортируют `backend.db`/`backend.config` напрямую (тот же код,
+   что и MCP tool), читают `DATABASE_URL`/`MARIYAM_BACKEND_ROOT` сперва из
+   унаследованного окружения, а если их там нет — сами разбирают
+   `<profile>/.env`. `.md`-промпты остаются в репозитории как справочный
+   контракт и путь мгновенного отката.
+
+   Процедура:
+
+   ```bash
+   hermes --profile mariyam_oyijon cron edit 668fbef5b5d5 \
+     --no-agent --script mariyam_obligation_reminders_cron.py
+   hermes --profile mariyam_oyijon cron edit 5c469d223c11 \
+     --no-agent --script mariyam_admin_report_cron.py
+   python3 /opt/hermes-mariyam/deploy/imp04_refresh_cron_fingerprints.py --apply
+   python3 /opt/hermes-mariyam/deploy/imp04_refresh_cron_fingerprints.py --check
+   ```
+
+   `--prompt` не трогать: `job_fingerprint_sha256`/`prompt_sha256` в приватной
+   cron-identity-карте для этих двух id пересчитываются наравне со всеми
+   trusted jobs, но перестают что-либо охранять — no-agent script не делает
+   MCP tool calls, поэтому identity guard этот job больше не видит. Запись в
+   карте не удаляется (не мешает, дешевле оставить одну систему источника
+   правды на id, чем чистить её отдельным шагом).
+
+   **Watchdog:** `deploy/watchdog/cron_watchdog_jobs.json` уменьшен с восьми
+   watched jobs до шести — `mariyam-cron-watchdog.py::_validate_production_job`
+   жёстко требует `script=null`/`no_agent=false` у каждого watched job (это
+   health-check LLM-хода, а не-agent job этому контракту не соответствует по
+   определению). `load_specs` теперь требует ровно 6, а не 8. Обязательство
+   напомнить Ойижон теряет +15-минутный авто-retry — сознательный размен:
+   сбой скрипта не должен превращаться в сырую английскую ошибку в её чате
+   (см. docstring обоих скриптов), а те же просроченные/предстоящие
+   обязательства всё равно приходят админу в отчёте 19:30 каждый день,
+   независимо от утреннего напоминания. Идентити-guard fingerprint drift
+   check (`check_fingerprints`, работает независимо от списка watched jobs)
+   продолжает покрывать оба id как раньше.
+3. **`get_daily_news` → топ-3.** `backend/external_data.py::MAX_NEWS_DIGEST_ITEMS
+   = 3` ограничивает только финальный список, отдаваемый модели за один вызов
+   `get_daily_news`; 30-минутный кэш (`_fetch_news`'s `unique[:20]`) не тронут,
+   поэтому повторный вызов с другой `topic`/`sources` в течение TTL всё ещё
+   фильтрует из полного набора. Backend-only правка, SOUL/cron не меняются.
+
+Деплой: приватный backup перед копированием (SOUL, оба новых script, watchdog
+config/script, `backend/external_data.py`), restart только
+`hermes-gateway-mariyam_oyijon.service` (обновляет SOUL/backend/scripts —
+backend работает как stdio child process гейтвея, отдельного рестарта не
+требует) и `systemctl --user daemon-reload` + restart
+`mariyam-cron-watchdog.timer` (подхватывает новый `cron_watchdog_jobs.json`).
+Fingerprint `--apply`→`--check` строго до рестарта gateway (см. «Cron identity»
+выше). Откат: `hermes cron edit <id> --agent` возвращает LLM-режим мгновенно
+(prompt никуда не делся), затем `imp04_refresh_cron_fingerprints.py --apply`
+и вернуть `cron_watchdog_jobs.json`/`mariyam-cron-watchdog.py` из backup.

@@ -90,8 +90,11 @@ def _job(
 
 
 def test_watchdog_config_covers_exact_critical_jobs():
+    # imp12-opus: mariyam_obligation_reminders and mariyam_admin_report_1930
+    # moved to no_agent scripts and dropped out of this LLM-turn-health list
+    # (see the watchdog module docstring) — six remain, not eight.
     specs = watchdog.load_specs(CONFIG_PATH)
-    assert len(specs) == 8
+    assert len(specs) == 6
     assert {item.name for item in specs} == {
         "mariyam_plan_25_draft",
         "mariyam_plan_27_reminder",
@@ -99,10 +102,22 @@ def test_watchdog_config_covers_exact_critical_jobs():
         "mariyam_plan_01a_auto",
         "mariyam_plan_01b_fallback",
         "mariyam_daily_morning",
-        "mariyam_obligation_reminders",
-        "mariyam_admin_report_1930",
     }
     assert all(item.grace_minutes == 15 for item in specs)
+
+
+def test_no_agent_jobs_would_be_rejected_by_the_llm_health_validator():
+    """Documents *why* the two jobs above had to leave this watchdog: a
+    no_agent job fails `_validate_production_job`'s trusted-shape check by
+    design (script is not None / no_agent is not False)."""
+    spec = watchdog.JobSpec("obligations", "15 9 * * *", 15, 360)
+    job = _job("c" * 12, spec.name, spec.schedule, None, None)
+    job["script"] = "mariyam_obligation_reminders_cron.py"
+    job["no_agent"] = True
+    import pytest
+
+    with pytest.raises(RuntimeError, match="trusted job definition mismatch"):
+        watchdog._validate_production_job(job, spec, {job["id"]})
 
 
 def test_successful_tick_is_silent_and_never_retried(tmp_path):

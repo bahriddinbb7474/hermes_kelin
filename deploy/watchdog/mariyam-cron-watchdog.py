@@ -7,6 +7,20 @@ bot to another Telegram account — is silently refused by the identity guard:
 the job still runs and still delivers, only without its data. Nothing in the
 run looks failed, so the retry logic above cannot see it. The drift check is
 what makes that visible within one timer tick instead of one day.
+
+imp12-opus: six watched jobs, not eight. `mariyam_obligation_reminders` and
+`mariyam_admin_report_1930` moved to `no_agent=true` scripts and were removed
+from `cron_watchdog_jobs.json` — `_validate_production_job` below hard-requires
+`script is None` and `no_agent is False` for every watched job (this is an
+LLM-turn health check: "did the model run and call its tools", which does not
+apply once there is no model or tool call). The identity-guard fingerprint
+drift check (`check_fingerprints`, unconditional at the end of `main`) still
+covers both jobs exactly as before: nothing about their trusted mapping entry
+changed. Losing the +15-minute auto-retry for these two specifically trades
+guaranteed delivery for never risking a raw error string reaching Oyijon's
+chat (see `mariyam_obligation_reminders_cron.py`'s docstring); the admin
+report's own numbers (including due/overdue obligations) still arrive
+independently every evening, so a missed 09:15 reminder is not invisible.
 """
 
 from __future__ import annotations
@@ -90,8 +104,8 @@ def load_specs(path: Path) -> list[JobSpec]:
         _parse_fixed_schedule(spec.schedule)
         names.add(spec.name)
         specs.append(spec)
-    if len(specs) != 8:
-        raise RuntimeError("watchdog must cover exactly eight critical jobs")
+    if len(specs) != 6:
+        raise RuntimeError("watchdog must cover exactly six critical jobs")
     return specs
 
 

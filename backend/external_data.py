@@ -34,6 +34,13 @@ MAX_REDIRECTS = 5
 # and updates through the day (Euronews itself advertises <ttl>30</ttl>).
 # Weather and prayer times keep the daily contract (imp09 §1a).
 NEWS_CACHE_TTL_SECONDS = 30 * 60
+# imp12-opus: the model only ever picks 1-2 items per NEWS_SELECTION_NOTE
+# below; the previous cap of 20 candidates per get_daily_news() call cost
+# ~2 500 extra tokens/turn for items nobody used. The 30-minute cache itself
+# still keeps up to 20 unique items (_fetch_news's own cap) so a later call
+# with a different topic/source selection still has enough to filter from —
+# only the final per-call digest handed to the model is capped here.
+MAX_NEWS_DIGEST_ITEMS = 3
 _FETCH_LOCKS: dict = {}
 NEWS_SELECTION_NOTE = (
     "Hermes must choose 1–2 calm items close to Oyijon's interests, "
@@ -920,5 +927,5 @@ async def get_daily_news(
         ]
     result["selected_sources"] = selected
     result["selected_topic"] = selected_topic
-    result["candidates"] = candidates[:20]
+    result["candidates"] = candidates[:MAX_NEWS_DIGEST_ITEMS]
     return result
